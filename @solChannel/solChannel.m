@@ -13,6 +13,7 @@ classdef solChannel < handle
       filt
       spikes
       stim
+      Index
    end
    
    methods
@@ -23,6 +24,7 @@ classdef solChannel < handle
             cfg.default('spacing') + cfg.default('offset');
          obj.Impedance = info.electrode_impedance_magnitude / 1000;
          obj.Name = info.custom_channel_name;
+         obj.Index = (info.native_order+1) + (info.port_number-1)*32;
          
          subf = cfg.default('subf');
          id = cfg.default('id');
@@ -122,7 +124,7 @@ classdef solChannel < handle
          
          for ii = 1:numel(obj)
             in = load(obj(ii).stim,'data');
-            if sum(in.data) > 0
+            if sum(abs(in.data)) > 0
                data = find(in.data > 0);
                ts = data([true, diff(data)>1]);
                in = load(obj(ii).stim,'fs');
@@ -183,6 +185,21 @@ classdef solChannel < handle
                  ones(1,2) * obj.Parent.Solenoid_Offset_Latency(ii) * 1e3];
             
             patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
+         end
+         
+         if  ismember(obj.Index,obj.Parent.ICMS_Channel)
+            for ii = 1:numel(obj.Parent.Solenoid_Onset_Latency)
+               a = obj.Parent.Solenoid_Onset_Latency(ii);
+               b = obj.Parent.Solenoid_Offset_Latency(ii);
+               m = (a + b)/2;
+               
+               x = [m a b m];
+               
+               yb = max(binCounts + 10);
+               y = [yb yb+10 yb+10 yb];
+
+               patch(x,y,'m','EdgeColor','r');
+            end
          end
          
          title(obj.Name,'FontName','Arial','FontSize',16,'Color','k');

@@ -34,6 +34,22 @@ classdef solRat < handle
                solBlock(obj,fullfile(F(iF).folder,F(iF).name))];
          end
       end
+      
+      function solBlockObj = Block(obj,Index)
+         % Add error parsing for indexing
+         if Index > (numel(obj.Children)+1)
+            error('Index (%d) is too large for %s.',Index,obj.Name);
+         end
+         if Index < 0
+            error('Index (%d) cannot be negative.',Index);
+         end
+         if isnan(Index)
+            error('Index is NaN. Did something else go wrong?');
+         end
+         
+         idx = find([obj.Children.Index] == Index,1,'first');
+         solBlockObj = obj.Children(idx);
+      end
    end
    
 end

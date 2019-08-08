@@ -9,6 +9,7 @@ classdef solBlock < handle
       Name
       Parent
       Children
+      Index
       fs
    end
    
@@ -48,6 +49,8 @@ classdef solBlock < handle
          
          name = strsplit(obj.folder,filesep);
          obj.Name = name{end};
+         tag = strsplit(obj.Name,'_');
+         obj.Index = str2double(tag{end});
          
          %% Get all the channels
          subf = cfg.default('subf');
