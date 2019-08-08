@@ -12,7 +12,7 @@ classdef solChannel < handle
       raw
       filt
       spikes
-      stim      
+      stim
    end
    
    methods
@@ -41,16 +41,16 @@ classdef solChannel < handle
             info.native_order));
       end
       
-      function data = getRaw(obj,ch,vec)         
+      function data = getRaw(obj,ch,vec)
          if nargin < 2
             ch = 1:numel(obj);
          end
          if nargin < 3
             vec = inf;
-         end  
+         end
          
          if numel(obj) > 1
-                      
+            
             data = [];
             for ii = 1:numel(ch)
                data = [data; getRaw(obj(ch(ii)),ch(ii),vec)]; %#ok<*AGROW>
@@ -66,15 +66,15 @@ classdef solChannel < handle
          end
       end
       
-      function data = getFilt(obj,ch,vec)         
+      function data = getFilt(obj,ch,vec)
          if nargin < 2
             ch = 1:numel(obj);
          end
          if nargin < 3
             vec = inf;
-         end     
+         end
          if numel(obj) > 1
-                   
+            
             data = [];
             for ii = 1:numel(ch)
                data = [data; getFilt(obj(ch(ii)),ch(ii),vec)];
@@ -90,15 +90,15 @@ classdef solChannel < handle
          end
       end
       
-      function data = getSpikes(obj,ch,type)         
+      function data = getSpikes(obj,ch,type)
          if nargin < 2
             ch = 1:numel(obj);
          end
          if nargin < 3
             type = 'ts';
-         end 
+         end
          if numel(obj) > 1
-                       
+            
             data = cell(numel(ch),1);
             for ii = 1:numel(ch)
                data{ii} = getSpikes(obj(ch(ii)),ch(ii),type);
@@ -118,7 +118,7 @@ classdef solChannel < handle
          
       end
       
-      function [ts,stimCh] = getStims(obj)         
+      function [ts,stimCh] = getStims(obj)
          
          for ii = 1:numel(obj)
             in = load(obj(ii).stim,'data');
@@ -134,6 +134,60 @@ classdef solChannel < handle
          
          ts = [];
          stimCh = nan;
+      end
+      
+      function fig = PETH(obj,edges,ii)
+         if nargin < 3
+            ii = 1;
+         end
+         if numel(obj) > 1
+            fig = [];
+            for ii = 1:numel(obj)
+               fig = [fig; PETH(obj(ii),edges,ii)];
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Triggers)
+            fig = [];
+            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         tvec = edges(1:(end-1))+(mode(diff(edges))/2);
+         tSpike = getSpikes(obj);
+         binCounts = zeros(size(tvec));
+         col = cfg.default('barcols');
+         
+         for iT = 1:numel(obj.Parent.Triggers)
+            binCounts = binCounts + histcounts(tSpike-obj.Parent.Triggers(iT),edges);
+         end
+         
+         fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
+            'Color','w',...
+            'Units','Normalized',...
+            'Position',obj.Parent.getFigPos(ii));
+         bar(tvec*1e3,binCounts,1,...
+            'FaceColor',col{obj.Hemisphere},...
+            'EdgeColor','none');
+         hold on;
+         y = [0 max(binCounts + 10)];
+         for ii = 1:numel(obj.Parent.ICMS_Onset_Latency)
+            tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii) * 1e3;
+            line(tOnset,y,'Color','m','LineStyle','--','LineWidth',1.5);
+         end
+         
+         y = [0 max(binCounts + 10) max(binCounts + 10) 0];
+         for ii = 1:numel(obj.Parent.Solenoid_Onset_Latency)
+            x = [ones(1,2) * obj.Parent.Solenoid_Onset_Latency(ii) * 1e3, ...
+                 ones(1,2) * obj.Parent.Solenoid_Offset_Latency(ii) * 1e3];
+            
+            patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
+         end
+         
+         title(obj.Name,'FontName','Arial','FontSize',16,'Color','k');
+         xlabel('Time (ms)','FontName','Arial','FontSize',14,'Color','k');
+         ylabel('Count','FontName','Arial','FontSize',14,'Color','k');
       end
    end
    

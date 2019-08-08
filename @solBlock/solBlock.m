@@ -2,18 +2,23 @@ classdef solBlock < handle
    
    properties (Access = public)
       
-           
+      
    end
    
    properties (SetAccess = immutable)
       Name
       Parent
-      Children 
+      Children
       fs
    end
    
    properties (GetAccess = public, SetAccess = private, Hidden = false)
       Depth
+      Triggers
+      Solenoid_Onset_Latency
+      Solenoid_Offset_Latency
+      ICMS_Onset_Latency
+      ICMS_Channel
    end
    
    properties (GetAccess = public, SetAccess = private, Hidden = true)
@@ -72,6 +77,43 @@ classdef solBlock < handle
          obj.Depth = newDepth;
       end
       
+      function batchPETH(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = 0.002;
+         end
+         
+         if nargin < 3
+            tPost = 0.300;
+         end
+         
+         if nargin < 2
+            tPre = -0.150;
+         end
+         
+         edgeVec = tPre:binWidth:tPost;
+
+         subf = cfg.default('subf');
+         id = cfg.default('id');
+         
+         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
+         if exist(outpath,'dir')==0
+            mkdir(outpath);
+         end
+         
+         obj.parseStimuliTimes
+         
+         for ii = subset
+
+            f = PETH(obj.Children(ii),edgeVec,ii);
+            
+            savefig(f,fullfile(outpath,[block.Name '_' obj.Children(ii).Name id.peth '.fig']));
+            saveas(f,fullfile(outpath,[block.Name '_' obj.Children(ii).Name id.peth '.png']));
+            
+            delete(f);
+            
+         end
+      end
+      
       function fig = PETH(obj,tPre,tPost,binWidth,subset)
          if nargin < 5
             subset = 1:numel(obj.Children);
@@ -91,34 +133,13 @@ classdef solBlock < handle
             tPre = -0.150;
          end
          
-         tTrig = getTrigs(obj);
-         vec = tPre:binWidth:tPost;
-         tvec = vec(1:(end-1)) + binWidth/2;
+         obj.parseStimuliTimes;
          
-         fig = [];
-         col = cfg.default('barcols');
-         for ii = subset
-         
-            tSpike = getSpikes(obj.Children(ii));
-            binCounts = zeros(size(tvec));
-            for iT = 1:numel(tTrig)
-               binCounts = binCounts + histcounts(tSpike-tTrig(iT),vec);
-            end
-            f = figure('Name',sprintf('%s: %s PETH',obj.Name,obj.Children(ii).Name),...
-               'Color','w',...
-               'Units','Normalized',...
-               'Position',obj.getFigPos(ii));
-            bar(tvec*1e3,binCounts,1,...
-               'FaceColor',col{obj.Children(ii).Hemisphere},...
-               'EdgeColor','none');
-            title(obj.Children(ii).Name,'FontName','Arial','FontSize',16,'Color','k');
-            xlabel('Time (ms)','FontName','Arial','FontSize',14,'Color','k');
-            ylabel('Count','FontName','Arial','FontSize',14,'Color','k');            
-            fig = [fig; f]; %#ok<*AGROW>
-         end
+         edgeVec = tPre:binWidth:tPost;         
+         fig = PETH(obj.Children(subset),edgeVec);
          
       end
-
+      
       function pos = getFigPos(obj,ii)
          pos = cfg.default('figpos');
          scl = cfg.default('figscl');
@@ -135,32 +156,86 @@ classdef solBlock < handle
          
          data = find(in.data > 0);
          ts = data([true, diff(data) > 1]) ./ obj.fs;
+         obj.Triggers = ts;
       end
       
-      function ts = getSolOnset(obj)
+      function ts = getSolOnset(obj,db)
          in = load(obj.sol,'data');
          if sum(in.data) == 0
             ts = [];
             return;
          end
          
+         if nargin < 2
+            db = 1;
+         end
+         
          data = find(in.data > 0);
-         ts = data([true, diff(in.data) > 1]) ./ obj.fs;
+         ts = data([true, diff(data) > db]) ./ obj.fs;
       end
       
-      function ts = getSolOffset(obj)
+      function ts = getSolOffset(obj,db)
          in = load(obj.sol,'data');
          if sum(in.data) == 0
             ts = [];
             return;
          end
          
+         if nargin < 2
+            db = 1; % Default of no debounce
+         end
+         
          data = find(in.data > 0);
-         ts = data([diff(in.data) > 1, true]) ./ obj.fs;
+         ts = data([diff(data) > db, true]) ./ obj.fs;
       end
-
-            
+      
+      function parseStimuliTimes(obj)
+         % Get triggers
+         if isempty(obj.Triggers)
+            obj.getTrigs;
+         else
+            return; % Otherwise it was already done
+         end
+         tTrig = obj.Triggers;
+         
+         % Get solenoid stim duration
+         tSolOnset = obj.getSolOnset(obj.fs/4);
+         tSolOnsetAll = obj.getSolOnset;
+         if isempty(tSolOnsetAll)
+            obj.Solenoid_Onset_Latency = nan;
+         else
+            nTrain = round(numel(tSolOnsetAll)/numel(tSolOnset));
+            obj.Solenoid_Onset_Latency = nan(1,nTrain);
+            for ii = 1:nTrain
+               obj.Solenoid_Onset_Latency(ii) = tSolOnsetAll(ii) - tTrig(1);
+            end
+         end
+         
+         tSolOffset = obj.getSolOffset(obj.fs/4);
+         tSolOffsetAll = obj.getSolOffset;
+         if isempty(tSolOffsetAll)
+            obj.Solenoid_Offset_Latency = nan;
+         else
+            nTrain = round(numel(tSolOffsetAll)/numel(tSolOffset));
+            obj.Solenoid_Offset_Latency = nan(1,nTrain);
+            for ii = 1:nTrain
+               obj.Solenoid_Offset_Latency(ii) = tSolOffsetAll(ii) - tTrig(1);
+            end
+         end
+         
+         % Get ICMS info
+         [tStim,obj.ICMS_Channel] = getStims(obj.Children);
+         if isempty(tStim)
+            obj.ICMS_Onset_Latency = nan;
+         else
+            nTrain = round(numel(tStim)/numel(tTrig));
+            obj.ICMS_Onset_Latency = nan(1,nTrain);
+            for ii = 1:nTrain
+               obj.ICMS_Onset_Latency(ii) = tStim(ii) - tTrig(1);
+            end
+         end
+      end
    end
-
+   
    
 end
