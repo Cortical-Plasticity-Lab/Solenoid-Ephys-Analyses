@@ -122,30 +122,36 @@ classdef solChannel < handle
       
       function [ts,stimCh] = getStims(obj)
          
+         stimCh = [];
+         ts = [];
+         
          for ii = 1:numel(obj)
             in = load(obj(ii).stim,'data');
             if sum(abs(in.data)) > 0
-               data = find(in.data > 0);
-               ts = data([true, diff(data)>1]);
+               data = find(abs(in.data) > 0);
+               t = data([true, diff(data)>1]);
                in = load(obj(ii).stim,'fs');
-               ts = ts ./ in.fs;
-               stimCh = ii;
-               return;
+               ts = [ts; t ./ in.fs];
+               stimCh = [stimCh,ii];
             end
          end
          
-         ts = [];
-         stimCh = nan;
+         if isempty(stimCh)
+            stimCh = nan;
+         end
       end
       
-      function fig = PETH(obj,edges,ii)
+      function fig = PETH(obj,edges,ii,makeNewFig)
+         if nargin < 4
+            makeNewFig = true;
+         end
          if nargin < 3
             ii = 1;
          end
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; PETH(obj(ii),edges,ii)];
+               fig = [fig; PETH(obj(ii),edges,ii,makeNewFig)];
             end
             return;
          end
@@ -165,18 +171,29 @@ classdef solChannel < handle
             binCounts = binCounts + histcounts(tSpike-obj.Parent.Triggers(iT),edges);
          end
          
-         fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
-            'Color','w',...
-            'Units','Normalized',...
-            'Position',obj.Parent.getFigPos(ii));
+         if makeNewFig
+            fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+         end
+         
+         
          bar(tvec*1e3,binCounts,1,...
             'FaceColor',col{obj.Hemisphere},...
             'EdgeColor','none');
          hold on;
          y = [0 max(binCounts + 10)];
-         for ii = 1:numel(obj.Parent.ICMS_Onset_Latency)
-            tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii) * 1e3;
-            line(tOnset,y,'Color','m','LineStyle','--','LineWidth',1.5);
+
+         for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
+            for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
+               tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
+               if obj.Parent.ICMS_Channel_Index(ik) == obj.Index
+                  line(tOnset,y,'Color','m','LineStyle','-','LineWidth',2);
+               else
+                  line(tOnset,y,'Color','m','LineStyle','--','LineWidth',1.5);
+               end
+            end
          end
          
          y = [0 max(binCounts + 10) max(binCounts + 10) 0];
@@ -187,20 +204,14 @@ classdef solChannel < handle
             patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
          end
          
-         if  ismember(obj.Index,obj.Parent.ICMS_Channel)
-            for ii = 1:numel(obj.Parent.Solenoid_Onset_Latency)
-               a = obj.Parent.Solenoid_Onset_Latency(ii);
-               b = obj.Parent.Solenoid_Offset_Latency(ii);
-               m = (a + b)/2;
-               
-               x = [m a b m];
-               
-               yb = max(binCounts + 10);
-               y = [yb yb+10 yb+10 yb];
+         if  ismember(obj.Index,obj.Parent.ICMS_Channel_Index)
+%             scatter(obj.Parent.ICMS_Onset_Latency*1e3,max(binCounts+20),40,'m','filled');
+            set(gca,'Color','y');
 
-               patch(x,y,'m','EdgeColor','r');
-            end
          end
+         
+         xlim(cfg.default('xlimit'));
+         ylim(cfg.default('ylimit'));
          
          title(obj.Name,'FontName','Arial','FontSize',16,'Color','k');
          xlabel('Time (ms)','FontName','Arial','FontSize',14,'Color','k');

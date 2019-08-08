@@ -51,6 +51,13 @@ out.figpos = [0.15 0.15 0.3 0.3];
 out.figscl = 0.4; % how much to move across screen
 out.barcols = {[0.8 0.2 0.2];[0.2 0.2 0.8]};
 
+% Default PETH parameters
+out.tpre = -0.100;
+out.tpost = 0.500;
+out.binwidth = 0.002;
+out.ylimit = [0 200];
+out.xlimit = [-100 500];
+
 %%
 if nargin > 0
    if isfield(out,paramName)

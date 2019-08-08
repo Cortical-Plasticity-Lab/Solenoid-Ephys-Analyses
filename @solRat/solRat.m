@@ -50,6 +50,38 @@ classdef solRat < handle
          idx = find([obj.Children.Index] == Index,1,'first');
          solBlockObj = obj.Children(idx);
       end
+      
+      function batchPETH(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         batchPETH(obj.Children,tPre,tPost,binWidth);
+      end
+      
+      function batchProbePETH(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         batchProbePETH(obj.Children,tPre,tPost,binWidth,true);
+      end
    end
    
 end

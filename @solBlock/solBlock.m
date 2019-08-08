@@ -19,7 +19,7 @@ classdef solBlock < handle
       Solenoid_Onset_Latency
       Solenoid_Offset_Latency
       ICMS_Onset_Latency
-      ICMS_Channel
+      ICMS_Channel_Name
    end
    
    properties (GetAccess = public, SetAccess = private, Hidden = true)
@@ -27,6 +27,8 @@ classdef solBlock < handle
       
       sol
       trig
+      
+      ICMS_Channel_Index
    end
    
    methods (Access = public)
@@ -73,6 +75,8 @@ classdef solBlock < handle
          obj.trig = fullfile(obj.folder,[obj.Name subf.dig],...
             [obj.Name id.trig]);
          
+         obj.parseStimuliTimes;
+         
       end
       
       % Set the depth manually (after object creation)
@@ -80,17 +84,32 @@ classdef solBlock < handle
          obj.Depth = newDepth;
       end
       
-      function batchPETH(obj,tPre,tPost,binWidth)
+      function batchPETH(obj,tPre,tPost,binWidth,subset)
          if nargin < 4
-            binWidth = 0.002;
+            binWidth = cfg.default('binwidth');
          end
          
          if nargin < 3
-            tPost = 0.300;
+            tPost = cfg.default('tpost');
          end
          
          if nargin < 2
-            tPre = -0.150;
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               if nargin < 5
+                  batchPETH(obj(ii),tPre,tPost,binWidth);
+               else
+                  batchPETH(obj(ii),tPre,tPost,binWidth,subset);
+               end
+            end
+            return;
+         end
+         
+         if nargin < 5
+            subset = 1:numel(obj.Children);
          end
          
          edgeVec = tPre:binWidth:tPost;
@@ -109,12 +128,85 @@ classdef solBlock < handle
 
             f = PETH(obj.Children(ii),edgeVec,ii);
             
-            savefig(f,fullfile(outpath,[block.Name '_' obj.Children(ii).Name id.peth '.fig']));
-            saveas(f,fullfile(outpath,[block.Name '_' obj.Children(ii).Name id.peth '.png']));
+            savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name id.peth '.fig']));
+            saveas(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name id.peth '.png']));
             
             delete(f);
             
          end
+      end
+      
+      function probePETH(obj,tPre,tPost,binWidth,batchRun)
+         if nargin < 5
+            batchRun = false;
+         end
+         
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               probePETH(obj(ii),tPre,tPost,binWidth,batchRun);
+            end
+            return;
+         end
+         
+         edgeVec = tPre:binWidth:tPost;   
+         
+         lFig = figure('Name',sprintf('%s - Left Hemisphere PETH',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.4 0.8],...
+            'Color','w');
+         
+         layout = cfg.default('L');
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},layout{ii}),1,'first');
+            subplot(8,4,ii);
+            PETH(c(idx),edgeVec,1,false);
+         end
+         suptitle('Left Hemisphere');
+         
+         rFig = figure('Name',sprintf('%s - Right Hemisphere PETH',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.5 0.1 0.4 0.8],...
+            'Color','w');
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},layout{ii}),1,'first');
+            subplot(8,4,ii);
+            PETH(c(idx),edgeVec,1,false);
+         end
+         suptitle('Right Hemisphere');
+         
+         if batchRun
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+            
+            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probepeth);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(lFig,fullfile(outpath,[obj.Name id.probepeth '-L.fig']));
+            savefig(rFig,fullfile(outpath,[obj.Name id.probepeth '-R.fig']));
+            saveas(lFig,fullfile(outpath,[obj.Name id.probepeth '-L.png']));
+            saveas(rFig,fullfile(outpath,[obj.Name id.probepeth '-R.png']));
+            delete(lFig);
+            delete(rFig);
+         end
+         
       end
       
       function fig = PETH(obj,tPre,tPost,binWidth,subset)
@@ -125,15 +217,15 @@ classdef solBlock < handle
          end
          
          if nargin < 4
-            binWidth = 0.002;
+            binWidth = cfg.default('binwidth');
          end
          
          if nargin < 3
-            tPost = 0.300;
+            tPost = cfg.default('tpost');
          end
          
          if nargin < 2
-            tPre = -0.150;
+            tPre = cfg.default('tpre');
          end
          
          obj.parseStimuliTimes;
@@ -227,14 +319,22 @@ classdef solBlock < handle
          end
          
          % Get ICMS info
-         [tStim,obj.ICMS_Channel] = getStims(obj.Children);
+         [tStim,obj.ICMS_Channel_Index] = getStims(obj.Children);
+         if isnan(obj.ICMS_Channel_Index)
+            obj.ICMS_Channel_Name = 'none';
+         else
+            obj.ICMS_Channel_Name = {obj.Children(obj.ICMS_Channel_Index).Name};
+         end
+         
          if isempty(tStim)
             obj.ICMS_Onset_Latency = nan;
          else
-            nTrain = round(numel(tStim)/numel(tTrig));
-            obj.ICMS_Onset_Latency = nan(1,nTrain);
+            nTrain = round(size(tStim,2)/numel(tTrig));
+            obj.ICMS_Onset_Latency = nan(nTrain,size(tStim,1));
             for ii = 1:nTrain
-               obj.ICMS_Onset_Latency(ii) = tStim(ii) - tTrig(1);
+               for ik = 1:size(tStim,1)
+                  obj.ICMS_Onset_Latency(ii,ik) = tStim(ik,ii) - tTrig(1);
+               end
             end
          end
       end
