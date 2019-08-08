@@ -1,0 +1,59 @@
+function out = default(paramName)
+%% DEFAULT  Return defaults struct or a single field of struct
+%
+%  out = cfg.DEFAULT(); % returns defaults struct
+%  out = cfg.DEFAULT(paramName);  % returns only field specified by
+%                                 % paramName
+%
+% By: Max Murphy  v1.0  2019-08-06  Original version (R2017a)
+
+%%
+out = struct;
+out.path = 'P:\Rat\RegionSpecificity';
+
+out.subf = struct('raw','_RawData',...
+                  'filt','_FilteredCAR',...
+                  'spikes','_wav-sneo_CAR_Spikes',...
+                  'dig','_Digital',...
+                  'stim','STIM_DATA');
+               
+out.id = struct('trig','_DIG_trigIn.mat',...
+                'sol','_DIG_solenoidOut.mat',...
+                'info','_RawWave_Info.mat',...
+                'raw','Raw_P',...
+                'filt','FiltCAR_P',...
+                'spikes','ptrain_P',...
+                'stim','STIM_P',...
+                'gen','_GenInfo.mat');
+
+out.L = {  '019','021','000','029',...
+           '009','016','005','003',...
+           '014','010','001','004',...
+           '013','011','026','002',...
+           '012','023','031','028',...
+           '018','015','007','006',...
+           '017','008','025','027',...
+           '022','020','024','030'};
+
+% Probe depth parameters
+out.offset =  -50;
+out.spacing = -100;
+out.nshank = 4;
+out.depth = -500;
+
+% Default figure position
+out.figpos = [0.15 0.15 0.3 0.3];
+out.figscl = 0.4; % how much to move across screen
+out.barcols = {[0.8 0.2 0.2];[0.2 0.2 0.8]};
+
+%%
+if nargin > 0
+   if isfield(out,paramName)
+      out = out.(paramName);
+   else
+      fprintf(1,'Invalid field: %s\n->\tFull defaults struct returned.\n',paramName);
+   end
+end
+
+
+end
