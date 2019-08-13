@@ -29,6 +29,7 @@ classdef solBlock < handle
       trig
       
       ICMS_Channel_Index
+      Layout
    end
    
    methods (Access = public)
@@ -57,6 +58,10 @@ classdef solBlock < handle
          %% Get all the channels
          subf = cfg.default('subf');
          id = cfg.default('id');
+         obj.setLayout;
+         
+         in = load(fullfile(obj.folder,[obj.Name id.gen]),'info');
+         obj.fs = in.info.frequency_pars.amplifier_sample_rate;
          
          in = load(fullfile(obj.folder,[obj.Name subf.raw],[obj.Name id.info]));
          for iCh = 1:numel(in.RW_info)
@@ -67,8 +72,7 @@ classdef solBlock < handle
          obj.Depth = cfg.default('depth'); % depth in microns of highest channel
          
          %% Get other metadata
-         in = load(fullfile(obj.folder,[obj.Name id.gen]),'info');
-         obj.fs = in.info.frequency_pars.amplifier_sample_rate;
+         
          
          obj.sol = fullfile(obj.folder,[obj.Name subf.dig],...
             [obj.Name id.sol]);
@@ -77,11 +81,26 @@ classdef solBlock < handle
          
          obj.parseStimuliTimes;
          
+         
       end
       
       % Set the depth manually (after object creation)
       function setDepth(obj,newDepth)
          obj.Depth = newDepth;
+      end
+      
+      % Set the site layout pattern
+      function setLayout(obj,L)
+         if nargin < 2
+            L = cfg.default('L');
+         end
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).setLayout(L);
+            end
+            return;
+         end
+         obj.Layout = L;         
       end
       
       function batchPETH(obj,tPre,tPost,binWidth,subset)
@@ -167,12 +186,14 @@ classdef solBlock < handle
             'Position',[0.1 0.1 0.4 0.8],...
             'Color','w');
          
-         layout = cfg.default('L');
-         
+         if isempty(obj.Layout) % If no Layout, use default from config
+            obj.setLayout;
+         end
+           
          c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
          for ii = 1:numel(c)
-            idx = find(contains({c.Name},layout{ii}),1,'first');
-            subplot(8,4,ii);
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
             PETH(c(idx),edgeVec,1,false);
          end
          suptitle('Left Hemisphere');
@@ -184,8 +205,8 @@ classdef solBlock < handle
          
          c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
          for ii = 1:numel(c)
-            idx = find(contains({c.Name},layout{ii}),1,'first');
-            subplot(8,4,ii);
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
             PETH(c(idx),edgeVec,1,false);
          end
          suptitle('Right Hemisphere');
@@ -194,7 +215,7 @@ classdef solBlock < handle
             subf = cfg.default('subf');
             id = cfg.default('id');
             
-            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probepeth);
+            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
             if exist(outpath,'dir')==0
                mkdir(outpath);
             end
@@ -232,6 +253,288 @@ classdef solBlock < handle
          
          edgeVec = tPre:binWidth:tPost;         
          fig = PETH(obj.Children(subset),edgeVec);
+         
+      end
+      
+      function probeLFPcoherence(obj,tPre,tPost)
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               probeLFPcoherence(obj(ii),tPre,tPost);
+            end
+            return;
+         end
+         
+         subf = cfg.default('subf');
+         id = cfg.default('id');
+         
+%          outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots,subf.lfpcoh);
+         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
+         if exist(outpath,'dir')==0
+            mkdir(outpath);
+         end
+         
+         
+         if isempty(obj.Triggers)
+            fprintf(1,'Trigger times not yet parsed for %s.\n',obj.Name,obj.Name);
+            return;
+         end
+         
+         
+         if isempty(obj.Layout) % If no Layout, use default from config
+            obj.setLayout;
+         end
+         
+         tpre = tPre * 1e3;
+         tpost = tPost * 1e3;
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
+         fs = c(1).fs_d;
+         t = tPre:(1/fs):tPost;
+         t = t(1:(end-1)) + mode(diff(t)/2);
+         x = zeros(size(t));
+         for ii = 1:numel(c)
+            X = c(ii);
+            x = x + mean(getAlignedLFP(X),1); 
+%             t = linspace(tpre,tpost,numel(x));
+%             fig = figure('Name',sprintf('%s - %s Left Hemisphere Coherence',obj.Name,X.Name),...
+%                'Units','Normalized',...
+%                'Position',[0.1 0.1 0.4 0.8],...
+%                'Color','w');
+%             for ik = 1:numel(c)
+%                y = mean(getAlignedLFP(c(ik)),1);
+%                idx = find(contains({c.Name},obj.Layout{ik}),1,'first');
+%                subplot(round(numel(obj.Layout)/4),4,ik);
+%                wcoherence(x,y,X.fs_d,'PhaseDisplayThreshold',0.8);
+%                xl = str2double(get(gca,'XTickLabel'));
+%                xl = xl + min(t);
+%                xl = reshape(xl,numel(xl),1);
+%                set(gca,'XTickLabel',cellstr(num2str(xl)));
+%             end
+%             suptitle('Left Hemisphere');
+%             savefig(fig,fullfile(outpath,[obj.Name id.lfpcoh '-' X.Name '-L.fig']));
+%             saveas(fig,fullfile(outpath,[obj.Name id.lfpcoh '-' X.Name '-L.png']));
+%             delete(fig);
+         end
+         x = x ./ numel(c);
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         y = zeros(size(t));
+         for ii = 1:numel(c)
+            Y = c(ii);
+            y = y + mean(getAlignedLFP(Y),1); 
+            
+%             X = c(ii);
+%             x = mean(getAlignedLFP(X),1); 
+%             t = linspace(tpre,tpost,numel(x));
+%             fig = figure('Name',sprintf('%s - %s Right Hemisphere Coherence',obj.Name,X.Name),...
+%                'Units','Normalized',...
+%                'Position',[0.1 0.1 0.4 0.8],...
+%                'Color','w');
+%             for ik = 1:numel(c)
+%                y = mean(getAlignedLFP(c(ik)),1);
+%                idx = find(contains({c.Name},obj.Layout{ik}),1,'first');
+%                subplot(round(numel(obj.Layout)/4),4,ik);
+%                wcoherence(x,y,X.fs_d,'PhaseDisplayThreshold',0.8);
+%                xl = str2double(get(gca,'XTickLabel'));
+%                xl = xl + min(t);
+%                xl = reshape(xl,numel(xl),1);
+%                set(gca,'XTickLabel',cellstr(num2str(xl)));
+%             end
+%             suptitle('Right Hemisphere');
+%             savefig(fig,fullfile(outpath,[obj.Name id.lfpcoh '-' X.Name '-R.fig']));
+%             saveas(fig,fullfile(outpath,[obj.Name id.lfpcoh '-' X.Name '-R.png']));
+%             delete(fig);
+         end
+         y = y ./ numel(c);
+         
+         fig = figure(...
+            'Name',sprintf('%s Interhemispheric LFP Coherence',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.8 0.8],...
+            'Color','w');
+         
+         wcoherence(x,y,fs,'PhaseDisplayThreshold',0.8); %#ok<*PROPLC>
+         xl = str2double(get(gca,'XTickLabel'));
+         xl = xl + min(t)*1e3;
+         set(gca,'XTickLabel',cellstr(num2str(xl)));
+
+         title('Left-Right Hemisphere LFP Coherence',...
+            'FontName','Arial','Color','k','FontSize',16);
+         savefig(fig,fullfile(outpath,[obj.Name id.lfpcoh '.fig']));
+         saveas(fig,fullfile(outpath,[obj.Name id.lfpcoh '.png']));
+         delete(fig);
+
+      end
+      
+      function probeAvgLFPplot(obj,tPre,tPost,batchRun)
+         if nargin < 4
+            batchRun = false;
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               probeAvgLFPplot(obj(ii),tPre,tPost,batchRun);
+            end
+            return;
+         end
+         
+         edgeVec = [tPre,tPost];   
+         
+         lFig = figure('Name',sprintf('%s - Left Hemisphere Average LFP',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.4 0.8],...
+            'Color','w');
+         
+         if isempty(obj.Layout) % If no Layout, use default from config
+            obj.setLayout;
+         end
+           
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            avgLFPplot(c(idx),edgeVec,1,false);
+         end
+         suptitle('Left Hemisphere');
+         
+         rFig = figure('Name',sprintf('%s - Right Hemisphere Average LFP',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.5 0.1 0.4 0.8],...
+            'Color','w');
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            avgLFPplot(c(idx),edgeVec,1,false);
+         end
+         suptitle('Right Hemisphere');
+         
+         if batchRun
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+            
+            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(lFig,fullfile(outpath,[obj.Name id.probeavglfp '-L.fig']));
+            savefig(rFig,fullfile(outpath,[obj.Name id.probeavglfp '-R.fig']));
+            saveas(lFig,fullfile(outpath,[obj.Name id.probeavglfp '-L.png']));
+            saveas(rFig,fullfile(outpath,[obj.Name id.probeavglfp '-R.png']));
+            delete(lFig);
+            delete(rFig);
+         end
+         
+      end
+      
+      function probeAvgIFRplot(obj,tPre,tPost,batchRun)
+         if nargin < 4
+            batchRun = false;
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               probeAvgIFRplot(obj(ii),tPre,tPost,batchRun);
+            end
+            return;
+         end
+         
+         edgeVec = [tPre,tPost];   
+         
+         lFig = figure('Name',sprintf('%s - Left Hemisphere Average IFR',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.4 0.8],...
+            'Color','w');
+         
+         if isempty(obj.Layout) % If no Layout, use default from config
+            obj.setLayout;
+         end
+           
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            avgIFRplot(c(idx),edgeVec,1,false);
+         end
+         suptitle('Left Hemisphere');
+         
+         rFig = figure('Name',sprintf('%s - Right Hemisphere Average IFR',obj.Name),...
+            'Units','Normalized',...
+            'Position',[0.5 0.1 0.4 0.8],...
+            'Color','w');
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            avgIFRplot(c(idx),edgeVec,1,false);
+         end
+         suptitle('Right Hemisphere');
+         
+         if batchRun
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+            
+            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(lFig,fullfile(outpath,[obj.Name id.probeavgifr '-L.fig']));
+            savefig(rFig,fullfile(outpath,[obj.Name id.probeavgifr '-R.fig']));
+            saveas(lFig,fullfile(outpath,[obj.Name id.probeavgifr '-L.png']));
+            saveas(rFig,fullfile(outpath,[obj.Name id.probeavgifr '-R.png']));
+            delete(lFig);
+            delete(rFig);
+         end
+
+      end
+      
+      function fig = avgLFPplot(obj,tPre,tPost,subset)
+         if nargin < 4
+            subset = 1:numel(obj.Children);
+         else
+            subset = reshape(subset,1,numel(subset));
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         obj.parseStimuliTimes;
+         
+         edgeVec = [tPre,tPost];        
+         fig = avgLFPplot(obj.Children(subset),edgeVec);
          
       end
       
@@ -284,9 +587,21 @@ classdef solBlock < handle
          ts = data([diff(data) > db, true]) ./ obj.fs;
       end
       
-      function parseStimuliTimes(obj)
+      function parseStimuliTimes(obj,forceParse)
+         if nargin < 2
+            forceParse = false;
+         end
+         
+         % Parse array input
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).parseStimuliTimes(forceParse);
+            end
+            return;
+         end
+         
          % Get triggers
-         if isempty(obj.Triggers)
+         if isempty(obj.Triggers) || forceParse
             obj.getTrigs;
          else
             return; % Otherwise it was already done

@@ -80,7 +80,55 @@ classdef solRat < handle
             tPre = cfg.default('tpre');
          end
          
-         batchProbePETH(obj.Children,tPre,tPost,binWidth,true);
+         probePETH(obj.Children,tPre,tPost,binWidth,true);
+      end
+      
+      function batchProbeAvgLFPplot(obj,tPre,tPost)
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         probeAvgLFPplot(obj.Children,tPre,tPost,true);
+      end
+      
+      function batchProbeAvgIFRplot(obj,tPre,tPost)
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         probeAvgIFRplot(obj.Children,tPre,tPost,true);
+      end
+      
+      function batchLFPcoherence(obj,tPre,tPost)
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         probeLFPcoherence(obj.Children,tPre,tPost);
+      end
+      
+      function parseStimuliTimes(obj)
+         % If called at "Rat" level, force parsing for all BLOCK times
+         parseStimuliTimes(obj.Children,true);
+      end
+      
+      function setLayout(obj,L)
+         if nargin < 2
+            L = cfg.default('L');
+         end
+         setLayout(obj.Children,L);
       end
    end
    
