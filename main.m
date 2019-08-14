@@ -3,11 +3,11 @@ clear; clc;
 TANK = 'P:\Rat\RegionSpecificity';
 RAT = {...'R19-85';
        ...'R19-87';
-       'R19-94';
-       'R19-101';
-       'R19-104';
-       'R19-146';
-       'R19-147';
+       ...'R19-94';
+       ...'R19-101';
+       ...'R19-104';
+       ...'R19-146';
+       ...'R19-147';
        'R19-159';
        'R19-160'};
 
@@ -18,6 +18,7 @@ for ii = 1:numel(RAT)
    r = solRat(fullfile(TANK,RAT{ii}));
    batchProbePETH(r);
    batchProbeAvgLFPplot(r);
+   batchProbeAvgIFRplot(r);
    batchLFPcoherence(r);
    save([RAT{ii} '.mat'],'r','-v7.3');
    

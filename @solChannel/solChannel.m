@@ -169,7 +169,7 @@ classdef solChannel < handle
          end
          
          obj.getfs_d;
-         
+         in = load(obj.ds,'data');
          if nargout > 1
             t = (0:(numel(in.data)-1))/obj.fs_d;
          end
@@ -185,7 +185,7 @@ classdef solChannel < handle
       end
       
       function getfs_d(obj)
-         in = load(obj.ds,'data','fs');
+         in = load(obj.ds,'fs');
          obj.fs_d = in.fs;
       end
       
@@ -390,7 +390,7 @@ classdef solChannel < handle
             save(obj.rate,'data','fs','-v7.3');
             return;
          end
-         data(round(ts*obj.fs_d)) = 1;
+         data(min(max(round(ts*obj.fs_d),1),n)) = 1;
          data = utils.fastsmooth(data,W,obj.ifr.kernel,0);
          
          [pname,~,~] = fileparts(obj.rate);
@@ -400,16 +400,11 @@ classdef solChannel < handle
          save(obj.rate,'data','fs','-v7.3');
       end
       
-      function binCounts = getBinnedSpikes(obj,edges)
-         if nargin < 2
-            if isempty(obj.edges)
-               tpre = cfg.default('tpre');
-               tpost = cfg.default('tpost');
-               bw = cfg.default('binwidth');
-               obj.edges = tpre:bw:tpost;
-            end
-            edges = obj.edges;
+      function binCounts = getBinnedSpikes(obj,tPre,tPost,binWidth)
+         if nargin == 4
+            obj.setSpikeBinEdges(tPre,tPost,binWidth);
          end
+         edges = obj.getSpikeBinEdges;
          
          tSpike = getSpikes(obj);
          trigs = obj.getTrigs;
@@ -471,9 +466,12 @@ classdef solChannel < handle
          obj.addAxesLabels(gca,'Time (ms)','Count');
       end
       
-      function addStimulusMarkers(obj,ax,graphicsObj)
+      function addStimulusMarkers(obj,ax,graphicsObj,pct)
+         if nargin < 4
+            pct = 0.9;
+         end
          set(ax,'NextPlot','add');
-         y = 0.9 * get(ax,'YLim');
+         y = pct * get(ax,'YLim');
          for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
             for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
                tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
@@ -525,21 +523,16 @@ classdef solChannel < handle
       
       function [data,t] = getAlignedLFP(obj)
          data = getLFP(obj);
-         if isempty(obj.edges)
-%             error('%s: edges not yet set using any of the PETH methods.',obj.Name);
-            tpre = cfg.default('tpre');
-            tpost = cfg.default('tpost');
-            binwidth = cfg.default('binwidth');
-            obj.edges = tpre:binwidth:tpost;
-            edges = tpre:(1/obj.fs_d):tpost; %#ok<*PROP>
-         else
-            edges = obj.edges(1):(1/obj.fs_d):obj.edges(end);
-         end
+         edges = obj.getSpikeBinEdges; %#ok<*PROP>
          
          
          trigs = getTrigs(obj);
          trigs = reshape(round(trigs*obj.fs_d),numel(trigs),1);
-         tvec = edges(1:(end-1)) + mode(diff(edges))/2;
+         
+%          tvec = linspace(edges(1),edges(end),size(data,2));
+         
+         tvec = edges(1):(1/obj.fs_d):edges(end);
+         tvec = tvec(1:(end-1)) + mode(diff(tvec))/2;
          tvec = round(tvec*obj.fs_d);
          
          vec = tvec + trigs;
@@ -551,11 +544,11 @@ classdef solChannel < handle
          data = data(vec);
          
          if nargout > 1
-            t = vec * obj.fs_d;
+            t = tvec ./ obj.fs_d * 1e3; % output in ms
          end
       end
       
-      function fig = avgLFPplot(obj,edges,ii,makeNewFig)
+      function fig = avgLFPplot(obj,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
             return;
@@ -568,21 +561,16 @@ classdef solChannel < handle
             ii = 1;
          end
          if nargin < 2
-            if isempty(obj.edges)
-               error('%s: edges not yet set using any of the PETH methods.',obj.Name);
-            else
-               edges = [obj.edges(1),obj.edges(end)];
-            end
+            edges = obj.getSpikeBinEdges;
+            startStop = [edges(1), edges(end)];
          end
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; avgLFPplot(obj(ii),edges,ii,makeNewFig)];
+               fig = [fig; avgLFPplot(obj(ii),startStop,ii,makeNewFig)];
             end
             return;
          end
-         
-         
          
          if isempty(obj.Parent.Triggers)
             fig = [];
@@ -595,9 +583,9 @@ classdef solChannel < handle
             in = load(obj.ds,'fs');
             obj.fs_d = in.fs;
          end
-         lfp = obj.getAlignedLFP;
-         tvec = edges(1):(1/obj.fs_d):edges(2); % relative sample times
-         tvec = tvec(1:(end-1)) + mode(diff(tvec))/2;
+         
+         
+         [lfp,t] = obj.getAlignedLFP;
          
          if makeNewFig
             fig = figure('Name',sprintf('%s: %s average LFP',obj.Parent.Name,obj.Name),...
@@ -606,7 +594,6 @@ classdef solChannel < handle
                'Position',obj.Parent.getFigPos(ii));
          end
          
-         t = tvec * 1e3;
          mu = mean(lfp,1);
          sd = std(lfp,[],1) ./ sqrt(size(mu,1));
          
@@ -653,7 +640,7 @@ classdef solChannel < handle
          end
       end
       
-      function fig = avgIFRplot(obj,edges,ii,makeNewFig)
+      function fig = avgIFRplot(obj,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
             return;
@@ -666,17 +653,14 @@ classdef solChannel < handle
             ii = 1;
          end
          if nargin < 2
-            if isempty(obj.edges)
-               error('%s: edges not yet set using any of the PETH methods.',obj.Name);
-            else
-               edges = [obj.edges(1),obj.edges(end)];
-            end
+            edges = obj.getSpikeBinEdges;
+            startStop = [edges(1), edges(end)];
          end
          
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; avgIFRplot(obj(ii),edges,ii,makeNewFig)];
+               fig = [fig; avgIFRplot(obj(ii),startStop,ii,makeNewFig)];
             end
             return;
          end
@@ -697,7 +681,7 @@ classdef solChannel < handle
          if isempty(obj.fs_d)
             obj.getfs_d;
          end
-         tvec = edges(1):(1/obj.fs_d):edges(2); % relative sample times
+         tvec = startStop(1):(1/obj.fs_d):startStop(2); % relative sample times
          [ifr,t] = obj.getAlignedIFR;
          ifr = sqrt(abs(ifr));
          ifr = (ifr - mean(ifr,2)) ./ std(ifr,[],1);
@@ -733,6 +717,97 @@ classdef solChannel < handle
             'EdgeColor','none',...
             'FaceColor',pars.col{obj.Hemisphere});
          
+      end
+      
+      function edges = getSpikeBinEdges(obj)
+         if isempty(obj.edges)
+            obj.setSpikeBinEdges;
+         end
+         edges = obj.edges;
+      end
+      
+      function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).setSpikeBinEdges(tPre,tPost,binWidth);
+            end
+            return;
+         end
+         
+         obj.edges = tPre:binWidth:tPost;
+      end
+      
+      function plotRaster(obj,tPre,tPost,binWidth)
+         if isempty(obj)
+            fig = [];
+            return;
+         end
+         
+         if nargin == 4
+            setSpikeBinEdges(obj,tPre,tPost,binWidth);
+         end
+
+         if numel(obj) > 1
+            fig = [];
+            for ii = 1:numel(obj)
+               plotRaster(obj(ii));
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Triggers)
+            fig = [];
+            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         col = cfg.default('barcols');
+         spikes = obj.getBinnedSpikes;
+         edges = obj.getSpikeBinEdges;
+
+         fig = figure('Name',sprintf('%s: %s Raster',obj.Parent.Name,obj.Name),...
+            'Color','w',...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.8 0.8]);
+
+         [ax,h] = utils.plotSpikeRaster(logical(spikes),...
+            'PlotType','vertline',...
+            'rasterWindowOffset',edges(1),...
+            'TimePerBin',mode(diff(edges)),...
+            'FigHandle',fig,...
+            'LineFormat',struct('Color',col{obj.Hemisphere},...
+                                'LineWidth',1.5,...
+                                'LineStyle','-'));         
+      
+         obj.addStimulusMarkers(ax,h,1);
+         obj.addAxesLabels(ax,'Time (sec)','Trial');
+         
+         if ~isempty(obj.Parent)
+         
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+
+            outpath = fullfile(obj.Parent.folder,[obj.Parent.Name subf.figs],subf.rasterplots);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(fig,fullfile(outpath,[obj.Name id.rasterplots '.fig']));
+            saveas(fig,fullfile(outpath,[obj.Name id.rasterplots '.png']));
+            delete(fig);
+         end
       end
       
       

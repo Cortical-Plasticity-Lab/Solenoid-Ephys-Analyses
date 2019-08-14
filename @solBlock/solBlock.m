@@ -20,6 +20,7 @@ classdef solBlock < handle
       Solenoid_Offset_Latency
       ICMS_Onset_Latency
       ICMS_Channel_Name
+      
    end
    
    properties (GetAccess = public, SetAccess = private, Hidden = true)
@@ -30,6 +31,11 @@ classdef solBlock < handle
       
       ICMS_Channel_Index
       Layout
+
+   end
+   
+   properties (Access = private)
+      edges
    end
    
    methods (Access = public)
@@ -652,6 +658,61 @@ classdef solBlock < handle
                end
             end
          end
+      end
+      
+      function plotRaster(obj,tPre,tPost,binWidth)
+         if nargin == 4
+            setSpikeBinEdges(obj,tPre,tPost,binWidth);
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               plotRaster(obj(ii));
+            end
+            return;
+         end
+         
+         plotRaster(obj.Children);
+         
+      end
+      
+      function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               setSpikeBinEdges(obj(ii),tPre,tPost,binWidth);
+            end
+            return;
+         end
+         
+         obj.edges = tPre:binWidth:tPost;
+         setSpikeBinEdges(obj.Children,tPre,tPost,binWidth);
+      end
+      
+      function edges = getSpikeBinEdges(obj)
+         if numel(obj) > 1
+            edges = cell(numel(obj),1);
+            for ii = 1:numel(obj)
+               edges{ii} = getSpikeBinEdges(obj(ii));
+            end
+            return;
+         end
+         
+         if isempty(obj.edges)
+            setSpikeBinEdges(obj);
+         end
+         edges = obj.edges;
       end
    end
    
