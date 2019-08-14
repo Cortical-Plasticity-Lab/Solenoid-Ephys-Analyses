@@ -306,6 +306,10 @@ classdef solBlock < handle
          t = tPre:(1/fs):tPost;
          t = t(1:(end-1)) + mode(diff(t)/2);
          x = zeros(size(t));
+         if numel(c) == 0
+            fprintf(1,'No LEFT probe for %s.\n',obj.Name);
+            return;
+         end
          for ii = 1:numel(c)
             X = c(ii);
             x = x + mean(getAlignedLFP(X),1); 
@@ -332,6 +336,10 @@ classdef solBlock < handle
          x = x ./ numel(c);
          
          c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         if numel(c) == 0
+            fprintf(1,'No RIGHT probe for %s.\n',obj.Name);
+            return;
+         end
          y = zeros(size(t));
          for ii = 1:numel(c)
             Y = c(ii);
