@@ -1,10 +1,5 @@
 classdef solBlock < handle
    
-   properties (Access = public)
-      
-      
-   end
-   
    properties (SetAccess = immutable)
       Name
       Parent
@@ -21,6 +16,7 @@ classdef solBlock < handle
       ICMS_Onset_Latency
       ICMS_Channel_Name
       
+      TrialIdx
    end
    
    properties (GetAccess = public, SetAccess = private, Hidden = true)
@@ -28,6 +24,8 @@ classdef solBlock < handle
       
       sol
       trig
+      iso
+      icms
       
       ICMS_Channel_Index
       Layout
@@ -84,6 +82,10 @@ classdef solBlock < handle
             [obj.Name id.sol]);
          obj.trig = fullfile(obj.folder,[obj.Name subf.dig],...
             [obj.Name id.trig]);
+         obj.iso = fullfile(obj.folder,[obj.Name subf.dig],...
+            [obj.Name id.iso]);
+         obj.icms = fullfile(obj.folder,[obj.Name subf.dig],...
+            [obj.Name id.icms]);
          
          obj.parseStimuliTimes;
          

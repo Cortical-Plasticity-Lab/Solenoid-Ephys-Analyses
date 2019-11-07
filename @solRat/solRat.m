@@ -9,6 +9,10 @@ classdef solRat < handle
       folder
    end
    
+   properties (GetAccess = public, SetAccess = private, Hidden = false)
+      Layout
+   end
+   
    methods
       function obj = solRat(folder)
          %% Get folder location
@@ -128,6 +132,7 @@ classdef solRat < handle
          if nargin < 2
             L = cfg.default('L');
          end
+         obj.Layout = L;
          setLayout(obj.Children,L);
       end
    end
