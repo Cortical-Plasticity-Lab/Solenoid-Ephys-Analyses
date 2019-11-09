@@ -1,365 +1,75 @@
 classdef solChannel < handle
+%% SOLCHANNEL  obj = solChannel(block,info);
    
-   properties (SetAccess = immutable)
-      Name           % String name of channel
-      Parent         % Block object (experiment)
+%% PROPERTIES
+   % Immutable properties set on object construction
+   properties (GetAccess = public, SetAccess = immutable, Hidden = false)
+      Name           % String name of electrode recording channel
+      Parent         % SOLBLOCK object handle (experiment)
       Hemisphere     % Left or Right hemisphere
-      Depth          % relative site depth (microns)
-      Impedance      % probe impedance (kOhms)
+      Depth          % relative electrode site depth (microns)
+      Impedance      % electrode impedance (kOhms)
    end
    
+   % Hidden properties that can be accessed outside of the class
    properties (GetAccess = public, SetAccess = private, Hidden = true)
-      raw
-      filt
-      ds
-      rate
-      spikes
-      stim
-      Index
+      raw    % File: RAW data
+      filt   % File: BANDPASS FILTERED (unit band) data
+      ds     % File: LFP DOWN-SAMPLED LOWPASS FILTERED data
+      rate   % File: SPIKE RATE (INSTANTANEOUS FIRING RATE; IFR) estimate
+      spikes % File: SPIKE point-process & snippet data
+      stim   % File: ICMS stimulation data
+      Index  % Channel index as CHILD of parent SOLBLOCK object
       
-      fs_d
-      ifr
+      fs_d   % Sample rate after decimation (_d)
+      ifr    % Struct with fields for IFR estimation parameters
       
-      edges
+      edges  % Edges for histogram binning
    end
    
-   properties (GetAccess = private, SetAccess = immutable)
-      port_number
-      native_order
-      fs
+   % Immutable properties that don't need to be listed with the other
+   % public properties that are set on object construction
+   properties (GetAccess = public, SetAccess = immutable, Hidden = true)
+      port_number    % PROBE used for this recording
+      native_order   % Original channel order on INTAN RHS
+      custom_order   % CUSTOM channel order used for acquisition on RHS
+      fs             % Original sample frequency during recording
    end
    
+%% METHODS
+   % Class constructor and data-handling methods
    methods (Access = public)
+      % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info)
+         % Set public immutable properties
          obj.Parent = block;
-         obj.Hemisphere = cfg.Hem(info.port_number);
-         obj.Depth = rem(info.custom_order,cfg.default('nshank')) * ...
-            cfg.default('spacing') + cfg.default('offset');
          obj.Impedance = info.electrode_impedance_magnitude / 1000;
          obj.Name = info.custom_channel_name;
-         obj.Index = (info.native_order+1) + (info.port_number-1)*numel(obj.Parent.Layout);
          
-         subf = cfg.default('subf');
-         id = cfg.default('id');
-         
+         % Set "hidden" properties
          obj.port_number = info.port_number;
          obj.native_order = info.native_order;
+         obj.custom_order = info.custom_order;
          obj.fs = block.fs;
          
-         obj.setRaw(subf.raw,id.raw);
-         obj.setFilt(subf.filt,id.filt);
-         obj.setDS(subf.ds,id.ds);
-         obj.setSpikes(subf.spikes,id.spikes);
-         obj.setStims(subf.dig,id.stim);
-         obj.setRate(subf.rate,id.rate);
+         % Parse channel's INDEX and LOCATION (Depth, Hemisphere)
+         obj.parseChannelIndex;
+         obj.parseChannelLocation;
+         
+         % Get configured defaults
+         [subf,id] = solChannel.getDefault('subf','id');
+
+         % Set file associations
+         obj.setFileAssociations(subf,id);
 
       end
-      
-      function [data,t] = getRaw(obj,ch,vec)
-         if nargin < 2
-            ch = 1:numel(obj);
-         end
-         if nargin < 3
-            vec = inf;
-         end
-         
-         if numel(obj) > 1
-            
-            data = [];
-            for ii = 1:numel(ch)
-               data = [data; getRaw(obj(ch(ii)),ch(ii),vec)]; %#ok<*AGROW>
-            end
-            return;
-         end
-         
-         in = load(obj.raw,'data');
-         if nargout > 1
-            t = (0:(numel(in.data)-1))/obj.fs;
-         end
-         
-         if ~isinf(vec)
-            data = in.data(vec);
-            if nargout > 1
-               t = t(vec);
-            end
-         else
-            data = in.data;
-         end
-      end
-      
-      function setRaw(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.raw;
-         end
-         
-         if nargin < 2
-            subf = cfg.default('subf');
-            f = subf.raw;
-         end
-         
-         obj.raw = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
-            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
-            obj.port_number,...
-            obj.native_order));
-      end
-      
-      function [data,t] = getFilt(obj,ch,vec)
-         if nargin < 2
-            ch = 1:numel(obj);
-         end
-         if nargin < 3
-            vec = inf;
-         end
-         if numel(obj) > 1
-            
-            data = [];
-            for ii = 1:numel(ch)
-               data = [data; getFilt(obj(ch(ii)),ch(ii),vec)];
-            end
-            return;
-         end
-         
-         in = load(obj.filt,'data');
-         if nargout > 1
-            t = (0:(numel(in.data)-1))/obj.fs;
-         end
-         
-         if ~isinf(vec)
-            data = in.data(vec);
-            if nargout > 1
-               t = t(vec);
-            end
-         else
-            data = in.data;
-         end
-      end
-      
-      function setFilt(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.filt;
-         end
-         
-         if nargin < 2
-            subf = cfg.default('subf');
-            f = subf.filt;
-         end
-         
-         obj.filt = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
-            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
-            obj.port_number,...
-            obj.native_order));
-      end
-      
-      function [data,t] = getLFP(obj,ch,vec)
-         if nargin < 2
-            ch = 1:numel(obj);
-         end
-         if nargin < 3
-            vec = inf;
-         end
-         if numel(obj) > 1
-            
-            data = [];
-            for ii = 1:numel(ch)
-               data = [data; getLFP(obj(ch(ii)),ch(ii),vec)];
-            end
-            return;
-         end
-         
-         obj.getfs_d;
-         in = load(obj.ds,'data');
-         if nargout > 1
-            t = (0:(numel(in.data)-1))/obj.fs_d;
-         end
-         
-         if ~isinf(vec)
-            data = in.data(vec);
-            if nargout > 1
-               t = t(vec);
-            end
-         else
-            data = in.data;
-         end
-      end
-      
-      function getfs_d(obj)
-         in = load(obj.ds,'fs');
-         obj.fs_d = in.fs;
-      end
-      
-      function setDS(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.ds;
-         end
-         
-         if nargin < 2
-            subf = cfg.default('subf');
-            f = subf.ds;
-         end
-         
-         obj.ds = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
-            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
-            obj.port_number,...
-            obj.native_order));
-      end
-      
-      function data = getSpikes(obj,ch,type)
-         if nargin < 2
-            ch = 1:numel(obj);
-         end
-         if nargin < 3
-            type = 'ts';
-         end
-         if numel(obj) > 1
-            
-            data = cell(numel(ch),1);
-            for ii = 1:numel(ch)
-               data{ii} = getSpikes(obj(ch(ii)),ch(ii),type);
-            end
-            return;
-         end
-         
-         switch type
-            case {'ts','times','timestamps','peaks','peak_train'}
-               in = load(obj.spikes,'peak_train','pars');
-               data = find(in.peak_train) ./ in.pars.FS;
-               
-            case {'wave','waves','waveform','waveforms','spike','spikes'}
-               in = load(obj.spikes,'spikes');
-               data = in.spikes;
-         end
-         
-      end
-      
-      function setSpikes(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.spikes;
-         end
-         
-         if nargin < 2
-            subf = cfg.default('subf');
-            f = subf.spikes;
-         end
-         
-         obj.spikes = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
-            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
-            obj.port_number,...
-            obj.native_order));
-      end
-      
-      function [ts,stimCh] = getStims(obj)
-         
-         stimCh = [];
-         ts = [];
-         
-         for ii = 1:numel(obj)
-            in = load(obj(ii).stim,'data');
-            if sum(abs(in.data)) > 0
-               data = find(abs(in.data) > 0);
-               t = data([true, diff(data)>1]);
-               in = load(obj(ii).stim,'fs');
-               ts = [ts; t ./ in.fs];
-               stimCh = [stimCh,ii];
-            end
-         end
-         
-         if isempty(stimCh)
-            stimCh = nan;
-         end
-      end
-      
-      function ts = getTrigs(obj)
-         if isempty(obj.Parent.Triggers)
-            obj.Parent.ParseStimuliTimes;
-         end
-         ts = obj.Parent.Triggers;
-      end
-      
-      function setStims(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.stim;
-         end
-         
-         subf = cfg.default('subf');
-         if nargin < 2
-            f = subf.dig;
-         end
-         
-         obj.stim = fullfile(obj.Parent.folder,[obj.Parent.Name f],subf.stim,...
-            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
-            obj.port_number,...
-            obj.native_order));
-      end
-      
-      function [data,t] = getIFR(obj,ch,vec)
-         if nargin < 2
-            ch = 1:numel(obj);
-         end
-         if nargin < 3
-            vec = inf;
-         end
-         if numel(obj) > 1
-            
-            data = [];
-            for ii = 1:numel(ch)
-               data = [data; getIFR(obj(ch(ii)),ch(ii),vec)];
-            end
-            return;
-         end
-         
-         if exist(obj.rate,'file')==0
-            obj.estimateRate;
-         end
-            
-         in = load(obj.rate,'data');
-         if nargout > 1
-            t = (0:(numel(in.data)-1))/obj.fs_d;
-         end
-         
-         if ~isinf(vec)
-            data = in.data(vec);
-            if nargout > 1
-               t = t(vec);
-            end
-         else
-            data = in.data;
-         end
-      end
-      
-      function setRate(obj,f,id)
-         if nargin < 3
-            ID = cfg.default('id');
-            id = ID.rate;
-         end
-         
-         if nargin < 2
-            subf = cfg.default('subf');
-            f = subf.rate;
-         end
-         
-         if isempty(obj.ifr)
-            obj.ifr = cfg.default('rate');
-         end
-         
-         obj.rate = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
-            sprintf('%s_%s_%03gms-%s_P%g_Ch_%03g.mat',...
-            obj.Parent.Name,...
-            id,...
-            obj.ifr.w,...
-            obj.ifr.kernel,...
-            obj.port_number,...
-            obj.native_order));
-         
-         if exist(obj.rate,'file')==0
-            obj.estimateRate;
-         end
-      end
-      
+
+      % Do actual RATE ESTIMATION for this channel, using a smoothing
+      % kernel to get the INSTANTANEOUS FIRING RATE (IFR; spike rate)
+      % estimate. Once computed, save the IFR estimate to the hard disk in
+      % the BLOCK folder and associate the filename with this CHANNEL
+      % object so it can be easily accessed in the future without costly
+      % recomputing.
       function estimateRate(obj,ch)
          if nargin < 2
             ch = 1:numel(obj);
@@ -400,127 +110,11 @@ classdef solChannel < handle
          save(obj.rate,'data','fs','-v7.3');
       end
       
-      function binCounts = getBinnedSpikes(obj,tPre,tPost,binWidth)
-         if nargin == 4
-            obj.setSpikeBinEdges(tPre,tPost,binWidth);
-         end
-         edges = obj.getSpikeBinEdges;
-         
-         tSpike = getSpikes(obj);
-         trigs = obj.getTrigs;
-         binCounts = zeros(numel(trigs),numel(edges)-1);
-         
-         for iT = 1:numel(trigs)
-            binCounts(iT,:) = histcounts(tSpike-trigs(iT),edges);
-         end
-      end
-      
-      function fig = PETH(obj,edges,ii,makeNewFig)
-         if isempty(obj)
-            fig = [];
-            return;
-         end
-         
-         if nargin < 4
-            makeNewFig = true;
-         end
-         if nargin < 3
-            ii = 1;
-         end
-         if numel(obj) > 1
-            fig = [];
-            for ii = 1:numel(obj)
-               fig = [fig; PETH(obj(ii),edges,ii,makeNewFig)];
-            end
-            return;
-         end
-         
-         if isempty(obj.Parent.Triggers)
-            fig = [];
-            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
-            return;
-         end
-         
-         col = cfg.default('barcols');
-         obj.edges = edges;
-         tvec = edges(1:(end-1))+(mode(diff(edges))/2);
-         
-         binCounts = sum(obj.getBinnedSpikes,1);         
-                  
-         if makeNewFig
-            fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
-               'Color','w',...
-               'Units','Normalized',...
-               'Position',obj.Parent.getFigPos(ii));
-         end
-         
-         b = bar(tvec*1e3,mean(binCounts,1),1,...
-            'FaceColor',col{obj.Hemisphere},...
-            'EdgeColor','none');
-         
-%          xlim(cfg.default('xlimit'));
-         xlim([obj.edges(1) obj.edges(end)]*1e3);
-         ylim(cfg.default('ylimit'));
-      
-         obj.addStimulusMarkers(gca,b);
-         obj.addAxesLabels(gca,'Time (ms)','Count');
-      end
-      
-      function addStimulusMarkers(obj,ax,graphicsObj,pct)
-         if nargin < 4
-            pct = 0.9;
-         end
-         set(ax,'NextPlot','add');
-         y = pct * get(ax,'YLim');
-         for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
-            for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
-               tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
-               if obj.Parent.ICMS_Channel_Index(ik) == obj.Index
-                  line(tOnset,y,'Color','m','LineStyle','-','LineWidth',2);
-               else
-                  line(tOnset,y,'Color','m','LineStyle','--','LineWidth',1.5);
-               end
-            end
-         end
-         
-         y = [y(1) y(2) y(2) y(1)];
-         for ii = 1:numel(obj.Parent.Solenoid_Onset_Latency)
-            x = [ones(1,2) * obj.Parent.Solenoid_Onset_Latency(ii) * 1e3, ...
-                 ones(1,2) * obj.Parent.Solenoid_Offset_Latency(ii) * 1e3];
-            
-            patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
-         end
-         
-         if  ismember(obj.Index,obj.Parent.ICMS_Channel_Index)
-            set(ax,'Color','y');
-            if nargin > 2
-               if isa(graphicsObj,'matlab.graphics.chart.primitive.Bar')
-                  set(graphicsObj,'FaceColor','k');
-               elseif isa(graphicsObj,'matlab.graphics.chart.primitive.Line')
-                  set(graphicsObj,'Color','k');
-               end
-            end
-
-         end
-      end
-      
-      function addAxesLabels(obj,ax,xLabelString,yLabelString)
-         ax.Title.String = obj.Name;
-         ax.Title.FontName = 'Arial';
-         ax.Title.FontSize = 16;
-         ax.Title.Color = 'k';
-         
-         ax.XLabel.String = xLabelString;
-         ax.XLabel.FontName = 'Arial';
-         ax.XLabel.FontSize = 14;
-         ax.XLabel.Color = 'k';
-
-         ax.YLabel.String = yLabelString;
-         ax.YLabel.FontName = 'Arial';
-         ax.YLabel.FontSize = 14;
-         ax.YLabel.Color = 'k';
-      end
-      
+   end
+   
+   % "Get" methods
+   methods (Access = public)
+      % Return LFP aligned to TRIALS for this channel
       function [data,t] = getAlignedLFP(obj)
          data = getLFP(obj);
          edges = obj.getSpikeBinEdges; %#ok<*PROP>
@@ -548,6 +142,473 @@ classdef solChannel < handle
          end
       end
       
+      % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to
+      % TRIALS for this channel
+      function [data,t,t_trial] = getAlignedIFR(obj)
+         data = getIFR(obj);
+         trigs = getTrigs(obj);
+         trigs = reshape(round(trigs*obj.fs_d),numel(trigs),1);
+         t = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
+         tvec = round(t*obj.fs_d);
+         
+         vec = tvec + trigs;
+         n = numel(data);
+         
+         vec(any(vec < 1,2),:) = [];
+         vec(any(vec > n,2),:) = [];
+         
+         data = data(vec);
+         
+         if nargout > 1
+            t = t * 1e3; % scale to ms
+         end
+         
+         if nargout > 2
+            t_trial = vec * obj.fs_d;
+         end
+      end
+      
+      % Returns matrix of counts of binned spikes (histograms) where each
+      % row is a TRIAL and each column is a bin. 
+      function binCounts = getBinnedSpikes(obj,tPre,tPost,binWidth)
+         if nargin == 4
+            obj.setSpikeBinEdges(tPre,tPost,binWidth);
+         end
+         edges = obj.getSpikeBinEdges;
+         
+         tSpike = getSpikes(obj);
+         trigs = obj.getTrigs;
+         binCounts = zeros(numel(trigs),numel(edges)-1);
+         
+         for iT = 1:numel(trigs)
+            binCounts(iT,:) = histcounts(tSpike-trigs(iT),edges);
+         end
+      end
+      
+      % Returns BANDPASS FILTERED (UNIT) data for this channel
+      function [data,t] = getFilt(obj,ch,vec)
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         if nargin < 3
+            vec = inf;
+         end
+         if numel(obj) > 1
+            
+            data = [];
+            for ii = 1:numel(ch)
+               data = [data; getFilt(obj(ch(ii)),ch(ii),vec)];
+            end
+            return;
+         end
+         
+         in = load(obj.filt,'data');
+         if nargout > 1
+            t = (0:(numel(in.data)-1))/obj.fs;
+         end
+         
+         if ~isinf(vec)
+            data = in.data(vec);
+            if nargout > 1
+               t = t(vec);
+            end
+         else
+            data = in.data;
+         end
+      end
+      
+      % Returns DECIMATED SAMPLE RATE (for LFP) for this channel
+      function getfs_d(obj)
+         in = load(obj.ds,'fs');
+         obj.fs_d = in.fs;
+      end
+      
+      % Returns LOWPASS FILTERED (DECIMATED; LFP) data for this channel
+      function [data,t] = getLFP(obj,ch,vec)
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         if nargin < 3
+            vec = inf;
+         end
+         if numel(obj) > 1
+            
+            data = [];
+            for ii = 1:numel(ch)
+               data = [data; getLFP(obj(ch(ii)),ch(ii),vec)];
+            end
+            return;
+         end
+         
+         obj.getfs_d;
+         in = load(obj.ds,'data');
+         if nargout > 1
+            t = (0:(numel(in.data)-1))/obj.fs_d;
+         end
+         
+         if ~isinf(vec)
+            data = in.data(vec);
+            if nargout > 1
+               t = t(vec);
+            end
+         else
+            data = in.data;
+         end
+      end
+      
+      % Returns RAW data for this channel (and corresponding sample times)
+      function [data,t] = getRaw(obj,ch,vec)
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         if nargin < 3
+            vec = inf;
+         end
+         
+         if numel(obj) > 1
+            
+            data = [];
+            for ii = 1:numel(ch)
+               data = [data; getRaw(obj(ch(ii)),ch(ii),vec)]; %#ok<*AGROW>
+            end
+            return;
+         end
+         
+         in = load(obj.raw,'data');
+         if nargout > 1
+            t = (0:(numel(in.data)-1))/obj.fs;
+         end
+         
+         if ~isinf(vec)
+            data = in.data(vec);
+            if nargout > 1
+               t = t(vec);
+            end
+         else
+            data = in.data;
+         end
+      end
+      
+      % Returns SPIKE point process data for this channel
+      % Depending on 'type' arg, either returns a vector of peak times
+      % (point process), or a data matrix of snippet waveforms
+      % with rows corresponding one-to-one with elements of peak times.
+      function data = getSpikes(obj,ch,type)
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         if nargin < 3
+            type = 'ts';
+         end
+         if numel(obj) > 1
+            
+            data = cell(numel(ch),1);
+            for ii = 1:numel(ch)
+               data{ii} = getSpikes(obj(ch(ii)),ch(ii),type);
+            end
+            return;
+         end
+         
+         switch type
+            case {'ts','times','timestamps','peaks','peak_train'}
+               in = load(obj.spikes,'peak_train','pars');
+               data = find(in.peak_train) ./ in.pars.FS;
+               
+            case {'wave','waves','waveform','waveforms','spike','spikes'}
+               in = load(obj.spikes,'spikes');
+               data = in.spikes;
+         end
+         
+      end
+      
+      % Return SPIKE BIN EDGES used to generate spike histograms or rasters
+      function edges = getSpikeBinEdges(obj)
+         if isempty(obj.edges)
+            obj.setSpikeBinEdges;
+         end
+         edges = obj.edges;
+      end
+      
+      % Return times of ICMS stimuli (as a point process vector of times)
+      % Second output argument gives channels that were stimulated
+      function [ts,stimCh] = getStims(obj)
+         
+         stimCh = [];
+         ts = [];
+         
+         for ii = 1:numel(obj)
+            in = load(obj(ii).stim,'data');
+            if sum(abs(in.data)) > 0
+               data = find(abs(in.data) > 0);
+               t = data([true, diff(data)>1]);
+               in = load(obj(ii).stim,'fs');
+               ts = [ts; t ./ in.fs];
+               stimCh = [stimCh,ii];
+            end
+         end
+         
+         if isempty(stimCh)
+            stimCh = nan;
+         end
+      end
+      
+      % Return times of "triggers" (TRIALS) as a vector of time stamps
+      function ts = getTrigs(obj)
+         if isempty(obj.Parent.Triggers)
+            obj.Parent.ParseStimuliTimes;
+         end
+         ts = obj.Parent.Triggers;
+      end
+      
+      % Returns the INSTANTEOUS FIRING RATE (IFR; spike rate) estimate for
+      % this channel, as well as the corresponding sample times
+      function [data,t] = getIFR(obj,ch,vec)
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         if nargin < 3
+            vec = inf;
+         end
+         if numel(obj) > 1
+            
+            data = [];
+            for ii = 1:numel(ch)
+               data = [data; getIFR(obj(ch(ii)),ch(ii),vec)];
+            end
+            return;
+         end
+         
+         if exist(obj.rate,'file')==0
+            obj.estimateRate;
+         end
+            
+         in = load(obj.rate,'data');
+         if nargout > 1
+            t = (0:(numel(in.data)-1))/obj.fs_d;
+         end
+         
+         if ~isinf(vec)
+            data = in.data(vec);
+            if nargout > 1
+               t = t(vec);
+            end
+         else
+            data = in.data;
+         end
+      end
+      
+      
+   end
+   
+   % "Set" methods
+   methods (Access = public)
+      % Set the RAW data file for this channel
+      function setRaw(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.raw;
+         end
+         
+         if nargin < 2
+            subf = cfg.default('subf');
+            f = subf.raw;
+         end
+         
+         obj.raw = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
+            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
+            obj.port_number,...
+            obj.native_order));
+      end
+      
+      % Set the FILTERED data file for this channel
+      function setFilt(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.filt;
+         end
+         
+         if nargin < 2
+            subf = cfg.default('subf');
+            f = subf.filt;
+         end
+         
+         obj.filt = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
+            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
+            obj.port_number,...
+            obj.native_order));
+      end
+      
+      % Set the DOWNSAMPLED LFP data file for this channel
+      function setDS(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.ds;
+         end
+         
+         if nargin < 2
+            subf = cfg.default('subf');
+            f = subf.ds;
+         end
+         
+         obj.ds = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
+            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
+            obj.port_number,...
+            obj.native_order));
+      end
+      
+      % Set the RATE ESTIMATE data file for this channel
+      function setRate(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.rate;
+         end
+         
+         if nargin < 2
+            subf = cfg.default('subf');
+            f = subf.rate;
+         end
+         
+         if isempty(obj.ifr)
+            obj.ifr = cfg.default('rate');
+         end
+         
+         obj.rate = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
+            sprintf('%s_%s_%03gms-%s_P%g_Ch_%03g.mat',...
+            obj.Parent.Name,...
+            id,...
+            obj.ifr.w,...
+            obj.ifr.kernel,...
+            obj.port_number,...
+            obj.native_order));
+         
+         if exist(obj.rate,'file')==0
+            obj.estimateRate;
+         end
+      end
+      
+      % Set the SPIKE data file for this channel
+      function setSpikes(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.spikes;
+         end
+         
+         if nargin < 2
+            subf = cfg.default('subf');
+            f = subf.spikes;
+         end
+         
+         obj.spikes = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
+            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
+            obj.port_number,...
+            obj.native_order));
+      end
+      
+      % Set the BIN EDGES used to generate HISTOGRAMS or AVERAGE IFR plots
+      % for this channel
+      function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         if nargin < 4
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 3
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 2
+            tPre = cfg.default('tpre');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).setSpikeBinEdges(tPre,tPost,binWidth);
+            end
+            return;
+         end
+         
+         obj.edges = tPre:binWidth:tPost;
+      end
+      
+      % Set the STIM data file for this channel
+      function setStims(obj,f,id)
+         if nargin < 3
+            ID = cfg.default('id');
+            id = ID.stim;
+         end
+         
+         subf = cfg.default('subf');
+         if nargin < 2
+            f = subf.dig;
+         end
+         
+         obj.stim = fullfile(obj.Parent.folder,[obj.Parent.Name f],subf.stim,...
+            sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
+            obj.port_number,...
+            obj.native_order));
+      end
+      
+   end
+   
+   % "Graphics" methods
+   methods (Access = public)
+      % Add markers denoting ICMS to a given axes
+      function addStimulusMarkers(obj,ax,graphicsObj,pct)
+         if nargin < 4
+            pct = 0.9;
+         end
+         
+         % Superimpose lines indicating timing of ICMS pulses
+         set(ax,'NextPlot','add');
+         Y = pct * get(ax,'YLim');
+         for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
+            for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
+               tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
+               if obj.Parent.ICMS_Channel_Index(ik) == obj.Index
+                  line(tOnset,Y,...
+                     'Color','m',...
+                     'LineStyle','-',...
+                     'LineWidth',2);
+               else
+                  line(tOnset,Y,...
+                     'Color','m',...
+                     'LineStyle','--',...
+                     'LineWidth',1.5);
+               end
+            end
+         end
+         
+         % Axes X-scale is in milliseconds
+         tStart = obj.Parent.Solenoid_Onset_Latency * 1e3;
+         tStop = obj.Parent.Solenoid_Offset_Latency * 1e3;
+         if numel(tStart) ~= numel(tStop)
+            error('Something is wrong, mismatch in parsed number of solenoid onset (%g) vs offset (%g) pulses.',...
+               numel(tStart),numel(tStop));
+         end
+         
+         % Superimpose PATCH rectangle graphics objects where there would
+         % be expected SOLENOID stimuli
+         for ii = 1:numel(tStart)
+            X = [tStart(ii),tStop(ii)];
+            [x,y] = solChannel.getGraphicsRectXY(X,Y);
+            patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
+         end
+         
+         % Change the color of the graphics objects depending on whether
+         % this is a STIMULATION channel for ICMS
+         if  ismember(obj.Index,obj.Parent.ICMS_Channel_Index)
+            set(ax,'Color','y');
+            if nargin > 2
+               if isa(graphicsObj,'matlab.graphics.chart.primitive.Bar')
+                  set(graphicsObj,'FaceColor','k');
+               elseif isa(graphicsObj,'matlab.graphics.chart.primitive.Line')
+                  set(graphicsObj,'Color','k');
+               end
+            end
+
+         end
+      end
+      
+      % Return figure handle to peri-event LFP (average) for this channel
       function fig = avgLFPplot(obj,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
@@ -605,7 +666,7 @@ classdef solChannel < handle
          ylim(pars.ylimit);
       
          obj.addStimulusMarkers(gca,p);
-         obj.addAxesLabels(gca,'Time (ms)','LFP (\muV)');
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','LFP (\muV)');
 
          errbary = [mu + sd, fliplr(mu - sd)];
          errbarx = [t, fliplr(t)];
@@ -616,30 +677,8 @@ classdef solChannel < handle
          
       end
       
-      function [data,t,t_trial] = getAlignedIFR(obj)
-         data = getIFR(obj);
-         trigs = getTrigs(obj);
-         trigs = reshape(round(trigs*obj.fs_d),numel(trigs),1);
-         t = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
-         tvec = round(t*obj.fs_d);
-         
-         vec = tvec + trigs;
-         n = numel(data);
-         
-         vec(any(vec < 1,2),:) = [];
-         vec(any(vec > n,2),:) = [];
-         
-         data = data(vec);
-         
-         if nargout > 1
-            t = t * 1e3; % scale to ms
-         end
-         
-         if nargout > 2
-            t_trial = vec * obj.fs_d;
-         end
-      end
-      
+      % Return figure handle to average INSTANTANEOUS FIRING RATE (IFR;
+      % spike rate) in alignment to TRIALS
       function fig = avgIFRplot(obj,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
@@ -708,7 +747,7 @@ classdef solChannel < handle
          ylim(pars.ylimit);
       
          obj.addStimulusMarkers(gca,p);
-         obj.addAxesLabels(gca,'Time (ms)','IFR');
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','IFR');
 
          errbary = [mu + sd, fliplr(mu - sd)];
          errbarx = [t, fliplr(t)];
@@ -719,36 +758,62 @@ classdef solChannel < handle
          
       end
       
-      function edges = getSpikeBinEdges(obj)
-         if isempty(obj.edges)
-            obj.setSpikeBinEdges;
+      % Return figure handle to peri-event time histogram (PETH) for 
+      % spiking on this channel
+      function fig = PETH(obj,edges,ii,makeNewFig)
+         if isempty(obj)
+            fig = [];
+            return;
          end
-         edges = obj.edges;
-      end
-      
-      function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         
          if nargin < 4
-            binWidth = cfg.default('binwidth');
+            makeNewFig = true;
          end
-         
          if nargin < 3
-            tPost = cfg.default('tpost');
+            ii = 1;
          end
-         
-         if nargin < 2
-            tPre = cfg.default('tpre');
-         end
-         
          if numel(obj) > 1
+            fig = [];
             for ii = 1:numel(obj)
-               obj(ii).setSpikeBinEdges(tPre,tPost,binWidth);
+               fig = [fig; PETH(obj(ii),edges,ii,makeNewFig)];
             end
             return;
          end
          
-         obj.edges = tPre:binWidth:tPost;
+         if isempty(obj.Parent.Triggers)
+            fig = [];
+            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         col = cfg.default('barcols');
+         obj.edges = edges;
+         tvec = edges(1:(end-1))+(mode(diff(edges))/2);
+         
+         binCounts = sum(obj.getBinnedSpikes,1);         
+                  
+         if makeNewFig
+            fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+         end
+         
+         b = bar(tvec*1e3,mean(binCounts,1),1,...
+            'FaceColor',col{obj.Hemisphere},...
+            'EdgeColor','none');
+         
+%          xlim(cfg.default('xlimit'));
+         xlim([obj.edges(1) obj.edges(end)]*1e3);
+         ylim(cfg.default('ylimit'));
+      
+         obj.addStimulusMarkers(gca,b);
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Count');
       end
       
+      % Plot SPIKE RASTER of spike instants across trials for this channel
+      % relative to TRIAL alignment. Spike times are represented as
+      % vertical bars.
       function plotRaster(obj,tPre,tPost,binWidth)
          if isempty(obj)
             fig = [];
@@ -792,7 +857,7 @@ classdef solChannel < handle
                                 'LineStyle','-'));         
       
          obj.addStimulusMarkers(ax,h,1);
-         obj.addAxesLabels(ax,'Time (sec)','Trial');
+         solChannel.addAxesLabels(ax,obj.Name,'Time (sec)','Trial');
          
          if ~isempty(obj.Parent)
          
@@ -810,7 +875,170 @@ classdef solChannel < handle
          end
       end
       
-      
    end
    
+   % Static methods
+   methods (Static = true)
+      % Add labels to a given axes. 'ax' can be an array of axes handles,
+      % in which case titleString/xLabelString/yLabelString may each be a
+      % char (same for all axes in array), titleString may be a cell array
+      % with the same number of cell elements as elements in 'ax' array,
+      % and xLabelString/yLabelString can be either both char vectors (same
+      % label for all plots) or each be a cell array of equal length to
+      % number of elements in 'ax'.
+      function addAxesLabels(ax,titleString,xLabelString,yLabelString)
+         % Parse input arguments
+         if nargin < 4
+            yLabelString = [];
+         end
+         if nargin < 3
+            xLabelString = [];
+         end
+         if nargin < 2
+            titleString = [];
+         end
+         
+         % Handle arrays of axes inputs
+         if numel(ax) > 1
+            if iscell(titleString) 
+               if iscell(xLabelString) 
+                  for i = 1:numel(ax)
+                     solChannel.addAxesLabels(ax(i),...
+                        titleString{i},...
+                        xLabelString{i},...
+                        yLabelString{i});
+                  end
+               else
+                  for i = 1:numel(ax)
+                     solChannel.addAxesLabels(ax(i),...
+                        titleString{i},...
+                        xLabelString,...
+                        yLabelString);
+                  end
+               end
+            else
+               for i = 1:numel(ax)
+                  solChannel.addAxesLabels(ax(i),...
+                     titleString,xLabelString,yLabelString);
+               end
+            end
+            return;
+         end
+         
+         % Set axes properties
+         ax.Title.String = titleString;
+         ax.Title.FontName = 'Arial';
+         ax.Title.FontSize = 16;
+         ax.Title.Color = 'k';
+         
+         ax.XLabel.String = xLabelString;
+         ax.XLabel.FontName = 'Arial';
+         ax.XLabel.FontSize = 14;
+         ax.XLabel.Color = 'k';
+
+         ax.YLabel.String = yLabelString;
+         ax.YLabel.FontName = 'Arial';
+         ax.YLabel.FontSize = 14;
+         ax.YLabel.Color = 'k';
+      end
+      
+      % Wrapper to return any number of configured default fields
+      function varargout = getDefault(varargin)
+         % Parse input
+         if nargin > nargout
+            error('More inputs specified than requested outputs.');
+         elseif nargin < nargout
+            error('More outputs requested than inputs specified.');
+         end
+         
+         % Collect fields into output cell array
+         varargout = cfg.default(varargin);        
+      end
+      
+      % Return [x,y] coordinates for vertices of a graphics rectangle,
+      % given inputs X & Y that are each 2-element vectors that specify the
+      % max and min bounds of the rect in X-Y dims.
+      function [x,y] = getGraphicsRectXY(X,Y)
+         x = [X(1), X(1), X(2), X(2)];
+         y = [Y(1) Y(2) Y(2) Y(1)];
+         
+      end
+   end
+   
+   % Private "helper" methods
+   methods (Access = private)
+      % Parse Channel Index for object or each element in object array
+      function parseChannelIndex(obj)
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).parseChannelIndex;
+            end
+            return;
+         end
+         
+         ch_ord = obj.native_order + 1; % Native order is zero-indexed
+         ch_port = obj.port_number - 1; % If Port "1" don't offset
+         
+         % Total number of channels is parsed from parent Layout
+         nCh_total = numel(obj.Parent.Layout);
+         
+         obj.Index = ch_ord + (ch_port * nCh_total);
+      end
+      
+      % Parse Channel depth for object or each element in object array
+      function parseChannelLocation(obj)
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).parseChannelDepth;
+            end
+            return;
+         end
+         
+         % Set the Hemisphere
+         obj.Hemisphere = cfg.Hem(obj.port_number);
+         
+         % Recordings all performed with rows indicating depth
+         rec_layout_ord = obj.custom_order;
+         [a,b] = solChannel.getDefault('spacing','offset');
+         
+         % Compute depth "index" of this site, based on # shanks (recording
+         % order from custom_order is incremented by elements of rows
+         % first, then by columns (e.g. [0, 1, 2, 3,
+         %                               4, 5, 6, 7] indexing).
+         x = floor(rec_layout_ord/n); % "Row Index"
+         
+         obj.Depth = a*x + b;
+      end
+      
+      % Associate individual channel *.mat files with this class object so
+      % the correct file can be pointed to for any of the data access
+      % methods, to prevent the whole file from being stored in memory at
+      % once.
+      function setFileAssociations(obj,subf,id)
+         % Parse input args
+         if nargin < 3
+            subf = cfg.default('subf');
+         end
+         
+         if nargin < 2
+            id = cfg.default('id');
+         end
+         
+         % Handle array of object inputs
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).setFileAssociations(subf,id);
+            end
+            return;
+         end
+         
+         % Set all file associations
+         obj.setRaw(subf.raw,id.raw);
+         obj.setFilt(subf.filt,id.filt);
+         obj.setDS(subf.ds,id.ds);
+         obj.setSpikes(subf.spikes,id.spikes);
+         obj.setStims(subf.dig,id.stim);
+         obj.setRate(subf.rate,id.rate);
+      end
+   end
 end
