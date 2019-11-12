@@ -6,6 +6,11 @@ classdef solChannel < handle
    properties (GetAccess = public, SetAccess = immutable, Hidden = false)
       Name           % String name of electrode recording channel
       Parent         % SOLBLOCK object handle (experiment)
+   end
+   
+   % Properties that are not hidden but can't be changed other than by
+   % class methods.
+   properties (GetAccess = public, SetAccess = private, Hidden = false)
       Hemisphere     % Left or Right hemisphere
       Depth          % relative electrode site depth (microns)
       Impedance      % electrode impedance (kOhms)
@@ -41,11 +46,22 @@ classdef solChannel < handle
    methods (Access = public)
       % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info)
+         if ~isa(block,'solBlock')
+            if isscalar(block) && isnumeric(block)
+               obj = repmat(obj,block,1); % Initialize empty array
+               return;
+            else
+               error('Check ''block'' input argument (current class: %s)',...
+                  class(block));               
+            end            
+         end
+         
          % Set public immutable properties
          obj.Parent = block;
          obj.Impedance = info.electrode_impedance_magnitude / 1000;
          obj.Name = info.custom_channel_name;
-         
+         fprintf(1,repmat('\b',1,5));
+
          % Set "hidden" properties
          obj.port_number = info.port_number;
          obj.native_order = info.native_order;
@@ -115,21 +131,23 @@ classdef solChannel < handle
    % "Get" methods
    methods (Access = public)
       % Return LFP aligned to TRIALS for this channel
-      function [data,t] = getAlignedLFP(obj)
+      function [data,t] = getAlignedLFP(obj,trialType)
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
          data = getLFP(obj);
          edges = obj.getSpikeBinEdges; %#ok<*PROP>
          
          
-         trigs = getTrigs(obj);
-         trigs = reshape(round(trigs*obj.fs_d),numel(trigs),1);
+         trials = getTrials(obj,trialType);
+         vec = round(edges(1)*obj.fs_d) : round(edges(end)*obj.fs_d);
+         itrials = round(trials * obj.fs_d);
+         itrials = reshape(itrials,numel(itrials),1);
          
-%          tvec = linspace(edges(1),edges(end),size(data,2));
+         t = vec / obj.fs_d * 1e3;
          
-         tvec = edges(1):(1/obj.fs_d):edges(end);
-         tvec = tvec(1:(end-1)) + mode(diff(tvec))/2;
-         tvec = round(tvec*obj.fs_d);
-         
-         vec = tvec + trigs;
+         vec = vec + itrials;
          n = numel(data);
          
          vec(any(vec < 1,2),:) = [];
@@ -137,21 +155,21 @@ classdef solChannel < handle
          
          data = data(vec);
          
-         if nargout > 1
-            t = tvec ./ obj.fs_d * 1e3; % output in ms
-         end
       end
       
       % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to
       % TRIALS for this channel
-      function [data,t,t_trial] = getAlignedIFR(obj)
+      function [data,t,t_trial] = getAlignedIFR(obj,trialType)
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
          data = getIFR(obj);
-         trigs = getTrigs(obj);
-         trigs = reshape(round(trigs*obj.fs_d),numel(trigs),1);
+         trials = getTrials(obj,trialType);
+         trials = reshape(round(trials*obj.fs_d),numel(trials),1);
          t = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
          tvec = round(t*obj.fs_d);
          
-         vec = tvec + trigs;
+         vec = tvec + trials;
          n = numel(data);
          
          vec(any(vec < 1,2),:) = [];
@@ -170,19 +188,24 @@ classdef solChannel < handle
       
       % Returns matrix of counts of binned spikes (histograms) where each
       % row is a TRIAL and each column is a bin. 
-      function binCounts = getBinnedSpikes(obj,tPre,tPost,binWidth)
-         if nargin == 4
+      function binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if nargin == 5
             obj.setSpikeBinEdges(tPre,tPost,binWidth);
          end
          edges = obj.getSpikeBinEdges;
          
          tSpike = getSpikes(obj);
-         trigs = obj.getTrigs;
-         binCounts = zeros(numel(trigs),numel(edges)-1);
+         trials = obj.getTrials(trialType);
+         binCounts = zeros(numel(trials),numel(edges)-1);
          
-         for iT = 1:numel(trigs)
-            binCounts(iT,:) = histcounts(tSpike-trigs(iT),edges);
+         for iT = 1:numel(trials)
+            binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
          end
+         binCounts = min(binCounts,1); % Clip to 1 spike per bin
       end
       
       % Returns BANDPASS FILTERED (UNIT) data for this channel
@@ -331,11 +354,28 @@ classdef solChannel < handle
       
       % Return times of ICMS stimuli (as a point process vector of times)
       % Second output argument gives channels that were stimulated
-      function [ts,stimCh] = getStims(obj)
+      % Second input argument defaults to false unless specified as true,
+      % in which case the ICMS info file is overwritten. If no ICMS info
+      % file exists, a new one is created.
+      function [ts,stimCh] = getStims(obj,force_overwrite)
+         
+         if nargin < 2
+            force_overwrite = false;
+         end
          
          stimCh = [];
          ts = [];
          
+         if (~force_overwrite)
+            if exist(obj(1).Parent.stim,'file')~=0
+               in = load(obj(1).Parent.stim,'ts','stimCh');
+               ts = in.ts;
+               stimCh = in.stimCh;
+               return;
+            end            
+         end
+         
+         fprintf(1,'-->\tParsing ICMS channel(s)...');
          for ii = 1:numel(obj)
             in = load(obj(ii).stim,'data');
             if sum(abs(in.data)) > 0
@@ -346,9 +386,31 @@ classdef solChannel < handle
                stimCh = [stimCh,ii];
             end
          end
+         fprintf(1,'complete\n');
          
          if isempty(stimCh)
             stimCh = nan;
+         end
+         
+         out = struct;
+         out.ts = ts;
+         out.stimCh = stimCh; %#ok<*STRNU>
+         save(obj(1).Parent.stim,'-struct','out');
+      end
+      
+      % Return times of TRIALS as a vector of time stamps. Can specify a
+      % subset of trial types using second arg (see cfg.TrialType)
+      function ts = getTrials(obj,trialType)
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if trialType >= 100
+            ts = obj.Parent.Trials;
+         else
+            ts = obj.Parent.Trials(ismember(...
+               obj.Parent.TrialType,...
+               trialType));
          end
       end
       
@@ -457,7 +519,11 @@ classdef solChannel < handle
       end
       
       % Set the RATE ESTIMATE data file for this channel
-      function setRate(obj,f,id)
+      function setRate(obj,f,id,doRateEstimate)
+         if nargin < 4
+            doRateEstimate = false;
+         end
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.rate;
@@ -481,7 +547,7 @@ classdef solChannel < handle
             obj.port_number,...
             obj.native_order));
          
-         if exist(obj.rate,'file')==0
+         if (exist(obj.rate,'file')==0) && (doRateEstimate)
             obj.estimateRate;
          end
       end
@@ -609,33 +675,36 @@ classdef solChannel < handle
       end
       
       % Return figure handle to peri-event LFP (average) for this channel
-      function fig = avgLFPplot(obj,startStop,ii,makeNewFig)
+      function fig = avgLFPplot(obj,trialType,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
             return;
          end
          
-         if nargin < 4
+         if nargin < 5
             makeNewFig = true;
          end
-         if nargin < 3
+         if nargin < 4
             ii = 1;
          end
-         if nargin < 2
+         if nargin < 3
             edges = obj.getSpikeBinEdges;
             startStop = [edges(1), edges(end)];
          end
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end         
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; avgLFPplot(obj(ii),startStop,ii,makeNewFig)];
+               fig = [fig; avgLFPplot(obj(ii),trialType,startStop,ii,makeNewFig)];
             end
             return;
          end
          
-         if isempty(obj.Parent.Triggers)
+         if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -646,10 +715,11 @@ classdef solChannel < handle
          end
          
          
-         [lfp,t] = obj.getAlignedLFP;
+         [lfp,t] = obj.getAlignedLFP(trialType);
          
          if makeNewFig
-            fig = figure('Name',sprintf('%s: %s average LFP',obj.Parent.Name,obj.Name),...
+            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+               obj.Parent.Name,obj.Name,char(trialType)),...
                'Color','w',...
                'Units','Normalized',...
                'Position',obj.Parent.getFigPos(ii));
@@ -679,36 +749,39 @@ classdef solChannel < handle
       
       % Return figure handle to average INSTANTANEOUS FIRING RATE (IFR;
       % spike rate) in alignment to TRIALS
-      function fig = avgIFRplot(obj,startStop,ii,makeNewFig)
+      function fig = avgIFRplot(obj,trialType,startStop,ii,makeNewFig)
          if isempty(obj)
             fig = [];
             return;
          end
          
-         if nargin < 4
+         if nargin < 5
             makeNewFig = true;
          end
-         if nargin < 3
+         if nargin < 4
             ii = 1;
          end
-         if nargin < 2
+         if nargin < 3
             edges = obj.getSpikeBinEdges;
             startStop = [edges(1), edges(end)];
+         end
+         if nargin < 2
+            trialType = cfg.TrialType('All');
          end
          
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; avgIFRplot(obj(ii),startStop,ii,makeNewFig)];
+               fig = [fig; avgIFRplot(obj(ii),trialType,startStop,ii,makeNewFig)];
             end
             return;
          end
          
          
          
-         if isempty(obj.Parent.Triggers)
+         if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -721,7 +794,7 @@ classdef solChannel < handle
             obj.getfs_d;
          end
          tvec = startStop(1):(1/obj.fs_d):startStop(2); % relative sample times
-         [ifr,t] = obj.getAlignedIFR;
+         [ifr,t] = obj.getAlignedIFR(trialType);
          ifr = sqrt(abs(ifr));
          ifr = (ifr - mean(ifr,2)) ./ std(ifr,[],1);
 %          tvec = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
@@ -729,7 +802,8 @@ classdef solChannel < handle
 %          ifr = utils.fastsmooth(binCounts,15,'pg',0,1);
          
          if makeNewFig
-            fig = figure('Name',sprintf('%s: %s average LFP',obj.Parent.Name,obj.Name),...
+            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+               obj.Parent.Name,obj.Name,char(trialType)),...
                'Color','w',...
                'Units','Normalized',...
                'Position',obj.Parent.getFigPos(ii));
@@ -760,29 +834,29 @@ classdef solChannel < handle
       
       % Return figure handle to peri-event time histogram (PETH) for 
       % spiking on this channel
-      function fig = PETH(obj,edges,ii,makeNewFig)
+      function fig = PETH(obj,edges,trialType,ii,makeNewFig)
          if isempty(obj)
             fig = [];
             return;
          end
          
-         if nargin < 4
+         if nargin < 5
             makeNewFig = true;
          end
-         if nargin < 3
+         if nargin < 4
             ii = 1;
          end
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; PETH(obj(ii),edges,ii,makeNewFig)];
+               fig = [fig; PETH(obj(ii),edges,trialType,ii,makeNewFig)];
             end
             return;
          end
          
-         if isempty(obj.Parent.Triggers)
+         if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -790,10 +864,11 @@ classdef solChannel < handle
          obj.edges = edges;
          tvec = edges(1:(end-1))+(mode(diff(edges))/2);
          
-         binCounts = sum(obj.getBinnedSpikes,1);         
+         binCounts = sum(obj.getBinnedSpikes(trialType),1);         
                   
          if makeNewFig
-            fig = figure('Name',sprintf('%s: %s PETH',obj.Parent.Name,obj.Name),...
+            fig = figure('Name',sprintf('%s: %s (%s) PETH',...
+               obj.Parent.Name,obj.Name,cfg.TrialType(trialType)),...
                'Color','w',...
                'Units','Normalized',...
                'Position',obj.Parent.getFigPos(ii));
@@ -803,38 +878,45 @@ classdef solChannel < handle
             'FaceColor',col{obj.Hemisphere},...
             'EdgeColor','none');
          
-%          xlim(cfg.default('xlimit'));
          xlim([obj.edges(1) obj.edges(end)]*1e3);
          ylim(cfg.default('ylimit'));
       
          obj.addStimulusMarkers(gca,b);
-         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Count');
+         if ii == 23
+            solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Count');
+         else
+            solChannel.addAxesLabels(gca,obj.Name);
+         end
       end
       
       % Plot SPIKE RASTER of spike instants across trials for this channel
       % relative to TRIAL alignment. Spike times are represented as
       % vertical bars.
-      function plotRaster(obj,tPre,tPost,binWidth)
+      function plotRaster(obj,trialType,tPre,tPost,binWidth)
          if isempty(obj)
             fig = [];
             return;
          end
          
-         if nargin == 4
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if nargin == 5
             setSpikeBinEdges(obj,tPre,tPost,binWidth);
          end
 
          if numel(obj) > 1
             fig = [];
             for ii = 1:numel(obj)
-               plotRaster(obj(ii));
+               plotRaster(obj(ii),trialType);
             end
             return;
          end
          
-         if isempty(obj.Parent.Triggers)
+         if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trigger times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -842,7 +924,8 @@ classdef solChannel < handle
          spikes = obj.getBinnedSpikes;
          edges = obj.getSpikeBinEdges;
 
-         fig = figure('Name',sprintf('%s: %s Raster',obj.Parent.Name,obj.Name),...
+         fig = figure('Name',sprintf('%s: %s Raster (%s trials)',...
+            obj.Parent.Name,obj.Name,char(trialType)),...
             'Color','w',...
             'Units','Normalized',...
             'Position',[0.1 0.1 0.8 0.8]);
@@ -869,8 +952,8 @@ classdef solChannel < handle
                mkdir(outpath);
             end
             
-            savefig(fig,fullfile(outpath,[obj.Name id.rasterplots '.fig']));
-            saveas(fig,fullfile(outpath,[obj.Name id.rasterplots '.png']));
+            savefig(fig,fullfile(outpath,[obj.Name id.rasterplots '_' char(trialType) '.fig']));
+            saveas(fig,fullfile(outpath,[obj.Name id.rasterplots '_' char(trialType) '.png']));
             delete(fig);
          end
       end
@@ -999,7 +1082,7 @@ classdef solChannel < handle
          
          % Recordings all performed with rows indicating depth
          rec_layout_ord = obj.custom_order;
-         [a,b] = solChannel.getDefault('spacing','offset');
+         [n,a,b] = solChannel.getDefault('nshank','spacing','offset');
          
          % Compute depth "index" of this site, based on # shanks (recording
          % order from custom_order is incremented by elements of rows
@@ -1038,7 +1121,7 @@ classdef solChannel < handle
          obj.setDS(subf.ds,id.ds);
          obj.setSpikes(subf.spikes,id.spikes);
          obj.setStims(subf.dig,id.stim);
-         obj.setRate(subf.rate,id.rate);
+         obj.setRate(subf.rate,id.rate,cfg.default('do_rate_estimate'));
       end
    end
 end

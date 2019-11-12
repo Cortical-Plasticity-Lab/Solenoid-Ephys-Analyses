@@ -20,30 +20,47 @@ classdef solRat < handle
    % Properties that can be publically accessed, but must be changed using 
    % SOLRAT methods only
    properties (GetAccess = public, SetAccess = private, Hidden = false)
-      Layout % Probe layout for this rat
+      Layout      % Probe layout for this rat
    end
 
+   % Private "under-the-hood" properties
+   properties (GetAccess = private, SetAccess = private)
+      fbrowser % figBrowser class object handle
+   end
+   
 %% METHODS
    % Class constructor and data-handling methods
    methods (Access = public)
       % SOLRAT class constructor
       function obj = solRat(folder)
          % Get folder location
-         if nargin < 1
+         if nargin < 1 % If no input
+            clc;
             [obj.folder,flag] = utils.getPathTo('Select RAT folder');
             if ~flag
                obj = [];
                return;
             end
-         else
+         elseif ischar(folder) % "Standard" input
             obj.folder = folder;
+         elseif iscell(folder) % Can take cell array of folders
+            nRat = numel(folder);
+            obj = solRat(nRat);
+            for ii = 1:nRat
+               obj(ii) = solRat(folder{ii});
+            end
+            return;
+         elseif isnumeric(folder) && isscalar(folder) % Initialize array
+            nRat = folder;
+            obj = repmat(obj,nRat,1);
+            return;
          end
          
          % Get name of rat
-         obj.parseName;
+         obj.Name = obj.parseName;
          
          % Initialize blocks
-         obj.initChildBlocks;
+         obj.Children = obj.initChildBlocks;
       end
       
       % Get BLOCK according to "tagged" INDEX (RYY-###_2019_MM_DD_INDEX)
@@ -70,6 +87,37 @@ classdef solRat < handle
          parseStimuliTimes(obj.Children,true);
       end
       
+      % OVERLOADED METHOD: save(obj);
+      % Saves in current folder as [obj.Name '.mat'], with obj named as
+      % variable 'r'
+      function save(obj)
+         % Handle object arrays
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               save(obj(i));
+            end
+            return;
+         end
+         
+         savetic = tic; % Start timing save
+         
+         % Notify command window of which SOLRAT is being saved
+         fname = fullfile(pwd,[obj.Name '.mat']);
+         fprintf(1,...
+            'Saving %s (as %s.mat): in progress...\n',...
+            obj.Name,obj.Name);
+
+         % Save object as variable 'r' for consistency elsewhere
+         r = obj;
+         save(fname,'r','-v7.3');
+         
+         % Update command window
+         backspace_str = repmat('\b',1,15);
+         savetoc = round(toc(savetic));
+         fprintf(1,...
+            [backspace_str 'successful!\n-->\t(%g sec elapsed)\n\n'],...
+            savetoc);
+      end
    end
    
    % "Set" methods
@@ -85,109 +133,207 @@ classdef solRat < handle
          obj.Layout = L;
          setLayout(obj.Children,L);
       end
+      
+      % Set figure browser object
+      function setFB(obj,figBrowserObj)
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               obj(i).setFB(figBrowserObj);
+            end
+            return;
+         end
+         
+         if ~isa(figBrowserObj,'figBrowser')
+            error('figBrowserObj must be of class FIGBROWSER');
+         end
+         obj.fbrowser = figBrowserObj;
+         
+      end
    end
    
-   % "Graphics" methods
+   % "Graphics" methods (can take SOLRAT array inputs)
    methods (Access = public)
       % Batch export (save and close) PERI-EVENT TIME HISTOGRAMS (PETH) for
       % viewing spike counts in alignment to trials or stimuli, where each
       % figure contains the PETH for a single channel.
-      function batchPETH(obj,tPre,tPost,binWidth)
-         if nargin < 4
+      function batchPETH(obj,trialType,tPre,tPost,binWidth)
+         if nargin < 5
             binWidth = cfg.default('binwidth');
          end
          
-         if nargin < 3
+         if nargin < 4
             tPost = cfg.default('tpost');
          end
          
-         if nargin < 2
+         if nargin < 3
             tPre = cfg.default('tpre');
          end
          
-         batchPETH(obj.Children,tPre,tPost,binWidth);
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               batchPETH(obj(i),trialType,tPre,tPost,binWidth);
+            end
+            return;
+         end
+         
+         batchPETH(obj.Children,trialType,tPre,tPost,binWidth);
       end
       
       % Batch export (save and close) PERI-EVENT TIME HISTOGRAMS (PETH) for
       % viewing spike counts in alignment to trials or stimuli, where each
       % figure contains subplots organized by probe LAYOUT for all channels
       % in a given recording BLOCK
-      function batchProbePETH(obj,tPre,tPost,binWidth)
-         if nargin < 4
+      function batchProbePETH(obj,trialType,tPre,tPost,binWidth)
+         if nargin < 5
             binWidth = cfg.default('binwidth');
          end
          
-         if nargin < 3
+         if nargin < 4
             tPost = cfg.default('tpost');
          end
          
-         if nargin < 2
+         if nargin < 3
             tPre = cfg.default('tpre');
          end
          
-         probePETH(obj.Children,tPre,tPost,binWidth,true);
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               batchProbePETH(obj(i),trialType,tPre,tPost,binWidth);
+            end
+            return;
+         end
+         
+         probePETH(obj.Children,trialType,tPre,tPost,binWidth,true);
       end
       
       % Batch export (save and close) TRIAL- or STIMULUS-aligned LFP
       % average plots
-      function batchProbeAvgLFPplot(obj,tPre,tPost)
-         if nargin < 3
+      function batchProbeAvgLFPplot(obj,trialType,tPre,tPost)
+         if nargin < 4
             tPost = cfg.default('tpost');
          end
          
-         if nargin < 2
+         if nargin < 3
             tPre = cfg.default('tpre');
          end
          
-         probeAvgLFPplot(obj.Children,tPre,tPost,true);
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               batchProbeAvgLFPplot(obj(i),trialType,tPre,tPost);
+            end
+            return;
+         end
+         
+         probeAvgLFPplot(obj.Children,trialType,tPre,tPost,true);
       end
       
       % Batch export (save and close) TRIAL- or STIMULUS-aligned
       % INSTANTANEOUS FIRING RATE (IFR; spike rate estimate) average plots
-      function batchProbeAvgIFRplot(obj,tPre,tPost)
-         if nargin < 3
+      function batchProbeAvgIFRplot(obj,trialType,tPre,tPost)
+         if nargin < 4
             tPost = cfg.default('tpost');
          end
          
-         if nargin < 2
+         if nargin < 3
             tPre = cfg.default('tpre');
          end
          
-         probeAvgIFRplot(obj.Children,tPre,tPost,true);
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               batchProbeAvgIFRplot(obj(i),trialType,tPre,tPost);
+            end
+            return;
+         end
+         
+         probeAvgIFRplot(obj.Children,trialType,tPre,tPost,true);
       end
       
       % Batch export (save and close) TRIAL- or STIMULUS-aligned COHERENCE
       % plots for LFP-LFP cross-channel COHERENCE.
-      function batchLFPcoherence(obj,tPre,tPost)
-         if nargin < 3
+      function batchLFPcoherence(obj,trialType,tPre,tPost)
+         if nargin < 4
             tPost = cfg.default('tpost');
          end
          
-         if nargin < 2
+         if nargin < 3
             tPre = cfg.default('tpre');
          end
          
-         probeLFPcoherence(obj.Children,tPre,tPost);
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               batchLFPcoherence(obj(i),trialType,tPre,tPost);
+            end
+            return;
+         end
+         
+         probeLFPcoherence(obj.Children,trialType,tPre,tPost);
       end
       
+      % OVERLOADED METHOD for OPENFIG - lets you view rat object figures
+      % more easily.
+      function openfig(obj)
+         if isempty(obj(1).fbrowser)
+            obj(1).fbrowser = figBrowser(obj);
+         else
+            open(obj(1).fbrowser);
+         end
+      end
+         
    end
    
    % Private "helper" methods (for initialization, etc.)
    methods (Access = private)
       % Initialize CHILDREN (SOLBLOCK class objects), each of which is a
       % separate recording (experiment) for this SOLRAT object
-      function initChildBlocks(obj)
+      function Children = initChildBlocks(obj)
          F = dir(fullfile(obj.folder,[obj.Name '*']));
+         Children = solBlock(numel(F)); % Initialize array
          for iF = 1:numel(F)
-            obj.Children = [obj.Children; ...
-               solBlock(obj,fullfile(F(iF).folder,F(iF).name))];
+            Children(iF) = solBlock(obj,fullfile(F(iF).folder,F(iF).name));
          end
       end
       
       % Parse RAT name from folder (path) hierarchical structure
-      function parseName(obj)
+      function Name = parseName(obj)
          name = strsplit(obj.folder,filesep);
-         obj.Name = name{end};
+         Name = name{end};
+      end
+   end
+   
+   % Static "helper" method for retrieving defaults
+   methods (Static = true)
+      % Wrapper function to get variable number of default fields 
+      % (see cfg.default)
+      function varargout = getDefault(varargin)
+         % Parse input
+         if nargin > nargout
+            error('More inputs specified than requested outputs.');
+         elseif nargin < nargout
+            error('More outputs requested than inputs specified.');
+         end
+         
+         % Collect fields into output cell array
+         varargout = cfg.default(varargin);  
       end
    end
    
