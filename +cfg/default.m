@@ -1,26 +1,24 @@
-function out = default(paramName)
-%% DEFAULT  Return defaults struct or a single field of struct
+function varargout = default(varargin)
+%DEFAULT  Return defaults struct or a single field of struct
 %
-%  out = cfg.DEFAULT(); % returns defaults struct
-%  out = cfg.DEFAULT(paramName);  % returns only field specified by
-%                                 % paramName
+%  params = defaults.files();
+%     * This format returns full struct of parameters.
+%     e.g.
+%     >> params.var1 == 'something'; params.var2 == 'somethingelse'; ...
+%
+%  [var1,var2,...] = defaults.files('var1Name','var2Name',...);
+%     * This format returns as many output arguments as input arguments, so
+%        you can select to return variables for only the desired variables
+%        (just up to preference).
+%
 %
 % By: Max Murphy  v1.0  2019-08-06  Original version (R2017a)
 %                 v1.1  2019-11-09  Changed input/output parsing
+%                 v1.2  2020-05-18  Fixed format to match other projects
 
-%% Check input and parse cell arrays recursively (do not change)
-if iscell(paramName)
-   out = cell(size(paramName));
-   for i = 1:numel(paramName)
-      out{i} = cfg.default(paramName{i});
-   end
-   return;
-end
-
-%% CHANGE DEFAULTS HERE
+% Change file path stuff here
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
-
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...
@@ -60,7 +58,8 @@ out.id = struct('trig','_DIG_trigIn.mat',...
                 'lfpcoh','_Probe-LFP-Coherence',...
                 'probeavglfp','_Probe-Avg-LFP',...
                 'probeavgifr','_Probe-Avg-IFR');
- 
+
+% Change layout stuff here
 out.L = {  '019','021','000','029',...
            '009','016','005','003',...
            '014','010','001','004',... % Layout (L)
@@ -70,7 +69,7 @@ out.L = {  '019','021','000','029',...
            '017','008','025','027',...
            '022','020','024','030'};
         
-
+% This was for only a few pilot recordings that used 16-channel arrays
 % out.L = {'008','011','006','001',... % Layout (L)
 %          '009','014','003','000',... % 16-channel 
 %          '015','012','002','005',... % NeuroNexus A4x4
@@ -120,15 +119,35 @@ out.probe_b_loc = 'S1';  % depends on recording block
 out.trial_high_duration = 500; % ms (same for all recordings in CYCLE setup)
 out.fig_type_for_browser = 'Probe-Plots';
 
-%%
-if nargin > 0
-   if isfield(out,paramName)
-      out = out.(paramName);
+% Parse output (don't change this part)
+if nargin < 1
+   varargout = {out};   
+else
+   F = fieldnames(out);   
+   if (nargout == 1) && (numel(varargin) > 1)
+      varargout{1} = struct;
+      for iV = 1:numel(varargin)
+         idx = strcmpi(F,varargin{iV});
+         if sum(idx)==1
+            varargout{1}.(F{idx}) = out.(F{idx});
+         end
+      end
+   elseif nargout > 0
+      varargout = cell(1,nargout);
+      for iV = 1:nargout
+         idx = strcmpi(F,varargin{iV});
+         if sum(idx)==1
+            varargout{iV} = out.(F{idx});
+         end
+      end
    else
-      fprintf(1,'Invalid field: %s\n->\tEmpty output returned.',paramName);
-      out = [];
+      for iV = 1:nargin
+         idx = strcmpi(F,varargin{iV});
+         if sum(idx) == 1
+            fprintf('<strong>%s</strong>:',F{idx});
+            disp(out.(F{idx}));
+         end
+      end
    end
 end
-
-
 end
