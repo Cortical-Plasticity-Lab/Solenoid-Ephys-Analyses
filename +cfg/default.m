@@ -6,10 +6,20 @@ function out = default(paramName)
 %                                 % paramName
 %
 % By: Max Murphy  v1.0  2019-08-06  Original version (R2017a)
+%                 v1.1  2019-11-09  Changed input/output parsing
 
-%%
+%% Check input and parse cell arrays recursively (do not change)
+if iscell(paramName)
+   out = cell(size(paramName));
+   for i = 1:numel(paramName)
+      out{i} = cfg.default(paramName{i});
+   end
+   return;
+end
+
+%% CHANGE DEFAULTS HERE
 out = struct;
-out.path = 'P:\Rat\RegionSpecificity';
+out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
@@ -26,12 +36,14 @@ out.subf = struct('raw','_RawData',...
                   'probeplots','Probe-Plots',...
                   'lfpcoh','LFP-Coherence');
                
-out.id = struct(... 'trig','_DIG_trigIn.mat',...
-                'trig','_ANA_trialIn.mat',...
+out.id = struct('trig','_DIG_trigIn.mat',...
+                ... 'trig','_ANA_trialIn.mat',...
                 ... 'sol','_DIG_solenoidOut.mat',...
-                'iso','_ANA_isoIn.mat',...
-                'icms','_ICMSIn.mat',...
                 'sol','_DIG_solenoidIn.mat',...
+                'trial','_ANA_trialIn.mat',...
+                'iso','_ANA_isoIn.mat',...
+                'icms','_DIG_icmsIn.mat',...
+                'stim_info','_StimInfo.mat',...
                 'info','_RawWave_Info.mat',...
                 'raw','Raw_P',...
                 'filt','FiltCAR_P',...
@@ -79,12 +91,12 @@ out.barcols = {[0.8 0.2 0.2];[0.2 0.2 0.8]};
 out.tpre = -0.250;
 out.tpost = 0.750;
 out.binwidth = 0.002;
-out.ylimit = [0 200];
+out.ylimit = [0 50];
 out.xlimit = [-250 750];
 
 % Rate estimation parameters
 out.rate.w = 20; % kernel size (ms)
-out.rate.kernel = 'pg';
+out.rate.kernel = 'pg'; % pseudo-gaussian kernel (can be 'rect' or 'tri')
 
 % Default LFP raw average trace parameters
 out.ds.ylimit = [-1500 1500];
@@ -99,12 +111,22 @@ out.ifr.xlimit = [-250 750];
 out.ifr.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ifr.lw = 1.75;
 
+% For CYCLE setup, parsing parameters
+out.analog_thresh = 0.02;     % Analog threshold for LOW to HIGH value
+out.trial_duration = 1;       % Trial duration (seconds)
+out.do_rate_estimate = true;  % Estimate rates (if not present)? [CAN BE LONG]
+out.probe_a_loc = 'RFA'; % depends on recording block
+out.probe_b_loc = 'S1';  % depends on recording block
+out.trial_high_duration = 500; % ms (same for all recordings in CYCLE setup)
+out.fig_type_for_browser = 'Probe-Plots';
+
 %%
 if nargin > 0
    if isfield(out,paramName)
       out = out.(paramName);
    else
-      fprintf(1,'Invalid field: %s\n->\tFull defaults struct returned.\n',paramName);
+      fprintf(1,'Invalid field: %s\n->\tEmpty output returned.',paramName);
+      out = [];
    end
 end
 
