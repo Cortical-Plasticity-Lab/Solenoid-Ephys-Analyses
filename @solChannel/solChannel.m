@@ -1035,7 +1035,8 @@ classdef solChannel < handle
          end
          
          % Collect fields into output cell array
-         varargout = cfg.default(varargin);        
+         varargout = cell(1,nargout);
+         [varargout{:}] = cfg.default(varargin{:});        
       end
       
       % Return [x,y] coordinates for vertices of a graphics rectangle,

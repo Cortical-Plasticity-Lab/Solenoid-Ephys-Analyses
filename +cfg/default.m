@@ -140,7 +140,8 @@ else
             varargout{iV} = out.(F{idx});
          end
       end
-   else
+   else % Otherwise no output args requested
+      varargout = {};
       for iV = 1:nargin
          idx = strcmpi(F,varargin{iV});
          if sum(idx) == 1
@@ -148,6 +149,7 @@ else
             disp(out.(F{idx}));
          end
       end
+      clear varargout; % Suppress output
    end
 end
 end
