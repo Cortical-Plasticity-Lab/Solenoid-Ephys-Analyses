@@ -1,6 +1,6 @@
 %% Load in mat file created in main.m of solRat
 load('R19-227.mat')
-%feature/makeTables branch test
+
 %% Start making the table
 trialID = r.Children.Name;
 
@@ -66,9 +66,27 @@ Hemisphere = repmat(hemisphereArr,nTrials,1);
 Impedance = repmat(impedenceArr,nTrials,1);
 Names = string(repmat(nameArr,nTrials,1));
 
-%% get the Histogram (spikes; PETH) and LFP data timeseries
-
+trialNumber = repelem(1:nTrials,nChannels)';
 %% make the table 
 
-masterTable = table(TrialID, RowID, AnimalID, Group, GroupStr, Channel, ...
+masterTable = table(TrialID, RowID, AnimalID, Group, GroupStr, trialNumber, Channel, ...
     Names, Hemisphere, Depth, Impedance);
+
+%% get the Histogram (spikes; PETH) and LFP data timeseries
+binCell = {nRows,1};
+%for loop over the whole table
+for iRow = 1:height(masterTable)
+    %first need to get which channel that row is
+    iChan = table2array(masterTable(iRow,'Channel'));
+    %get the binned spikes for that channel, allTrials is 118x500 double
+    allTrials = r.Children.Children(iChan,1).getBinnedSpikes();
+    %get the specific trial in question using the trialNumber as index
+    %each cell in binCell should return a 1x500 double
+    binCell{iRow} = allTrials(table2array(masterTable(iRow,'trialNumber')),:);
+end
+
+%have to some reason transpose it to get it to be nx1
+binCellt = binCell';
+
+%add it to the table
+masterTable.Spikes = binCellt;
