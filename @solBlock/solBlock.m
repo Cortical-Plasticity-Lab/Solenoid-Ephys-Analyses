@@ -374,7 +374,9 @@ classdef solBlock < handle
             return;
          end
          
+         
          nTrial = sum(obj.TrialType == trialType);
+         
          edgeVec = tPre:binWidth:tPost;   
          
          [a_loc,b_loc] = solBlock.getDefault('probe_a_loc','probe_b_loc');
