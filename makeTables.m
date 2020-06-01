@@ -4,6 +4,9 @@ load('R19-227.mat')
 %% Start making the table
 trialID = r.Children.Name;
 
+% Note that r.Children can be an array. So this syntax works currently, but
+% only because there is a single Block in the example.
+
 %number of rows = number of channels * number of trials
 nChannels = length(r.Children.Children);
 trialTypes = r.Children.TrialType;
@@ -23,29 +26,30 @@ end
 % 2 = evoked response of ICMS only
 % 3 = evoked response from the combination of solenoid and ICMS. 
 
-Group = repelem(trialTypes, 64);
+GroupID = repelem(trialTypes, 64);
 
-%if you want it as a group name, not value do this
-GroupStr = strings([nRows 1]);
-
-for i = 1:length(Group)
-    if Group(i) == 1
-        GroupStr(i) = 'Solenoid';
-    end
-    if Group(i) == 2
-        GroupStr(i) = 'ICMS';
-    end
-    if Group(i) == 3
-        GroupStr(i) = 'Solenoid+ICMS';
-    end
-end
+% %if you want it as a group name, not value do this
+% GroupStr = strings([nRows 1]);
+% 
+% for i = 1:length(GroupID)
+%     if GroupID(i) == 1
+%         GroupStr(i) = 'Solenoid';
+%     end
+%     if GroupID(i) == 2
+%         GroupStr(i) = 'ICMS';
+%     end
+%     if GroupID(i) == 3
+%         GroupStr(i) = 'Solenoid+ICMS';
+%     end
+% end
 
 parseID = split(trialID, '_');
 AnimalID = string(repelem(parseID(1),nRows)');
 BlockID = string(repmat(join(parseID(2:end),'_'),nRows,1));
 TrialID = string(repmat(trialID,nRows,1));
 
-GroupCategorical = categorical(Group,1:3,{'Solenoid','ICMS','Solenoid+ICMS'});
+% Group = categorical(GroupID,1:3,{'Solenoid','ICMS','Solenoid+ICMS'});
+Group = cfg.TrialType(GroupID); % Uses previously-defined enumeration TrialType class
 
 %% SolChannel stuff
 
@@ -71,8 +75,8 @@ Names = string(repmat(nameArr,nTrials,1));
 trialNumber = repelem(1:nTrials,nChannels)';
 %% make the table 
 
-masterTable = table(TrialID, BlockID, RowID, AnimalID, Group, GroupStr, ...
-    GroupCategorical, trialNumber, Channel, ...
+masterTable = table(TrialID, BlockID, RowID, AnimalID, GroupID, ...
+    Group, Channel, trialNumber, ...
     Names, Hemisphere, Depth, Impedance);
 
 %% get the Histogram (spikes; PETH) and LFP data timeseries
@@ -82,6 +86,8 @@ for iRow = 1:height(masterTable)
     %first need to get which channel that row is
     iChan = table2array(masterTable(iRow,'Channel'));
     %get the binned spikes for that channel, allTrials is 118x500 double
+    % 118 --> Number of trials
+    % 500 --> Number of time bins (-500 : 500 ms; 2-ms bins)
     allTrials = r.Children.Children(iChan,1).getBinnedSpikes();
     %get the specific trial in question using the trialNumber as index
     %each cell in binCell should return a 1x500 double
