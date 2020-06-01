@@ -45,6 +45,7 @@ AnimalID = string(repelem(parseID(1),nRows)');
 TrialID = string(repmat(trialID,nRows,1));
 
 
+
 %% SolChannel stuff
 
 Channel = repmat(1:nChannels,1,nTrials)';
@@ -85,4 +86,8 @@ for iRow = 1:height(masterTable)
     binCell{iRow} = allTrials(table2array(masterTable(iRow,'trialNumber')),:);
 end
 
-binCellt = 
+%have to some reason transpose it to get it to be nx1
+binCellt = binCell';
+
+%add it to the table
+masterTable.Spikes = binCellt;

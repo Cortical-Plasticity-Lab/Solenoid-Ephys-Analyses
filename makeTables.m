@@ -44,6 +44,7 @@ parseID = split(trialID, '_');
 AnimalID = string(repelem(parseID(1),nRows)');
 TrialID = string(repmat(trialID,nRows,1));
 
+GroupCategorical = categorical(Group,1:3,{'Solenoid','ICMS','Solenoid+ICMS'});
 
 %% SolChannel stuff
 
@@ -69,7 +70,7 @@ Names = string(repmat(nameArr,nTrials,1));
 trialNumber = repelem(1:nTrials,nChannels)';
 %% make the table 
 
-masterTable = table(TrialID, RowID, AnimalID, Group, GroupStr, trialNumber, Channel, ...
+masterTable = table(TrialID, RowID, AnimalID, Group, GroupStr, GroupCategorical, trialNumber, Channel, ...
     Names, Hemisphere, Depth, Impedance);
 
 %% get the Histogram (spikes; PETH) and LFP data timeseries
