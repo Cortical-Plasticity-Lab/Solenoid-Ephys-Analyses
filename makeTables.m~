@@ -107,7 +107,7 @@ masterTable.Spikes = binCellt;
 % is P1 Ch 0 always == channel 1?
 wav_sneo_folder = 'R19-227_2019_11_05_2_wav-sneo_CAR_Spikes'; 
 
-probeList = [];
+probeList = {};
 chList = [];
 
 %gets all mat files only
@@ -115,6 +115,37 @@ matFiles = dir(fullfile(wav_sneo_folder,'*.mat'));
 for i = 1:length(matFiles)
   fileName = matFiles(i).name;
   fileSplit = split(fileName, '_');
-  probeList(i) = fileSplit(end-1);
-  chList(i) = fileSplit(end);
+  probeList(i) = fileSplit(end-2);
+  %have to get rid of the .mat on this
+  chSplit = split(fileSplit(end), '.');
+  chList(i) = str2double(chSplit(end-1));
 end
+
+% check to see if any channels were removed
+% if they werent, then assume:
+% probe 1 ch0 -> channel 1
+% probe 2 ch0 -> channel 33
+probeTable = strings(nRows,1);
+chTable = zeros(nRows,1);
+% +1 is needed because chList values start at 0
+if length(unique(chList))*length(unique(probeList)) == nChannels
+    for iRow = 1:height(masterTable)
+        %get the channel of that row
+        iChan = table2array(masterTable(iRow,'Channel'));
+        % if its greater than the max + 1 then subract 1
+        if iChan <= max(chList) + 1
+            chTable(iRow) = iChan - 1; 
+        % otherwise subract (max + 2), 2 is the offset
+        else
+            chTable(iRow) = iChan - max(chList) - 2;            
+        end
+        probeTable(iRow) = probeList{iChan};
+    end
+    
+else
+    'Channel was removed, might have to manually add ChannelID, ProbeID'
+end
+
+%add it to the table
+masterTable.ChannelID = chTable;
+masterTable.ProbeID = probeTable;

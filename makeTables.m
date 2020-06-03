@@ -108,7 +108,7 @@ masterTable.Spikes = binCellt;
 wav_sneo_folder = 'R19-227_2019_11_05_2_wav-sneo_CAR_Spikes'; 
 
 probeList = {};
-chList = {};
+chList = [];
 
 %gets all mat files only
 matFiles = dir(fullfile(wav_sneo_folder,'*.mat')); 
@@ -118,5 +118,39 @@ for i = 1:length(matFiles)
   probeList(i) = fileSplit(end-2);
   %have to get rid of the .mat on this
   chSplit = split(fileSplit(end), '.');
-  chList(i) = chSplit(end-1);
+  chList(i) = str2double(chSplit(end-1));
 end
+
+% check to see if any channels were removed
+% if they werent, then assume:
+% probe 1 ch0 -> channel 1
+% probe 2 ch0 -> channel 33
+% not sure how well this holds up if its not the same shape as this data
+probeTable = strings(nRows,1);
+chTable = zeros(nRows,1);
+% +1 is needed because chList values start at 0
+if length(unique(chList))*length(unique(probeList)) == nChannels
+    for iRow = 1:height(masterTable)
+        %get the channel of that row
+        iChan = table2array(masterTable(iRow,'Channel'));
+        % if its greater than the max + 1 then subract 1
+        if iChan <= max(chList) + 1
+            chTable(iRow) = iChan - 1; 
+        % otherwise subract (max + 2), 2 is the offset
+        else
+            chTable(iRow) = iChan - max(chList) - 2;            
+        end
+        probeTable(iRow) = probeList{iChan};
+    end
+    
+else
+    'Channel might have been removed, might manually add ChannelID, ProbeID'
+end
+
+%add it to the table
+masterTable.ChannelID = chTable;
+masterTable.ProbeID = probeTable;
+
+% move the variable around so its next to the other channel stuff
+masterTable = movevars(masterTable,'ProbeID','After','Channel');
+masterTable = movevars(masterTable,'ChannelID','After','ProbeID');
