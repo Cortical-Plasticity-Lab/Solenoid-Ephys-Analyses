@@ -99,3 +99,24 @@ binCellt = binCell';
 
 %add it to the table
 masterTable.Spikes = binCellt;
+
+%% ChannelID and ProbeID
+% this variable/section will need to be changed
+% unsure how these filenames correspond with each of the channels from
+% solRat object
+% is P1 Ch 0 always == channel 1?
+wav_sneo_folder = 'R19-227_2019_11_05_2_wav-sneo_CAR_Spikes'; 
+
+probeList = {};
+chList = {};
+
+%gets all mat files only
+matFiles = dir(fullfile(wav_sneo_folder,'*.mat')); 
+for i = 1:length(matFiles)
+  fileName = matFiles(i).name;
+  fileSplit = split(fileName, '_');
+  probeList(i) = fileSplit(end-2);
+  %have to get rid of the .mat on this
+  chSplit = split(fileSplit(end), '.');
+  chList(i) = chSplit(end-1);
+end
