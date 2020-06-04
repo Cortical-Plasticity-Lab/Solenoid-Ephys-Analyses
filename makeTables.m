@@ -219,3 +219,4 @@ end
 
 % add it to the table
 masterTable.LFP = lfp;
+
