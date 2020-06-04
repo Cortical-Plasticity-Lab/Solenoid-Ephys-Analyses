@@ -154,3 +154,58 @@ masterTable.ProbeID = probeTable;
 % move the variable around so its next to the other channel stuff
 masterTable = movevars(masterTable,'ProbeID','After','Channel');
 masterTable = movevars(masterTable,'ChannelID','After','ProbeID');
+
+%% Load in the _DS mat files and parse them using timestamps
+
+% Default PETH parameters
+tpre = -0.250;
+tpost = 0.750;
+% fs is 1000 for the _DS data
+timeStamps = r.Children.Trials;
+
+%using fs and the timeStamps create a nTrials x 2 array of indices 
+% first value is the start of that 1s window (in samples), second is end
+% these indices can then be used to index into mat files and grab data
+
+windowInd = zeros(nTrials, 2);
+
+for i = 1:nTrials
+    % should I round up or down? 
+    % the boundary is never on a whole number index
+    % right now round down on the beginning, and round up on the end
+    windowInd(i,1) = floor(timeStamps(i)*fs-tpre*fs);
+    windowInd(i,2) = ceil(timeStamps(i)*fs+tpre*fs);
+end
+
+%now use windowInd to access the mat files and parse the data
+%using cells because some of the windows be off by 1 due to rounding
+lfp = cell(nRows,1);
+% loop through the .mat files in _DS
+
+DS_folder = 'R19-227_2019_11_05_2_DS'; 
+
+%gets all mat files only
+matFiles = dir(fullfile(DS_folder,'*.mat')); 
+for i = 1:length(matFiles)
+  fileName = matFiles(i).name;
+  load(fileName);
+  fileSplit = split(fileName, '_');
+  probe = fileSplit(end-2);
+  %have to get rid of the .mat on this
+  chSplit = split(fileSplit(end), '.');
+  ch = str2double(chSplit(end-1));
+  
+  % find the rows where you have that channel and probe
+  for iRow = 1:height(masterTable)
+      if strcmp(table2cell(masterTable(iRow,'ProbeID')), probe)
+          %doesnt seem to enter this if statement
+          chI = table2array(masterTable(iRow,'ChannelID'));
+          if chI == ch
+              t = windowInd(masterTable(iRow,'Trial'));
+              lfp{iRow} = data(t(1):t(2));
+          end
+      end
+  end
+  
+end
+
