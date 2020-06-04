@@ -187,6 +187,7 @@ DS_folder = 'R19-227_2019_11_05_2_DS';
 
 %gets all mat files only
 matFiles = dir(fullfile(DS_folder,'*.mat')); 
+%iterate through all the files
 for i = 1:length(matFiles)
   fileName = matFiles(i).name;
   load(fileName);
@@ -197,11 +198,16 @@ for i = 1:length(matFiles)
   ch = str2double(chSplit(end-1));
   
   % find the rows where you have that channel and probe
+  % there might be a faster way to do this? not sure
+  % iterate through all rows
   for iRow = 1:height(masterTable)
-      if strcmp(table2array(masterTable(iRow,'ProbeID')), cell2mat(probe))
-          %doesnt seem to enter this if statement
-          chI = table2array(masterTable(iRow,'ChannelID'));
-          if chI == ch
+      % if the channel is correct
+      chI = table2array(masterTable(iRow,'ChannelID'));
+      if chI == ch
+          % if the probe is correct
+          if strcmp(table2array(masterTable(iRow,'ProbeID')), cell2mat(probe))
+              
+              % grab the indicies we parsed earlier and get that data
               ind = table2array(masterTable(iRow,'trialNumber'));
               t = windowInd(ind,:);
               lfp{iRow} = data(t(1):t(2));
