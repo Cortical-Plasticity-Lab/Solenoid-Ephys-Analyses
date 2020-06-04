@@ -144,7 +144,10 @@ if length(unique(chList))*length(unique(probeList)) == nChannels
     end
     
 else
-    'Channel might have been removed, might manually add ChannelID, ProbeID'
+    warning(['SOLENOID:' mfilename ':DataFormat'],...
+       ['\n\t->\t<strong>[MAKETABLES]:</strong> ' ...
+        'Channel might have been removed. The indexing for ' ...
+        'ChannelID & ProbeID may be incorrect']);
 end
 
 %add it to the table
