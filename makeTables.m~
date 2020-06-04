@@ -197,9 +197,13 @@ for i = 1:length(matFiles)
   
   % find the rows where you have that channel and probe
   for iRow = 1:height(masterTable)
-      if masterTable(iRow).ProbeID == probe
-          if masterTable(iRow).ChannelID == ch
-            lfp{iRow} = ;
+      if strcmp(table2array(masterTable(iRow,'ProbeID')), cell2mat(probe))
+          %doesnt seem to enter this if statement
+          chI = table2array(masterTable(iRow,'ChannelID'));
+          if chI == ch
+              ind = table2array(masterTable(iRow,'trialNumber'));
+              t = windowInd(ind);
+              lfp{iRow} = data(:,t(1):t(2));
           end
       end
   end

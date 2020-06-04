@@ -173,8 +173,9 @@ for i = 1:nTrials
     % should I round up or down? 
     % the boundary is never on a whole number index
     % right now round down on the beginning, and round up on the end
-    windowInd(i,1) = floor(timeStamps(i)*fs-tpre*fs);
-    windowInd(i,2) = ceil(timeStamps(i)*fs+tpre*fs);
+    % tpre is a negative number, so add it 
+    windowInd(i,1) = floor(timeStamps(i)*fs+(tpre*fs));
+    windowInd(i,2) = ceil(timeStamps(i)*fs+(tpost*fs));
 end
 
 %now use windowInd to access the mat files and parse the data
@@ -197,11 +198,12 @@ for i = 1:length(matFiles)
   
   % find the rows where you have that channel and probe
   for iRow = 1:height(masterTable)
-      if strcmp(table2cell(masterTable(iRow,'ProbeID')), probe)
+      if strcmp(table2array(masterTable(iRow,'ProbeID')), cell2mat(probe))
           %doesnt seem to enter this if statement
           chI = table2array(masterTable(iRow,'ChannelID'));
           if chI == ch
-              t = windowInd(masterTable(iRow,'Trial'));
+              ind = table2array(masterTable(iRow,'trialNumber'));
+              t = windowInd(ind,:);
               lfp{iRow} = data(t(1):t(2));
           end
       end
@@ -209,3 +211,5 @@ for i = 1:length(matFiles)
   
 end
 
+% add it to the table
+masterTable.LFP = lfp;
