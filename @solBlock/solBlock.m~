@@ -472,7 +472,7 @@ classdef solBlock < handle
       matFiles = dir(fullfile(DS_folder,'*.mat')); 
       
       firstMat = matFiles(1).name; %load the first mat file to get the fs
-      fsDS = getfield(load(firstMat,'fs'),'fs');
+      fsDS = load(firstMat,'fs');
       
       windowInd = zeros(nTrials, 2);
       for i = 1:nTrials
@@ -491,7 +491,7 @@ classdef solBlock < handle
       % iterate through all the files
       for i = 1:length(matFiles)
         fileName = matFiles(i).name;
-        data = getfield(load(firstMat,'data'),'data');%get data from .mat
+        load(fileName);
         fileSplit = split(fileName, '_');
         probe = fileSplit(end-2);
         %have to get rid of the .mat on this

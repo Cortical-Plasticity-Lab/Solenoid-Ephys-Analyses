@@ -223,3 +223,9 @@ end
 % add it to the table
 masterTable.LFP = lfp;
 
+%% Testing solBlock makeTables
+
+load('R19-227.mat')
+blocks = r.Children;
+
+bTable = blocks.makeTables;
