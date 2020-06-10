@@ -1,7 +1,9 @@
 classdef solChannel < handle
-%% SOLCHANNEL  obj = solChannel(block,info);
+%SOLCHANNEL  Organization object for data at the individual-channel level
+%
+%  obj = solChannel(solBlockObj,info);
    
-%% PROPERTIES
+% PROPERTIES
    % Immutable properties set on object construction
    properties (GetAccess = public, SetAccess = immutable, Hidden = false)
       Name           % String name of electrode recording channel
@@ -41,11 +43,26 @@ classdef solChannel < handle
       fs             % Original sample frequency during recording
    end
    
-%% METHODS
+% METHODS
    % Class constructor and data-handling methods
    methods (Access = public)
       % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info)
+         %SOLCHANNEL Constructor for `solChannel` object
+         %
+         % obj = solChannel(solBlockObj,info);
+         %
+         % Inputs
+         %  solBlockObj - "Parent" `solBlock` object (must be provided)
+         %  info        - struct with channel-specific "info" that is
+         %                 obtained at the Block level (due to how the
+         %                 recording information gets extracted). Therefore
+         %                 this is passed as an input argument.
+         %
+         % Output
+         %  obj         - Scalar or array `solChannel` object that contains
+         %                 data at the individual-channel level.
+         
          if ~isa(block,'solBlock')
             if isscalar(block) && isnumeric(block)
                obj = repmat(obj,block,1); % Initialize empty array
@@ -125,7 +142,77 @@ classdef solChannel < handle
          end
          save(obj.rate,'data','fs','-v7.3');
       end
+         
+      % Returns **channel** data table for convenient export of dataset
+      function channelTable = makeTables(obj,trialData)
+      %MAKETABLES Returns data table elements specific to `solChannel`
+      %
+      %  channelTable = makeTables(obj,trialData);
+      %
+      %  Inputs
+      %     obj       - Scalar or Array of `solBlock` objects
+      %     trialData - Struct array, where each array element describes
+      %                    metadata for an individual trial:
+      %                    * `Time`  - Timestamp of trial onset
+      %                    * `Type`  - see: cfg.TrialType
+      %                    * `ID`    - Unique trial key (see utils.makeKey)
+      %  
+      %  Output
+      %     channelTable - Table with the following variables:
+      %        * `ChannelID`- (Unique) identifier for a single channel
+      %        * `Channel`  - Channel index (1:32) for a given array
+      %        * `Probe`    - Probe index (1:2) 
+      %        * `Hemisphere` - Indicates if probe is in left or right
+      %                          hemisphere
+      %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+      %        * `Impedance`  - Individual channel measured impedance
+      %        * `XLoc`       - X-coordinate (mm) relative to bregma
+      %                          (anteroposterior distance)
+      %        * `YLoc`       - Y-coordinate (mm) relative to bregma
+      %                          (mediolateral distance)
+      %        * `Depth`      - Depth of recording channel (depends on
+      %                          channels, which are at different depths on
+      %                          individual recording shanks, as well as
+      %                          the overall insertion depth)
+      %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
+      %        * `Spikes` - Binned spike counts relative to alignment for a
+      %                       single channel.
+      %        * `LFP`    - LFP time-series relative to alignment for a
+      %                       single channel.
+      %        * `Notes` - Most-likely empty, but allows manual input of
+      %                    notes or maybe a notes struct? Basically
+      %                    something that lets you manually add "tags" to
+      %                    the data rows.
+      %
+      %  Note: channelTable might also contain `TrialID`, `TrialTime`, and
+      %        `TrialType`, or you might choose to deal with those at the
+      %        `solBlock` makeTables level.
+      %        
+      %  Note 2: I just realized we should also include with each trial
+      %           other timing metadata: perhaps instead of `TrialType`
+      %           variable, it is better just to include the following
+      %           variables:
+      %           - ICMSOnset      : Relative to trial onset (sec)
+      %           - ICMSPulseCount : Usually 1, but sometimes multipulse
+      %           - ICMSFrequency  : If multiple pulses, what is rate?
+      %           - SolenoidOnset  : Relative to trial onset (sec)
+      %           - SolenoidOffset : Relative to trial onset (sec)
+      %           Like the Trial timing or TrialType data, those things are
+      %           probably easiest to parse at the Block level and then
+      %           either pass to this function as an argument or to deal
+      %           with at the Block level after returning the
+      %           `channelTable`.
       
+      % Since it can be an array, iterate/recurse over all the blocks
+      if ~isscalar(obj)
+          channelTable = table.empty; % Create empty data table to append
+          for iChannel = 1:numel(obj)
+            channelTable = [channelTable; makeTable(obj(iChannel))]; 
+          end
+          return;
+      end
+       
+      end %%%% End of makeTables%%%%
    end
    
    % "Get" methods

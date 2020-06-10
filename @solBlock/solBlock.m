@@ -1,9 +1,9 @@
 classdef solBlock < handle
-%% SOLBLOCK   obj = solBlock(); or obj = solBlock(ratObj,folder);
+%SOLBLOCK   obj = solBlock(); or obj = solBlock(ratObj,folder);
 %
 %  Class for organizing data from an individual recording (experiment).
 
-%% PROPERTIES
+% PROPERTIES
    % Unchangeable properties set on object construction
    properties (GetAccess = public, SetAccess = immutable, Hidden = false)
       Name        % Recording BLOCK name
@@ -49,11 +49,36 @@ classdef solBlock < handle
       edges    % Time bin edges for binning histograms relative to alignment
    end
 
-%% METHODS
+% METHODS
    % Class constructor and data-handling/parsing methods
    methods (Access = public)
       % SOLBLOCK class constructor
       function obj = solBlock(ratObj,folder)
+         %SOLBLOCK  Class constructor for `solBlock` "recording" object
+         %
+         % obj = solBlock();
+         % obj = solBlock(solRatObj);
+         % obj = solBlock(folder);
+         % obj = solBlock(solRatObj,folder);
+         %
+         % Inputs
+         %  solRatObj - (Optional) `solRat` class object for Rat used in
+         %              this recording. If given, the constructor will
+         %              return an array of `solBlock` objects corresponding
+         %              to the number of "Block" folders detected within
+         %              the "Rat" folder at the `solRat` level.
+         %              -> If no input is provided, a prompt will pop up to
+         %                 select the desired BLOCK folder in order to
+         %                 return a scalar `solBlock` object from the
+         %                 constructor.
+         %  folder    - (Optional) char array that is the BLOCK folder path
+         %
+         % Output
+         %  obj       - `solBlock` object representing a single recording,
+         %              or an array of such objects representing multiple
+         %              recordings from the same rat.
+         
+         
          % Set the folder
          if nargin < 1
             clc;
@@ -112,9 +137,26 @@ classdef solBlock < handle
    methods (Access = private)
       % Parse BLOCK name using recording folder path
       function [Name,Index] = parseName(obj)
+         %PARSENAME Parse BLOCK name using recording folder path
+         %
+         % [Name,Index] = obj.parseName();
+         %
+         % Inputs
+         %  obj   - `solBlock` object or array of such objects
+         %
+         % Output
+         %  Name  - Name of recording block (char array). If `obj` is
+         %           nonscalar, then this is returned as cell array of same
+         %           dimension as `obj`
+         %  Index - Same as Name regarding size, except this is a numeric
+         %           array representing the block index corresponding to
+         %           each Block.
+         
          if numel(obj) > 1
+            Name = cell(size(obj));
+            Index = nan(size(obj));
             for ii = 1:numel(obj)
-               obj(ii).parseName;
+               [Name{ii},Index(ii)] = obj(ii).parseName;
             end
             return;
          end
@@ -124,11 +166,18 @@ classdef solBlock < handle
          Index = str2double(tag{end});
       end
       
-      % Parse trial FILE (if not present, because Max is dumb and forgot to
-      % enable the analog inputs on a couple of recording blocks); it can
-      % be reconstructed from the combination of ICMS and SOLENOID digital
-      % streams.
+      % Parse trile FILE
       function successful_parse_flag = parseTrials(obj)
+         %PARSETRIALS Parse trial file
+         %
+         % Parse trial FILE (if not present, because Max is dumb and forgot
+         % to enable the analog inputs on a couple of recording blocks); it
+         % can be reconstructed from the combination of ICMS and SOLENOID 
+         % digital streams, so this is just there to "fix" a few "bad"
+         % recordings.
+         %
+         % successful_parse_flag = parseTrials(obj);
+         
          if numel(obj) > 1
             successful_parse_flag = false(numel(obj),1);
             for i = 1:numel(obj)
@@ -184,6 +233,18 @@ classdef solBlock < handle
       
       % Parse the trial TYPE (for new CYCLE setup)
       function parseTrialType(obj,tTrials,thresh)
+         %PARSETRIALTYPE Parses the enumerated TYPE for each trial
+         %
+         % parseTrialType(obj,tTrials,thresh);
+         %
+         % Inputs
+         %  obj     - Scalar or array of `solBlock` objects
+         %  tTrials - Time of each trial (seconds)
+         %  thresh  - Threshold (seconds) for distinguishing between trials
+         %
+         % Output
+         %  Associates the TYPE with each trial in `obj.TrialType` property
+         
          if numel(obj) > 1
             error('parseTrialType is a method for SCALAR solBlock objects only.');
          end
@@ -218,6 +279,10 @@ classdef solBlock < handle
    
    % Static methods of SOLBLOCK class 
    methods (Static = true)
+      % Return indexing array with correct dimensions
+      function Y = pruneTruncatedSegments(X)
+      %PRUNETRUNCATEDSEGMENTS Return indexing array with correct dimensions
+      %
       % Returns indexing matrix Y from binary vector X, where X switches
       % from LOW to HIGH to indicate a contiguous segment related to some
       % event of interest. Because if a recording is stopped early these
@@ -226,7 +291,15 @@ classdef solBlock < handle
       % "segment" and then returns the corresponding sample indices in the
       % data matrix Y, where each row corresponds to a segment and each
       % column is the sample index of a consecutive sample of interest.
-      function Y = pruneTruncatedSegments(X)
+      %
+      %  Y = solBlock.pruneTruncatedSegments(X);
+      %
+      %  Inputs
+      %   X - Thresholding matrix indicating that a stimulus was present
+      %
+      %  Output
+      %   Y - Indexing matrix corresponding to rising/falling edges of X
+      
          data = find(X > cfg.default('analog_thresh'));
          iStart = data([true, diff(data) > 1]);
          iDiff = iStart(2)-iStart(1);
@@ -240,8 +313,13 @@ classdef solBlock < handle
       end
       
       % Wrapper function to get variable number of default fields 
-      % (see cfg.default)
       function varargout = getDefault(varargin)
+         %GETDEFAULT Return default variable
+         %
+         % varargout = solBlock.getDefault(varargin);
+         %
+         % See also: cfg.default
+         
          % Parse input
          if nargin > nargout
             error('More inputs specified than requested outputs.');
@@ -259,11 +337,27 @@ classdef solBlock < handle
    methods (Access = public)
       % Plot the aligned LFP for each channel
       function fig = avgLFPplot(obj,trialType,tPre,tPost,subset)
-         if nargin < 5
-            subset = 1:numel(obj.Children);
-         else
-            subset = reshape(subset,1,numel(subset));
-         end
+         %AVGLFPPLOT Plot the aligned LFP for each channel
+         %
+         % fig = avgLFPplot(obj,trialType,tPre,tPost,subset);
+         %
+         % Inputs
+         %  obj - scalar or array `solBlock` object
+         %  trialType - Enumerated trial type that we want to select for
+         %              plots
+         %  tPre      - "Pre" time, relative to alignment event
+         %  tPost     - "Post" time, relative to alignment event
+         %  subset    - (Optional) if obj is array, then this should be
+         %              cell array of same size. If not provided, plot all
+         %              trials for a given `solBlock` obj. If given, each
+         %              cell array element should be an indexing array that
+         %              indexes which trials to include from the restricted
+         %              set of trials set by `trialType` argument.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
          
          if nargin < 4
             tPost = cfg.default('tpost');
@@ -277,6 +371,29 @@ classdef solBlock < handle
             trialType = cfg.TrialType('All');
          end
          
+         if numel(obj) > 1
+            fig = gobjects(size(obj));
+            for i = 1:numel(obj)
+               if nargin < 5
+                  fig(i) = avgLFPplot(obj(i),trialType,tPre,tPost);
+               else
+                  if ~iscell(subset)
+                     subset = repmat({subset},size(obj));
+                  end
+                  fig(i) = avgLFPplot(obj(i),trialType,tPre,tPost,subset{i});
+               end
+            end
+            return;
+         elseif iscell(subset)
+            subset = subset{:};
+         end
+         
+         if nargin < 5
+            subset = 1:numel(obj.Children);
+         else
+            subset = reshape(subset,1,numel(subset));
+         end
+         
 %          obj.parseStimuliTimes;
          
          edgeVec = [tPre,tPost];        
@@ -284,10 +401,9 @@ classdef solBlock < handle
          
       end
       
-      
       % Returns **block** data table for convenient export of dataset
       function blockTable = makeTables(obj)
-      %%%%%%%MAKETABLES Returns data table for the blocks%%%%%%%%%
+      %MAKETABLES Returns data table elements specific to `solBlock`
       %
       %  blockTable = obj.makeTables;
       %  blockTable = makeTables(objArray);
@@ -296,19 +412,90 @@ classdef solBlock < handle
       %     obj - Scalar or Array of `solBlock` objects
       %  
       %  Output
-      %     blockTable - Table with the following variable names...
-      %           (to be added)
+      %     blockTable - Table with the following variables:
+      %        * `BlockID`  - Name of recording block
+      %        * `TrialID`  - Trial-specific identifier (might be
+      %                          replicated for all channels within a
+      %                          Block)
+      %        * `ChannelID`- (Unique) identifier for a single channel
+      %        * `Channel`  - Channel index (1:32) for a given array
+      %        * `Probe`    - Probe index (1:2) 
+      %        * `Hemisphere` - Indicates if probe is in left or right
+      %                          hemisphere
+      %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+      %        * `Impedance`  - Individual channel measured impedance
+      %        * `XLoc`       - X-coordinate (mm) relative to bregma
+      %                          (anteroposterior distance)
+      %        * `YLoc`       - Y-coordinate (mm) relative to bregma
+      %                          (mediolateral distance)
+      %        * `Depth`      - Depth of recording channel (depends on
+      %                          channels, which are at different depths on
+      %                          individual recording shanks, as well as
+      %                          the overall insertion depth)
+      %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
+      %        * `Spikes` - Binned spike counts relative to alignment for a
+      %                       single channel.
+      %        * `LFP`    - LFP time-series relative to alignment for a
+      %                       single channel.
+      %        * `Notes` - Most-likely empty, but allows manual input of
+      %                    notes or maybe a notes struct? Basically
+      %                    something that lets you manually add "tags" to
+      %                    the data rows.
+      
       % Since it can be an array, iterate/recurse over all the blocks
       if ~isscalar(obj)
           blockTable = table.empty; % Create empty data table to append
           for iBlock = 1:numel(obj)
 
-            blockTable = [blockTable; solBlock.makeTable(obj(iBlock))];
+            blockTable = [blockTable; solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
           end
+          return;
       end
       
+      % Need to parse the following variables from Block:
+      %  * `TrialID`  - Since "Block" contains list of all trial instances,
+      %                 each of those instances should get an associated
+      %                 'TrialID' and that can be passed to the
+      %                 `makeTables` method of `solChannel` so that it is
+      %                 added to each trial of individual channel data
+      %                 properly.
+      %  * `TrialType` - Same as `TrialID`
+      %  * `BlockID`  - obj.Name
+      %  * Generally, we will get all information about the electrodes as a
+      %     single data structure that is obtained with every recording.
+      %     However, to be manipulated easily, that metadata needs to be
+      %     associated at an individual Channel level with each channel
+      %     properly. So we should pass that `info` struct, which contains
+      %     things like `Depth` and `XLoc` and `Area` etc. to the method of
+      %     `solChannel` in order to properly associate them. Ideally, that
+      %     `info` struct is already associated with the `solChannel`
+      %     object as one of its properties from the constructor, when such
+      %     data is parsed generally and added to the properties at the
+      %     relevant level. 
+      %
+      %   * The rest of the table comes from
+      %     ```
+      %        trialData = getTrialData(obj); % Not yet written
+      %        channelTable = makeTables(obj.Children,trialData);
+      %     ```
+      %
+      %  Strategy -- 
+      %     1) Create `trialTable` in this method using data from Block
+      %           * Mainly, we can get `TrialID` `TrialTime` and
+      %              `TrialType` (the three main fields that should be
+      %              incorporated to the `trialData` struct array returned
+      %              by `getTrialData(obj)`); those will have to be
+      %              replicated properly either within
+      %              `makeTables(obj.Children);` or at this level so that
+      %              the number of rows match
+      %     2) Create `channelTable` using syntax above
+      %     3) Replicate `trialTable` to same number of rows as 
+      %           `channelTable`
+      %     4) Concatenate the two tables (horizontally) to create
+      %        `blockTable`
+      
       %number of rows = number of channels * number of trials
-      trialID = obj.Name;
+      trialID = obj.Name; % 
       nChannels = length(obj.Children);
       trialTypes = obj.TrialType;
       nTrials = length(obj.TrialType);
@@ -321,11 +508,6 @@ classdef solBlock < handle
           randstr = alphabet(randi(length(alphabet), 1, 10));
           RowID(i) = strcat("ROWID_",randstr);
       end
-
-      % should group be a number? or should it say: "Solenoid","ICMS","ICMS+Solenoid"
-      % 1 = evoked response of the solenoid only
-      % 2 = evoked response of ICMS only
-      % 3 = evoked response from the combination of solenoid and ICMS. 
 
       GroupID = repelem(trialTypes, nChannels);
 
@@ -345,14 +527,7 @@ classdef solBlock < handle
       hemisphereArr = zeros(nChannels,1);
       impedenceArr = zeros(nChannels,1);
       nameArr = strings([nChannels 1]);
-
-      % For any of the parts I've commented out, try moving those in as
-      % methods of `solBlock` (the object comprising each array element of
-      % `solRat` obj.Children array). That method should accept
-      % obj.Children as a full array (see iterator used above).
       
-      % % Commented part below has to change % %
-      %   (Won't work when there are multiple Blocks for each Rat ) %
       for i = 1:nChannels
           depthArr(i) = obj.Children(i,1).Depth;
           hemisphereArr(i) = obj.Children(i,1).Hemisphere;
@@ -523,7 +698,7 @@ classdef solBlock < handle
       blockTable.LFP = lfp;
          
       
-      end %%%%%%% End of makeTables%%%%%%%%
+      end %%%% End of makeTables%%%%
       
       % Plot the peri-event time histogram for each channel, save the
       % figure, and close the figure once it has been saved.
@@ -1224,12 +1399,12 @@ classdef solBlock < handle
             [obj.Name subf.raw],...
             [obj.Name id.info]));
          % Construct child CHANNEL array
-         fprintf(1,'Adding CHANNEL child objects to %s...000%%\n',obj.Name);
+         fprintf(1,'Adding CHANNEL child objects to %s...000%\n',obj.Name);
          nCh = numel(in.RW_info);
          Children = solChannel(nCh);
          for iCh = 1:nCh
             Children(iCh) = solChannel(obj,in.RW_info(iCh));
-            fprintf(1,'%03g%%\n',round((iCh/nCh)*100));
+            fprintf(1,'%03g%\n',round((iCh/nCh)*100));
          end
       end
       

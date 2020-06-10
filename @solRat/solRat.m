@@ -234,32 +234,113 @@ classdef solRat < handle
       %     obj - Scalar or Array of `solRat` objects
       %  
       %  Output
-      %     masterTable - Table with the following variable names...
-      %           (to be added)
+      %     masterTable - Table with the following variables:
+      %        * `RowID`    - Unique "key" for each row (trial)
+      %        * `AnimalID` - Name of rat 
+      %        * `BlockID`  - Name of recording block
+      %        * `TrialID`  - Trial-specific identifier (might be
+      %                          replicated for all channels within a
+      %                          Block)
+      %        * `ChannelID`- (Unique) identifier for a single channel
+      %        * `Channel`  - Channel index (1:32) for a given array
+      %        * `Probe`    - Probe index (1:2) 
+      %        * `Hemisphere` - Indicates if probe is in left or right
+      %                          hemisphere
+      %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+      %        * `Impedance`  - Individual channel measured impedance
+      %        * `XLoc`       - X-coordinate (mm) relative to bregma
+      %                          (anteroposterior distance)
+      %        * `YLoc`       - Y-coordinate (mm) relative to bregma
+      %                          (mediolateral distance)
+      %        * `Depth`      - Depth of recording channel (depends on
+      %                          channels, which are at different depths on
+      %                          individual recording shanks, as well as
+      %                          the overall insertion depth)
+      %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
+      %        * `DeficitSeverity` - Severity of animal's deficit, parsed
+      %                              from animal behavioral record.
+      %        * `Spikes` - Binned spike counts relative to alignment for a
+      %                       single channel.
+      %        * `LFP`    - LFP time-series relative to alignment for a
+      %                       single channel.
+      %        * `Notes` - Most-likely empty, but allows manual input of
+      %                    notes or maybe a notes struct? Basically
+      %                    something that lets you manually add "tags" to
+      %                    the data rows.
       
-      % % Load in mat file created in main.m of solRat (now is `obj`)
-      % load('R19-227.mat')
-      
-      
-      % Instead, check if its scalar or array and iterate on array if so:
+      % Check if its scalar or array and iterate on array if so:
       if ~isscalar(obj)
          masterTable = table.empty; % Create empty data table to append
          for iRat = 1:numel(obj)
             % Note: we could pre-allocate `masterTable` but this isn't
             % really that much slower here and is a lot more convenient to
             % write for the time-being.
-            masterTable = [masterTable; makeTable(obj(iRat))]; %#ok<AGROW>
+            masterTable = [masterTable; makeTables(obj(iRat))]; %#ok<AGROW>
          end         
          return; % End "recursion"
       end
 
-      % Start making the table
-      % need to reference the solBlock makeTables function
-    
-      %rest of the code moved to solBlock 
+      % Need to parse the following variables from Rat:
+      %  * `RowID`            (at very end of table-making process)
+      %  * `GroupID`    - Associated with Animal (see **Column K** of
+      %                    `Reach-Scoring.xlsx`)
+      %  * `AnimalID`   - From `obj.Name`
+      %  * `DeficitSeverity` (or any other behaviorally-related metadata)
+      %
+      %  * The rest of the table comes from:
+      %     `blockTable = makeTables(obj.Children);`
+      %
+      %  Strategy -- 
+      %     1) Create `ratTable` in this method using data parsed from Rat
+      %     2) Create `blockTable` using syntax above (within `makeTables` 
+      %           of `solBlock` it makes sense to reference a similar 
+      %           method of organization for `solChannel` objects)
+      %     3) Replicate `ratTable` to same number of rows as `blockTable`
+      %     4) Concatenate the two tables (horizontally) to create
+      %        `masterTable`
+      %        -> You can either add `RowID` after (3) or (4)
       
+      AnimalID = obj.Name;
+      DeficitSeverity = parseDeficitSeverity(obj); % Empty method currently
+      ratTable = table(AnimalID,DeficitSeverity);
+      % Runs on each child Block of `solRat`:
+      blockTable = makeTables(obj.Children);
+      % Replicate `ratTable` to match number of rows from Block
+      nBlockRows = size(blockTable,1);
+      ratTable = repmat(ratTable,nBlockRows,1);
       
+      % Concatenate tables
+      masterTable = [ratTable, blockTable];
       
+      % Add unique "ID" to each row
+      masterTable.RowID = utils.makeKey(...
+         nBlockRows,'unique',[strrep(obj.Name,'-','') '_']);
+      
+      % Move appended `RowID` to first variable:
+      masterTable = masterTable(:,[end, 1:(end-1)]);
+      end
+      
+      % Returns quantitative indicator of deficit severity [PLACEHOLDER]
+      function deficitSeverity = parseDeficitSeverity(obj)
+         %PARSEDEFICITSEVERITY Return some indicator of deficit (behavior)
+         %
+         % deficitSeverity = parseDeficitSeverity(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array `solRat` object
+         %
+         % Output
+         %  deficitSeverity - Quantitative indicator of behavioral deficit
+         %     * TBD (see: Reach-Scoring.xlsx for data source)
+         
+         if ~isscalar(obj)
+            deficitSeverity = nan(size(obj));
+            for i = 1:numel(obj)
+               deficitSeverity(i) = parseDeficitSeverity(obj(i));
+            end            
+            return;
+         end
+         deficitSeverity = nan;
       end
       
       % Set stimulus times for each `solBlock` child
