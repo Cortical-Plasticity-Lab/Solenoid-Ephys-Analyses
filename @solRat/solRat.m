@@ -419,33 +419,53 @@ classdef solRat < handle
       end
       
       % Displays a graph of a rats behavior over time (pre and post op)
-      function behaviorTraces(obj)
-          % BEHAVIOR TRACES returns a graphic for behavior over time
-          % behaviorTraces(obj)
-          % Inputs
-          %  obj - Scalar or array `solRat` object
-          %
-          % Output
-          %  figures of the behavioral performance for each rat
-          
-          
-          if ~isscalar(obj)       
+      function fig = behaviorTraces(obj)
+         %BEHAVIORTRACES returns a graphic for behavior over time
+         %
+         % fig = behaviorTraces(obj)
+         %
+         % Inputs
+         %  obj - Scalar or array `solRat` object
+         %
+         % Output
+         %  fig - figure handle(s) of the behavioral performance for each
+         %           element of `obj`
+         
+         if ~isscalar(obj)
+            fig = gobjects(size(obj));
             for i = 1:numel(obj)
-               behaviorTraces(obj(i));
+               fig(i) = behaviorTraces(obj(i));
             end
             return;
          end
-          
-          [~,behavior] = obj.parseDeficitSeverity();
-          
-          figure
-          scatter(behavior.Day,behavior.Percent_Success.*100)
-          title(strcat(obj.Name ,' Percent Success Pre and Post Surgery'))
-          xlabel('Day (Surgery = Day 0)')
-          ylabel('Percent Success')
-          xlim([-10 22])
-          ylim([0 100])
-          xline(0,'--r') %vertical line at day of surgery
+         
+         [~,behavior] = obj.parseDeficitSeverity();
+         
+         [figParams,axParams,scatterParams,fontParams] = ...
+            solRat.getDefault(...
+            'figparams','axparams','scatterparams','fontparams');
+         
+         fig = figure(...
+            'Name',sprintf('%s - Behavioral Outcomes',obj.Name),...
+            figParams{:});
+         ax = axes(fig,axParams{:});
+         
+         xTick = sort([behavior.Day; 0],'ascend');
+         xTick(abs(xTick)<=2) = [];
+         xTickLab = cellfun(@num2str,num2cell(xTick),'UniformOutput',false);
+         xTickLab(xTick == 0) = {'\color{red} Surgery'};
+         set(ax,'XTick',xTick,'XTickLabel',xTickLab);
+            
+         scatter(ax,behavior.Day,behavior.Percent_Success.*100,...
+             scatterParams{:})
+         title(ax,...
+            strcat(obj.Name ,': Recovery on Pellet Retrieval Task'),...
+            fontParams{:})
+         xlabel(ax,'Experiment Day',fontParams{:});
+         ylabel(ax,'Percent Successful Retrievals',fontParams{:});
+         xlim(ax,[-10 22]);
+         ylim(ax,[0 100]);
+         xline(ax,0,'--r','LineWidth',2); %vertical line at day of surgery
          
       end
       
