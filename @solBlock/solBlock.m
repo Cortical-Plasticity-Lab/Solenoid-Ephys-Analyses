@@ -518,8 +518,7 @@ classdef solBlock < handle
 
          % make the table 
 
-         blockTable = table(TrialID, BlockID, RowID, AnimalID, GroupID, ...
-             Group, Channel, trialNumber, ...
+         blockTable = table(Channel, trialNumber, ...
              Names, Hemisphere, ProbeDepth, Impedance);
 
          % % Commented part below has to change % %
@@ -696,6 +695,9 @@ classdef solBlock < handle
          %                                ICMS+Solenoid combination
          %                    * 'Time' : Time of trial (relative to start
          %                                of recording; seconds)
+         %                    * 'Number' : Trial number within recording
+         %                                   block (starts with 1 for first
+         %                                   trial in the block, etc.)
          %                    * 'ICMS_Onset' : Onset time relative to start
          %                                      of trial for (each) ICMS
          %                                      pulse. Typically only one
@@ -740,6 +742,8 @@ classdef solBlock < handle
          [trialData.ID] = deal(ID{:});
          trialtype = num2cell(obj.TrialType);
          [trialData.Type] = deal(trialtype{:});
+         trialNumber = num2cell((1:nTrial)');
+         [trialData.Number] = deal(trialNumber{:});
          
          % % % Get ICMS information (for each trial) % % %
          % ICMS for TrialType == 2 (ICMS) or TrialType == 3 (SolICMS)
