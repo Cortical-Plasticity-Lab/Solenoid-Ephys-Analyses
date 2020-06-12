@@ -300,14 +300,14 @@ classdef solRat < handle
          %        `masterTable`
          %        -> You can either add `RowID` after (3) or (4)
          
-         AnimalID = obj.Name;
-         DeficitSeverity = parseDeficitSeverity(obj); % Empty method currently
-         ratTable = table(AnimalID,DeficitSeverity);
+         % `deficitTable` contains `AnimalID`, `SurgID`, and `Group`
+         deficitTable = parseDeficitSeverity(obj); % Empty method currently
+         
          % Runs on each child Block of `solRat`:
          blockTable = makeTables(obj.Children);
-         % Replicate `ratTable` to match number of rows from Block
+         % Replicate `deficitTable` to match number of rows from Block
          nBlockRows = size(blockTable,1);
-         ratTable = repmat(ratTable,nBlockRows,1);
+         ratTable = repmat(deficitTable,nBlockRows,1);
          
          % Concatenate tables
          masterTable = [ratTable, blockTable];
