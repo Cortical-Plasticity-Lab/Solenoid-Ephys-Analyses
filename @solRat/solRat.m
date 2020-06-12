@@ -343,7 +343,7 @@ classdef solRat < handle
             return;
          end
          deficitSeverity = nan;
-         %solRat getDefault
+         %solRat.getDefault()
       end
       
       % Set stimulus times for each `solBlock` child
