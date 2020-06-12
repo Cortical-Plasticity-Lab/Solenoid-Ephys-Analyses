@@ -885,7 +885,7 @@ classdef solBlock < handle
             'Color','w');
          
          if isempty(obj.Layout) % If no Layout, use default from config
-            obj.setLayout;
+            setLayout(obj);
          end
            
          c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
@@ -1491,11 +1491,39 @@ classdef solBlock < handle
       
       % Set the depth manually (after object creation)
       function setDepth(obj,newDepth)
-         obj.Depth = newDepth;
+         %SETDEPTH Update depth (manually); done after object creation
+         %
+         % setDepth(obj,newDepth);
+         %
+         % Inputs
+         %  obj      - scalar or array of `solBlock` objects
+         %  newDepth - scalar or array of depths (microns) to update.
+         %                 Should have one element for each element of
+         %                 `obj`
+         
+         if isscalar(newDepth) && ~isscalar(obj)
+            newDepth = repelem(newDepth,size(obj));
+         end
+         
+         for i = 1:numel(obj)
+            obj(i).Depth = newDepth(i);
+         end
       end
       
       % Set the site layout pattern and site depth
       function setLayout(obj,L,depth)
+         %SETLAYOUT Set the site layout pattern and site depth
+         %
+         % setLayout(obj,L,depth);
+         %
+         % Inputs
+         %  obj   - `solBlock` or array of `solBlock` objects
+         %  L     - Layout of channels (names)
+         %  depth - Depth of *highest* (dorsal-most) channel (microns)
+         %
+         % Output
+         %  -- none -- (Sets `Layout` and `Depth` properties of solBlock)
+         
          if nargin < 2
             L = cfg.default('L');
          end
@@ -1504,7 +1532,7 @@ classdef solBlock < handle
          end
          if numel(obj) > 1
             for ii = 1:numel(obj)
-               obj(ii).setLayout(L,depth);
+               setLayout(obj(ii),L,depth);
             end
             return;
          end
@@ -1514,6 +1542,24 @@ classdef solBlock < handle
       
       % Set Metadata file names
       function setMetaNames(obj,subf,id)
+         %SETMETANAMES Set metadata file names
+         %
+         % setMetaNames(obj,subf,id);
+         %
+         % Inputs
+         %  obj  - scalar or array of `solBlock` object
+         %  subf - struct where each field corresponds to a particular
+         %           sub-folder name or tag to check at the "Block"
+         %           hierarchical level
+         %  id   - struct where each field corresponds to a particular
+         %           "file id" tag that is used for each file of the
+         %           corresponding fieldname type
+         %
+         % Output
+         %  -- none -- Creates associations with the correct files in the
+         %             properties of solBlock `obj` or array of such
+         %             objects.
+         
          if nargin < 2
             subf = cfg.default('subf');
          end
@@ -1571,8 +1617,26 @@ classdef solBlock < handle
       
       % Set solenoid ON and OFF times (or) 
       function setSolenoidLatencies(obj,onsetLatency,offsetLatency)
-         if numel(obj) > 1
-            error('setSolenoidOnOffTimes is a method for SCALAR solBlock objects only.');
+         %SETSOLENOIDLATENCIES Set solenoid onset and offset times
+         %
+         % setSolenoidLatencies(obj,onsetLatency,offsetLatency);
+         %
+         % Inputs
+         %  obj           - SCALAR-only `solBlock` object 
+         %  onsetLatency  - onset latency of solenoid (relative time of 
+         %                    when it was energized; sec)
+         %  offsetLatency - offset latency of solenoid (relative time of
+         %                    when it current pulse ended; sec)
+         %
+         % Output
+         %  -- none -- Create association to relative timing of solenoid
+         %              stimulus for trials in solBlock `obj`
+         
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[SETSOLENOIDLATENCIES]:</strong> ' ...
+                '`setSolenoidOnOffTimes` is a method for SCALAR ' ...
+                '`solBlock` objects only']);
          end
          
          % If specified, just set those properties
@@ -1582,7 +1646,8 @@ classdef solBlock < handle
                obj.Solenoid_Offset_Latency = offsetLatency;
                return;
             else
-               fprintf(1,'''onsetLatency'' and ''offsetLatency'' must be numeric.\n');
+               fprintf(1,...
+                  '''onsetLatency'' and ''offsetLatency'' must be numeric.\n');
             end
          end
          
@@ -1620,6 +1685,22 @@ classdef solBlock < handle
       
       % Set the "pre" alignment, "post" alignment, and histogram bin width
       function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         %SETSPIKEBINEDGES Set "pre" and "post" binning vector for spikes
+         %
+         % setSpikeBinEdges(obj);
+         % setSpikeBinEdges(obj,tPre,tPost);
+         % setSpikeBinEdges(obj,tPre,tPost,binWidth);
+         % 
+         % Inputs
+         %  obj      - scalar or array `solBlock` object
+         %  tPre     - time (seconds) for "pre-stimulus" epoch (negative)
+         %  tPost    - time (seconds) for "post-stimulus" epoch (positive)
+         %  binWidth - width of each histogram bin (seconds)
+         %
+         % Output
+         %  -- none -- Create binning vector association for spike
+         %  histogram creation.
+         
          if nargin < 4
             binWidth = cfg.default('binwidth');
          end
@@ -1645,8 +1726,20 @@ classdef solBlock < handle
       
       % Set ICMS times
       function setStims(obj,tStim,icms_channel_index)
-         if numel(obj) > 1
-            error('setStims is a method for SCALAR solBlock objects only.');
+         %SETSTIMS Set ICMS stimulus times
+         %
+         % setStims(obj);
+         % setStims(obj,tStim);
+         % setStims(obj,tStim,icms_channel_index);
+         %
+         % Inputs
+         %  obj 
+         
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[SETSTIMS]:</strong> ' ...
+                '`setStims` is a method for SCALAR ' ...
+                '`solBlock` objects only']);
          end
          
          if nargin < 2
