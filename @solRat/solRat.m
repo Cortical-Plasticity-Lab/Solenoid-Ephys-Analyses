@@ -332,6 +332,8 @@ classdef solRat < handle
          % Output
          %  deficitSeverity - Quantitative indicator of behavioral deficit
          %     * TBD (see: Reach-Scoring.xlsx for data source)
+         %      returns a row per each animal, containing percent sucess
+         %      over each of the days, pre and post 
          
          if ~isscalar(obj)
             deficitSeverity = nan(size(obj));
@@ -341,6 +343,7 @@ classdef solRat < handle
             return;
          end
          deficitSeverity = nan;
+         %solRat getDefault
       end
       
       % Set stimulus times for each `solBlock` child
