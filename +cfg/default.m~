@@ -19,7 +19,9 @@ function varargout = default(varargin)
 % Change file path stuff here
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
-out.excel = '';
+out.excel = 'Reach-Scoring.xlsx';
+out.namingKey =[]; %put the list of rat names ex: MM-R1
+out.namingValue =[]; %put th
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...

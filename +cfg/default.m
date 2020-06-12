@@ -20,6 +20,10 @@ function varargout = default(varargin)
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
+%put the list of rat names ex: MM-T1, order matches namingValue
+out.namingKey =[]; 
+%put the list of their animal ID ex R19-226, order matches namingKey
+out.namingValue =[]; 
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...
