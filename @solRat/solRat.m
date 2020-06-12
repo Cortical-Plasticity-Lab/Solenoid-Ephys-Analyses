@@ -418,6 +418,37 @@ classdef solRat < handle
          deficitTable.coeff = lme.Coefficients(2,2); % Coefficient for day
       end
       
+      % Displays a graph of a rats behavior over time (pre and post op)
+      function behaviorTraces(obj)
+          % BEHAVIOR TRACES returns a graphic for behavior over time
+          % behaviorTraces(obj)
+          % Inputs
+          %  obj - Scalar or array `solRat` object
+          %
+          % Output
+          %  figures of the behavioral performance for each rat
+          
+          
+          if ~isscalar(obj)       
+            for i = 1:numel(obj)
+               behaviorTraces(obj(i));
+            end
+            return;
+         end
+          
+          [~,behavior] = obj.parseDeficitSeverity();
+          
+          figure
+          scatter(behavior.Day,behavior.Percent_Success.*100)
+          title(strcat(obj.Name ,' Percent Success Pre and Post Surgery'))
+          xlabel('Day (Surgery = Day 0)')
+          ylabel('Percent Success')
+          xlim([-10 22])
+          ylim([0 100])
+          xline(0,'--r') %vertical line at day of surgery
+         
+      end
+      
       % Set stimulus times for each `solBlock` child
       function parseStimuliTimes(obj)
          %PARSESTIMULITIMES Set stimulus times for each `solBlock` child
