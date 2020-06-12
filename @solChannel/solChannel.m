@@ -211,6 +211,29 @@ classdef solChannel < handle
           end
           return;
       end
+      
+      % SolChannel stuff
+
+      Channel = repmat(1:nChannels,1,nTrials)';
+
+      depthArr = zeros(nChannels,1);
+      hemisphereArr = zeros(nChannels,1);
+      impedenceArr = zeros(nChannels,1);
+      nameArr = strings([nChannels 1]);
+      
+      for i = 1:nChannels
+          depthArr(i) = obj.Children(i,1).Depth;
+          hemisphereArr(i) = obj.Children(i,1).Hemisphere;
+          impedenceArr(i) = obj.Children(i,1).Impedance;
+          nameArr(i) = obj.Children(i,1).Name;
+      end
+
+      ProbeDepth = repmat(depthArr,nTrials,1);
+      Hemisphere = repmat(hemisphereArr,nTrials,1);
+      Impedance = repmat(impedenceArr,nTrials,1);
+      Names = string(repmat(nameArr,nTrials,1));
+
+      trialNumber = repelem(1:nTrials,nChannels)';
        
       end %%%% End of makeTables%%%%
    end

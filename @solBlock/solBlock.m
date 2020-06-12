@@ -23,7 +23,7 @@ classdef solBlock < handle
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
       ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
       ICMS_Channel_Name        % Name of ICMS stimulation channel
-      TrialType % Categorical array indicating trial type
+      TrialType                % Categorical array indicating trial type
    end
    
    % Properties that can be publically accessed but only changed by class
@@ -495,7 +495,7 @@ classdef solBlock < handle
       %        `blockTable`
       
       %number of rows = number of channels * number of trials
-      trialID = obj.Name; % 
+      BlockID = obj.Name; % 
       nChannels = length(obj.Children);
       trialTypes = obj.TrialType;
       nTrials = length(obj.TrialType);
@@ -511,36 +511,15 @@ classdef solBlock < handle
 
       GroupID = repelem(trialTypes, nChannels);
 
-      parseID = split(trialID, '_');
+      parseID = split(BlockID, '_');
       AnimalID = string(repelem(parseID(1),nRows)');
       BlockID = string(repmat(join(parseID(2:end),'_'),nRows,1));
-      TrialID = string(repmat(trialID,nRows,1));
+      TrialID = string(repmat(BlockID,nRows,1));
 
       % Group = categorical(GroupID,1:3,{'Solenoid','ICMS','Solenoid+ICMS'});
       Group = cfg.TrialType(GroupID); % Uses previously-defined enumeration TrialType class
 
-      % SolChannel stuff
-
-      Channel = repmat(1:nChannels,1,nTrials)';
-
-      depthArr = zeros(nChannels,1);
-      hemisphereArr = zeros(nChannels,1);
-      impedenceArr = zeros(nChannels,1);
-      nameArr = strings([nChannels 1]);
       
-      for i = 1:nChannels
-          depthArr(i) = obj.Children(i,1).Depth;
-          hemisphereArr(i) = obj.Children(i,1).Hemisphere;
-          impedenceArr(i) = obj.Children(i,1).Impedance;
-          nameArr(i) = obj.Children(i,1).Name;
-      end
-
-      ProbeDepth = repmat(depthArr,nTrials,1);
-      Hemisphere = repmat(hemisphereArr,nTrials,1);
-      Impedance = repmat(impedenceArr,nTrials,1);
-      Names = string(repmat(nameArr,nTrials,1));
-
-      trialNumber = repelem(1:nTrials,nChannels)';
       % make the table 
 
       blockTable = table(TrialID, BlockID, RowID, AnimalID, GroupID, ...
@@ -699,6 +678,32 @@ classdef solBlock < handle
          
       
       end %%%% End of makeTables%%%%
+      
+      % Return data related to each trial
+      function trialData = getTrialData(obj)
+         %GETTRIALDATA Get data that is associated with each trial
+         %
+         %  trialData = getTrialData(obj);
+         
+         if ~isscalar(obj)
+            n = numel(obj);
+            trialData = cfg.default('init_trial_data');
+            for i = 1:n
+               trialData = [trialData; getTrialData(obj(i))]; %#ok<AGROW>
+            end
+            return;
+         end
+         trialData = cfg.default('init_trial_data');
+         nTrial = numel(obj.Trials);
+         trialData = repmat(trialData,nTrial,1);
+         
+         time = num2cell(obj.Trials);
+         [trialData.Time] = deal(time{:});
+         ID = utils.makeKey(nTrial,'unique',sprintf('B%02d_',obj.Index));
+         [trialData.ID] = deal(ID{:});
+         
+      end
+      
       
       % Plot the peri-event time histogram for each channel, save the
       % figure, and close the figure once it has been saved.
