@@ -23,6 +23,7 @@ classdef solBlock < handle
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
       ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
       ICMS_Channel_Name        % Name of ICMS stimulation channel
+      Location_Table           % Table with location data for each probe (note that reference angle is 0 at horizontal to ref. GRID; positive with clockwise rotation)
       TrialType                % Categorical array indicating trial type
    end
    
@@ -245,8 +246,11 @@ classdef solBlock < handle
          % Output
          %  Associates the TYPE with each trial in `obj.TrialType` property
          
-         if numel(obj) > 1
-            error('parseTrialType is a method for SCALAR solBlock objects only.');
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[PARSETRIALTYPE]:</strong> ' ...
+                '`parseTrialType` is a method for SCALAR ' ...
+                '`solBlock` objects only']);
          end
          if nargin < 3
             thresh = cfg.default('trial_duration');
@@ -517,9 +521,8 @@ classdef solBlock < handle
          channelTable = makeTables(obj.Children); 
 
          % make the table 
-
-         blockTable = table(Channel, trialNumber, ...
-             Names, Hemisphere, ProbeDepth, Impedance);
+         trialTable = struct2table(trialData);
+         blockTable = [trialTable,channelTable];
 
          % % Commented part below has to change % %
          %   (Won't work when there are multiple Blocks for each Rat ) %
@@ -675,6 +678,66 @@ classdef solBlock < handle
       
       end %%%% End of makeTables%%%%
       
+      % Plot the peri-event time histogram for each channel, save the
+      % figure, and close the figure once it has been saved.
+      function batchPETH(obj,trialType,tPre,tPost,binWidth,subset)
+         if nargin < 5
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 4
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 3
+            tPre = cfg.default('tpre');
+         end
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               if nargin < 6
+                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth);
+               else
+                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth,subset);
+               end
+            end
+            return;
+         end
+         
+         if nargin < 6
+            subset = 1:numel(obj.Children);
+         end
+         
+         edgeVec = tPre:binWidth:tPost;
+
+         subf = cfg.default('subf');
+         id = cfg.default('id');
+         
+         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
+         if exist(outpath,'dir')==0
+            mkdir(outpath);
+         end
+         
+%          obj.parseStimuliTimes
+         
+         for ii = subset
+
+            f = PETH(obj.Children(ii),edgeVec,trialType,ii);
+            
+            savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
+               char(trialType) '_' id.peth '.fig']));
+            saveas(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
+               char(trialType) '_' id.peth '.png']));
+            
+            delete(f);
+            
+         end
+      end
+      
       % Return data related to each trial
       function trialData = getTrialData(obj)
          %GETTRIALDATA Get data that is associated with each trial
@@ -781,64 +844,47 @@ classdef solBlock < handle
          [trialData.Solenoid_Offset] = deal(off{:});
       end
       
-      % Plot the peri-event time histogram for each channel, save the
-      % figure, and close the figure once it has been saved.
-      function batchPETH(obj,trialType,tPre,tPost,binWidth,subset)
-         if nargin < 5
-            binWidth = cfg.default('binwidth');
-         end
-         
-         if nargin < 4
-            tPost = cfg.default('tpost');
-         end
-         
-         if nargin < 3
-            tPre = cfg.default('tpre');
-         end
+      % Parse electrode site information based on spreadsheet table
+      function parseSiteInfo(obj,fname)
+         %PARSESITEINFO Parses the site location for each probe
+         %
+         % parseSiteInfo(obj,fname);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solBlock` objects
+         %  fname - (Optional) filename of table spreadsheet 
+         %           -> If not given, uses value in `cfg.default`
+         %
+         % Output
+         %  -- none -- Updates the site location for electrodes associated
+         %  with each recording block passed via `obj`
          
          if nargin < 2
-            trialType = cfg.TrialType('All');
+            fname = cfg.default('site_location_table');
          end
          
-         if numel(obj) > 1
-            for ii = 1:numel(obj)
-               if nargin < 6
-                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth);
-               else
-                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth,subset);
-               end
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseSiteInfo(obj(i),fname);
             end
             return;
          end
          
-         if nargin < 6
-            subset = 1:numel(obj.Children);
-         end
-         
-         edgeVec = tPre:binWidth:tPost;
-
-         subf = cfg.default('subf');
-         id = cfg.default('id');
-         
-         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
-         if exist(outpath,'dir')==0
-            mkdir(outpath);
-         end
-         
-%          obj.parseStimuliTimes
-         
-         for ii = subset
-
-            f = PETH(obj.Children(ii),edgeVec,trialType,ii);
-            
-            savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
-               char(trialType) '_' id.peth '.fig']));
-            saveas(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
-               char(trialType) '_' id.peth '.png']));
-            
-            delete(f);
-            
-         end
+         locTable = readtable(fname);
+         obj.Location_Table = locTable(strcmpi(locTable.BlockID,obj.Name),:);
+         obj.Location_Table.Properties.UserData = struct(...
+            'type','Location');
+         obj.Location_Table.Properties.Description = ...
+            'Insertion site coordinates for recording probes';
+         obj.Location_Table.Properties.VariableUnits = {...
+            'Experiment','mm','mm','microns','Port','degrees'};
+         obj.Location_Table.Properties.VariableDescriptions = {...
+            'Experiment recording block name',...
+            'Anteroposterior distance from bregma (mm)',...
+            'Mediolateral distance from bregma (mm)', ...
+            'Insertion depth of highest channel (microns)',...
+            'Intan probe port indicating separate arrays',...
+            'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
       end
       
       % Plot the peri-event time histogram for each channel, organized
@@ -981,7 +1027,6 @@ classdef solBlock < handle
          plotRaster(obj.Children,trialType);
          
       end
-      
       
       % Plot the LFP coherence for each channel. Organize subplots by
       % channel configuration (LAYOUT) of the electrode.
@@ -1460,6 +1505,24 @@ classdef solBlock < handle
    methods (Access = public)
       % Set (construct) the child CHANNEL objects
       function Children = setChannels(obj,subf,id)
+         %SETCHANNELS Creates child `solChannel` objects
+         %
+         % Children = setChannels(obj,subf,id);
+         %
+         % Inputs
+         %  obj  - scalar or array of `solBlock` object
+         %  subf - struct where each field corresponds to a particular
+         %           sub-folder name or tag to check at the "Block"
+         %           hierarchical level
+         %  id   - struct where each field corresponds to a particular
+         %           "file id" tag that is used for each file of the
+         %           corresponding fieldname type
+         %
+         % Output
+         %  Children - `solChannel` scalar or array that populates the
+         %             `solBlock.Children` property of each element in
+         %             `obj` input argument.
+         
          % Parse input arguments
          if nargin < 3
             id = cfg.defaults('id');
@@ -1469,8 +1532,10 @@ classdef solBlock < handle
          end
          % Handle object array input
          if numel(obj) > 1
+            Children = [];
             for ii = 1:numel(obj)
-               obj(ii).setChannels(subf,id);
+               Children = [Children; ...
+                  obj(ii).setChannels(subf,id)];
             end
             return;
          end
@@ -1536,6 +1601,7 @@ classdef solBlock < handle
             end
             return;
          end
+         
          obj.Depth = depth; % depth in microns of highest channel
          obj.Layout = L;    % relative offset of each channel (microns)     
       end

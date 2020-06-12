@@ -20,6 +20,7 @@ function varargout = default(varargin)
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
+out.site_location_table = '.xlsx';
 %put the list of rat names ex: MM-T1, order matches namingValue
 out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2'}; 
 %put the list of their animal ID ex R19-226, order matches namingKey
@@ -132,6 +133,7 @@ out.ds.xlimit = [-250 750];
 out.ds.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ds.lw = 1.75;
 out.fs_d = 1000;
+out.clip_bin_counts = false; % Do not clip bin counts to one if false
 
 % Default IFR average trace parameters
 out.ifr.ylimit = [-4 4];

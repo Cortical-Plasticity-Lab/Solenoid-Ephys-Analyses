@@ -167,18 +167,18 @@ classdef solChannel < handle
          %        * `YLoc`       - Y-coordinate (mm) relative to bregma
          %                          (mediolateral distance)
          %        * `Depth`      - Depth of recording channel (depends on
-         %                          channels, which are at different depths on
-         %                          individual recording shanks, as well as
-         %                          the overall insertion depth)
+         %                          channels, which are at different depths
+         %                          on individual recording shanks, as well
+         %                          as the overall insertion depth)
          %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
-         %        * `Spikes` - Binned spike counts relative to alignment for a
-         %                       single channel.
+         %        * `Spikes` - Binned spike counts relative to alignment 
+         %                       for a single channel.
          %        * `LFP`    - LFP time-series relative to alignment for a
          %                       single channel.
          %        * `Notes` - Most-likely empty, but allows manual input of
          %                    notes or maybe a notes struct? Basically
-         %                    something that lets you manually add "tags" to
-         %                    the data rows.
+         %                    something that lets you manually add "tags" 
+         %                    to the data rows.
          
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
@@ -197,6 +197,8 @@ classdef solChannel < handle
          
          ChannelID = obj.Name;
          
+         table(Channel, trialNumber, ...
+             Names, Hemisphere, ProbeDepth, Impedance);
          
          depthArr = zeros(nChannels,1);
          hemisphereArr = zeros(nChannels,1);
@@ -278,16 +280,44 @@ classdef solChannel < handle
          end
       end
       
-      % Returns matrix of counts of binned spikes (histograms) where each
-      % row is a TRIAL and each column is a bin.
+      % Returns matrix of counts of binned spikes
       function binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
+         %GETBINNEDSPIKES Returns matrix of counts of binned spikes
+         %
+         % binCounts = getBinnedSpikes(obj);
+         % binCounts = getBinnedSpikes(obj,trialType);
+         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost);
+         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
+         %
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) only get matrix for trials of
+         %                 `TrialType`
+         %  tPre      - (Optional) relative time (seconds) to start bins 
+         %  tPost     - (Optional) relative time (seconds) to end bins
+         %  binWidth  - (Optional) width of bins (seconds) for counting
+         %                 spike times relative to trial onset
+         % Output
+         %  binCounts - Matrix of counts of binned spikes, where each row
+         %              corresponds to a single trial
+         
          if nargin < 2
             trialType = cfg.TrialType('All');
          end
          
          if nargin == 5
+            % Set the spike bin edges if this arg is given
             obj.setSpikeBinEdges(tPre,tPost,binWidth);
          end
+         
+         % Do we clip bin counts to one (per trial)?
+         %  -> Makes more sense to do if looking at **sorted** single-unit
+         %     activity
+         %  -> For multi-unit activity, it's not inconceivable to see
+         %     multiple spikes within a 2-ms epoch, simply due to the
+         %     possibility of multiple sources generating said spikes.
+         clipBinCounts = cfg.default('clip_bin_counts');
+         
          edges = obj.getSpikeBinEdges;
          
          tSpike = getSpikes(obj);
@@ -297,11 +327,28 @@ classdef solChannel < handle
          for iT = 1:numel(trials)
             binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
          end
-         binCounts = min(binCounts,1); % Clip to 1 spike per bin
+         
+         if clipBinCounts
+            binCounts = min(binCounts,1); % Clip to 1 spike per bin
+         end
       end
       
       % Returns BANDPASS FILTERED (UNIT) data for this channel
       function [data,t] = getFilt(obj,ch,vec)
+         %GETFILT Return bandpass filtered (unit) data for this channel
+         %
+         % [data,t] = getFilt(obj,ch,vec);
+         %
+         % Inputs
+         %  obj - Scalar or array `solChannel` object
+         %  ch  - Channel indices to use (indices into `obj` array)
+         %  vec - "Time-Mask" index vector; if not supplied, returns the
+         %        entire vector.
+         %
+         % Output
+         %  data - Bandpass-filtered (unit) time-series signal
+         %  t    - Times corresponding to samples of `data`
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
@@ -1162,7 +1209,18 @@ classdef solChannel < handle
       end
       
       % Parse Channel depth for object or each element in object array
-      function parseChannelLocation(obj)
+      function parseChannelLocation(obj,depth,angle,cX,cY)
+         %PARSECHANNELLOCATION Parse channel location & depth 
+         %
+         % parseChannelLocation(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %
+         % Output
+         %  -- none -- Makes association with correct channel location,
+         %             depth, based on the name of the recording channel.
+         
          if numel(obj) > 1
             for ii = 1:numel(obj)
                obj(ii).parseChannelDepth;
@@ -1186,11 +1244,26 @@ classdef solChannel < handle
          obj.Depth = a*x + b;
       end
       
-      % Associate individual channel *.mat files with this class object so
-      % the correct file can be pointed to for any of the data access
-      % methods, to prevent the whole file from being stored in memory at
-      % once.
+      % Associate individual channel *.mat files
       function setFileAssociations(obj,subf,id)
+         %SETFILEASSOCIATIONS Associate individual channel *.mat files
+         %
+         % setFileAssociations(obj,subf,id);
+         %
+         % Inputs
+         %  obj  - scalar or array of `solBlock` object
+         %  subf - struct where each field corresponds to a particular
+         %           sub-folder name or tag to check at the "Block"
+         %           hierarchical level
+         %  id   - struct where each field corresponds to a particular
+         %           "file id" tag that is used for each file of the
+         %           corresponding fieldname type
+         %
+         % Output
+         %  -- none -- Creates associations with the correct files in the
+         %             properties of solBlock `obj` or array of such
+         %             objects.
+         
          % Parse input args
          if nargin < 3
             subf = cfg.default('subf');
