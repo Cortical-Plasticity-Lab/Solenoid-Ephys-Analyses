@@ -413,9 +413,7 @@ classdef solRat < handle
          lme = fitlme(tbl,modelspec);
          
          % Parse relevant parameters from the model
-         deficitTable.Rsquared = lme.Rsquared.Adjusted;
-         deficitTable.p = lme.Coefficients(2,6); % 'day', p-value column
-         deficitTable.coeff = lme.Coefficients(2,2); % Coefficient for day
+         deficitTable.
       end
       
       % Set stimulus times for each `solBlock` child
