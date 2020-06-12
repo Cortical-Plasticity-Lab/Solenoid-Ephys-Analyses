@@ -510,8 +510,8 @@ classdef solBlock < handle
          % Note that at this point, we *must* make sure that trialData matches
          % up with the corresponding elements of `channelTable`; the pattern
          % for trialData will be [a; b; c; ... a; b; c] whereas pattern for
-         % `channelTable` elements will be [1; 1; 1; ... nCh; nCh; nCh], 
-         %  where [a,b,c] are trials and [1,2,...nCh] are channel indices.
+         % `channelTable` elements will be [1; 1; 1; ... nCh; nCh; nCh], where
+         % [a,b,c] are trials and [1,2,...nCh] are channel indices.
 
          % % Return the `channelTable` for all child 'Channel' objects % %
          channelTable = makeTables(obj.Children); 
