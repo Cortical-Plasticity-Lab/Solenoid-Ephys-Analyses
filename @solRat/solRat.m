@@ -342,8 +342,30 @@ classdef solRat < handle
             end            
             return;
          end
-         deficitSeverity = nan;
+         
          %solRat.getDefault()
+         nameDict = containers.Map(solRat.getDefault('namingValue'),solRat.getDefault('namingKey'));
+         %load excel file
+         excelTable = readtable(solRat.getDefault('excel'));
+         ratID = obj.Name;
+         ratName = nameDict(ratID);
+         
+         ratDay = [];
+         ratSuccess = [];
+         
+         for iRow = 1:height(excelTable)
+             
+             iName = table2array(excelTable(iRow,'Rat'));
+             if cell2mat(iName) == ratName
+                 ratDay = [ratDay; table2array(excelTable(iRow,'Day'))];
+                 ratSuccess = [ratSuccess; table2array(excelTable(iRow,'Percent_Success'))];
+             end
+                          
+         end
+         ratProgress = [ratDay, ratSuccess];
+         ratProgress = sortrows(ratProgress);
+         deficitSeverity = table(convertCharsToStrings(ratID),{ratProgress});
+         deficitSeverity.Properties.VariableNames = {'RatID' 'Success Progress'};
       end
       
       % Set stimulus times for each `solBlock` child
@@ -549,7 +571,7 @@ classdef solRat < handle
       function varargout = getDefault(varargin)
       %GETDEFAULT Return defaults for parameters associated with `solRat`
       %
-      %  varargout = solRat.getDefault(varargin);
+      %  varargout = solRat.(varargin);
       %  e.g.
       %     param = solRat.getDefault('paramName');
       %     [p1,...,pk] = solRat.getDefault('p1Name',...,'pkName');

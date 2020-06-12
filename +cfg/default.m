@@ -21,9 +21,9 @@ out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
 %put the list of rat names ex: MM-T1, order matches namingValue
-out.namingKey =[]; 
+out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2'}; 
 %put the list of their animal ID ex R19-226, order matches namingKey
-out.namingValue =[]; 
+out.namingValue = {'R19-224';'R19-225';'R19-226';'R19-227';'R19-230';'R19-231';'R19-232';'R19-233'}; 
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...
