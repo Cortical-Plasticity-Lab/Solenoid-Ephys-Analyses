@@ -97,13 +97,22 @@ classdef solChannel < handle
          
       end
       
-      % Do actual RATE ESTIMATION for this channel, using a smoothing
-      % kernel to get the INSTANTANEOUS FIRING RATE (IFR; spike rate)
-      % estimate. Once computed, save the IFR estimate to the hard disk in
-      % the BLOCK folder and associate the filename with this CHANNEL
-      % object so it can be easily accessed in the future without costly
-      % recomputing.
+      % Compute the instantaneous firing rate (IFR) and save to files
       function estimateRate(obj,ch)
+         %ESTIMATERATE Estimate instantaneous firing rate (IFR) 
+         %
+         % estimateRate(obj);
+         % estimateRate(obj,ch);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  ch  - (optional) indexing into `obj` input
+         %
+         % Output
+         %  -- none -- Create IFR estimates in diskfiles associated with
+         %             this `solChannel` object or each `solChannel` object
+         %             in `obj` array.
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
@@ -1028,12 +1037,27 @@ classdef solChannel < handle
          end
       end
       
-      % Plot SPIKE RASTER of spike instants across trials for this channel
-      % relative to TRIAL alignment. Spike times are represented as
-      % vertical bars.
-      function plotRaster(obj,trialType,tPre,tPost,binWidth)
+      % Plot spike times in rows (trials) as vertical bars (impulses)
+      function fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth)
+         %PLOTRASTER Plot spike raster of spikes across trials for channel
+         %
+         % fig = plotRaster(obj);
+         % fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth);
+         %
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - `cfg.TrialType` of which trials to include
+         %  tPre      - Time (sec) prior to alignment
+         %  tPost     - Time (sec) after alignment
+         %  batch     - (default is false): if set to true, delete `fig`
+         %                 after saving it for each element of `obj`
+         %  binWidth  - Time (sec) width of each raster "bin"
+         %
+         % Output
+         %  fig       - Array of figure handles corresponding to elements
+         %                 of `obj`
          if isempty(obj)
-            fig = [];
+            fig = gobjects(1);
             return;
          end
          
@@ -1041,21 +1065,35 @@ classdef solChannel < handle
             trialType = cfg.TrialType('All');
          end
          
-         if nargin == 5
+         if nargin < 3
+            tPre = solChannel.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solChannel.getDefault('tpost');
+         end
+         
+         if nargin < 5
+            batch = false;
+         end
+         
+         if nargin >= 6
             setSpikeBinEdges(obj,tPre,tPost,binWidth);
          end
          
          if numel(obj) > 1
-            fig = [];
+            fig = gobjects(size(obj));
             for ii = 1:numel(obj)
-               plotRaster(obj(ii),trialType);
+               fig(ii) = plotRaster(obj(ii),trialType,tPre,tPost,batch);
             end
             return;
          end
          
          if isempty(obj.Parent.Trials)
-            fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fig = gobjects(1);
+            fprintf(1,...
+               'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -1063,7 +1101,8 @@ classdef solChannel < handle
          spikes = obj.getBinnedSpikes;
          edges = obj.getSpikeBinEdges;
          
-         fig = figure('Name',sprintf('%s: %s Raster (%s trials)',...
+         fig = figure(...
+            'Name',sprintf('%s: %s Raster (%s trials)',...
             obj.Parent.Name,obj.Name,char(trialType)),...
             'Color','w',...
             'Units','Normalized',...
@@ -1081,18 +1120,21 @@ classdef solChannel < handle
          obj.addStimulusMarkers(ax,h,1);
          solChannel.addAxesLabels(ax,obj.Name,'Time (sec)','Trial');
          
-         if ~isempty(obj.Parent)
+         if ~isempty(obj.Parent) && batch
             
             subf = cfg.default('subf');
             id = cfg.default('id');
             
-            outpath = fullfile(obj.Parent.folder,[obj.Parent.Name subf.figs],subf.rasterplots);
+            outpath = fullfile(obj.Parent.folder,...
+               [obj.Parent.Name subf.figs],subf.rasterplots);
             if exist(outpath,'dir')==0
                mkdir(outpath);
             end
             
-            savefig(fig,fullfile(outpath,[obj.Name id.rasterplots '_' char(trialType) '.fig']));
-            saveas(fig,fullfile(outpath,[obj.Name id.rasterplots '_' char(trialType) '.png']));
+            savefig(fig,fullfile(outpath,...
+               [obj.Name id.rasterplots '_' char(trialType) '.fig']));
+            saveas(fig,fullfile(outpath,...
+               [obj.Name id.rasterplots '_' char(trialType) '.png']));
             delete(fig);
          end
       end
@@ -1101,14 +1143,27 @@ classdef solChannel < handle
    
    % Static methods
    methods (Static = true)
-      % Add labels to a given axes. 'ax' can be an array of axes handles,
-      % in which case titleString/xLabelString/yLabelString may each be a
-      % char (same for all axes in array), titleString may be a cell array
-      % with the same number of cell elements as elements in 'ax' array,
-      % and xLabelString/yLabelString can be either both char vectors (same
-      % label for all plots) or each be a cell array of equal length to
-      % number of elements in 'ax'.
+      % Add labels to a given axes
       function addAxesLabels(ax,titleString,xLabelString,yLabelString)
+         %ADDAXESLABELS Add labels to a given axes
+         %
+         % solChannel.addAxesLabels(ax);
+         % solChannel.addAxesLabels(ax,titleString);
+         % solChannel.addAxesLabels(ax,titleString,xLabelString,yLabelString);
+         %
+         % Inputs
+         %  ax           - `matlab.graphics.axis.Axes` object or array
+         %  titleString  - (Optional) string to add as title of `ax`
+         %        -> If `ax` is an array, can either be a single string or
+         %           a cell array of chars or strings that matches the size
+         %           of obj (same is true for other 2 input args).
+         %  xLabelString - (Optional) string to add as xLabel
+         %  yLabelString - (Optional) string to add as yLabel
+         %        -> Must match dimension of `xLabelString`
+         %
+         % Output
+         %  -- None -- Updates `ax` with formatted labels.
+         
          % Parse input arguments
          if nargin < 4
             yLabelString = [];
@@ -1146,36 +1201,63 @@ classdef solChannel < handle
             end
             return;
          end
+         fontParams = solChannel.getDefault('fontparams');
+         % Set axes labels with correct formatting
+         set(ax.Title,'String',titleString,...
+            'FontSize',16,fontParams{:});
+         set(ax.XLabel,'String',xLabelString,...
+            'FontSize',14,fontParams{:});
+         set(ax.YLabel,'String',yLabelString,...
+            'FontSize',14,fontParams{:});
+      end
+      
+      % Return empty `solChannel` object
+      function obj = empty()
+         %EMPTY  Return empty `solChannel` object
+         %
+         % obj = solChannel.empty();
+         %
+         % Use this to initialize an empty array of `solChannel` for
+         % concatenation, for example.
          
-         % Set axes properties
-         ax.Title.String = titleString;
-         ax.Title.FontName = 'Arial';
-         ax.Title.FontSize = 16;
-         ax.Title.Color = 'k';
-         
-         ax.XLabel.String = xLabelString;
-         ax.XLabel.FontName = 'Arial';
-         ax.XLabel.FontSize = 14;
-         ax.XLabel.Color = 'k';
-         
-         ax.YLabel.String = yLabelString;
-         ax.YLabel.FontName = 'Arial';
-         ax.YLabel.FontSize = 14;
-         ax.YLabel.Color = 'k';
+         obj = solChannel(0);
       end
       
       % Wrapper to return any number of configured default fields
       function varargout = getDefault(varargin)
+         %GETDEFAULT Return defaults parameters for `solChannel`
+         %
+         %  varargout = solChannel.getDefault(varargin);
+         %  e.g.
+         %     param = solChannel.getDefault('paramName');
+         %     [p1,...,pk] = solChannel.getDefault('p1Name',...,'pkName');
+         %
+         %  Inputs
+         %     varargin - Any of the parameter fields in the struct 
+         %                delineated in `cfg.default`
+         %
+         %  Wrapper function to get variable number of default fields
+         %
+         %  See Also: cfg.default
+         
          % Parse input
-         if nargin > nargout
-            error('More inputs specified than requested outputs.');
-         elseif nargin < nargout
-            error('More outputs requested than inputs specified.');
+         if (nargin > nargout) && (nargout > 0)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More inputs specified than requested outputs']);
+         elseif (nargin < nargout)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More outputs requested than inputs specified']);
          end
          
          % Collect fields into output cell array
-         varargout = cell(1,nargout);
-         [varargout{:}] = cfg.default(varargin{:});
+         if nargout > 0
+            varargout = cell(1,nargout);
+            [varargout{:}] = cfg.default(varargin{:});
+         else
+            cfg.default(varargin{:});
+         end
       end
       
       % Return [x,y] coordinates for vertices of a graphics rectangle,

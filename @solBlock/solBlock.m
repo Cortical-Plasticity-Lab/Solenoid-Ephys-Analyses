@@ -283,6 +283,18 @@ classdef solBlock < handle
    
    % Static methods of SOLBLOCK class 
    methods (Static = true)
+      % Return empty `solBlock` object
+      function obj = empty()
+         %EMPTY  Return empty `solBlock` object
+         %
+         % obj = solBlock.empty();
+         %
+         % Use this to initialize an empty array of `solBlock` for
+         % concatenation, for example.
+         
+         obj = solBlock(0);
+      end
+      
       % Return indexing array with correct dimensions
       function Y = pruneTruncatedSegments(X)
       %PRUNETRUNCATEDSEGMENTS Return indexing array with correct dimensions
@@ -318,22 +330,39 @@ classdef solBlock < handle
       
       % Wrapper function to get variable number of default fields 
       function varargout = getDefault(varargin)
-         %GETDEFAULT Return default variable
+         %GETDEFAULT Return defaults parameters for `solBlock`
          %
-         % varargout = solBlock.getDefault(varargin);
+         %  varargout = solBlock.getDefault(varargin);
+         %  e.g.
+         %     param = solBlock.getDefault('paramName');
+         %     [p1,...,pk] = solBlock.getDefault('p1Name',...,'pkName');
          %
-         % See also: cfg.default
+         %  Inputs
+         %     varargin - Any of the parameter fields in the struct 
+         %                delineated in `cfg.default`
+         %
+         %  Wrapper function to get variable number of default fields
+         %
+         %  See Also: cfg.default
          
          % Parse input
-         if nargin > nargout
-            error('More inputs specified than requested outputs.');
-         elseif nargin < nargout
-            error('More outputs requested than inputs specified.');
+         if (nargin > nargout) && (nargout > 0)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More inputs specified than requested outputs']);
+         elseif (nargin < nargout)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More outputs requested than inputs specified']);
          end
          
          % Collect fields into output cell array
-         varargout = cell(1,nargout);
-         [varargout{:}] = cfg.default(varargin{:});  
+         if nargout > 0
+            varargout = cell(1,nargout);
+            [varargout{:}] = cfg.default(varargin{:});
+         else
+            cfg.default(varargin{:});
+         end
       end
    end
    
@@ -397,8 +426,6 @@ classdef solBlock < handle
          else
             subset = reshape(subset,1,numel(subset));
          end
-         
-%          obj.parseStimuliTimes;
          
          edgeVec = [tPre,tPost];        
          fig = avgLFPplot(obj.Children(subset),trialType,edgeVec);
@@ -887,8 +914,7 @@ classdef solBlock < handle
             'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
       end
       
-      % Plot the peri-event time histogram for each channel, organized
-      % using the channel configuration (LAYOUT) of the electrode.
+      % Plot organized subplots for PETH of each channel
       function probePETH(obj,trialType,tPre,tPost,binWidth,batchRun)
          if nargin < 6
             batchRun = false;
@@ -975,7 +1001,7 @@ classdef solBlock < handle
          
       end
       
-      % Plot the peri-event time histogram (and leave it open)
+      % Plot the peri-event time histogram (PETH)
       function fig = PETH(obj,trialType,tPre,tPost,binWidth,subset)
          if nargin < 6
             subset = 1:numel(obj.Children);
@@ -1006,31 +1032,78 @@ classdef solBlock < handle
          
       end
       
-      % Plot spike raster for all the child CHANNELS of this recording,
-      % aligned to the solenoid trials.
-      function plotRaster(obj,trialType,tPre,tPost,binWidth)
+      % Plot spike raster for each channel of this recording
+      function fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth)
+         %PLOTRASTER Plot spike raster for each channel of this recording
+         %
+         % fig = plotRaster(obj);
+         % fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth);
+         %
+         % Inputs
+         %  obj       - scalar or array `solBlock` object
+         %  trialType - (Optional) Enumerated trial type that we want to 
+         %              select for plots
+         %  tPre      - (Optional) "Pre" time, relative to alignment event
+         %  tPost     - (Optional) "Post" time, relative to alignment event
+         %  batch     - (Optional) Default is false. Set true to indicate
+         %                 batch run (save/delete each figure)
+         %  binWidth  - (Optional) Default is false. Set true to save and
+         %                 delete each figure after it is generated.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         
          if nargin < 2
             trialType = cfg.TrialType('All');
          end
          
-         if nargin == 5
+         if nargin < 3
+            tPre = solBlock.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solBlock.getDefault('tpost');
+         end
+         
+         if nargin < 5
+            batch = false;
+         end
+         
+         if nargin >= 6
             setSpikeBinEdges(obj,tPre,tPost,binWidth);
          end
          
-         if numel(obj) > 1
+          if ~isscalar(obj)
+            fig = gobjects(size(obj));
             for ii = 1:numel(obj)
-               plotRaster(obj(ii),trialType);
+               fig(ii) = plotRaster(obj(ii),trialType,tPre,tPost,batch);
             end
             return;
          end
          
-         plotRaster(obj.Children,trialType);
+         fig = plotRaster(obj.Children,trialType,tPre,tPost,batch);
          
       end
       
-      % Plot the LFP coherence for each channel. Organize subplots by
-      % channel configuration (LAYOUT) of the electrode.
+      % Plot the LFP coherence for each channel
       function probeLFPcoherence(obj,trialType,tPre,tPost)
+         %PROBELFPCOHERENCE Plot LFP coherence for each channel
+         %
+         % probeLFPcoherence(obj,trialType,tPre,tPost);
+         %
+         % Inputs
+         %  obj       - scalar or array `solBlock` object
+         %  trialType - (Optional) Enumerated trial type that we want to 
+         %              select for plots
+         %  tPre      - (Optional) "Pre" time, relative to alignment event
+         %  tPost     - (Optional) "Post" time, relative to alignment event
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
          
          if nargin < 4
             tPost = cfg.default('tpost');
@@ -1161,9 +1234,26 @@ classdef solBlock < handle
 
       end
       
-      % Plot the mean aligned LFP for each channel. Organize subplots by
-      % channel configuration (LAYOUT) of the electrode.
+      % Plot the mean aligned LFP for each channel
       function probeAvgLFPplot(obj,trialType,tPre,tPost,batchRun)
+         %PROBEAVGLFPPLOT Plot mean aligned LFP for each channel
+         %
+         % probeAvgLFPplot(obj,trialType,tPre,tPost,batchRun);
+         %
+         % Inputs
+         %  obj       - scalar or array `solBlock` object
+         %  trialType - (Optional) Enumerated trial type that we want to 
+         %              select for plots
+         %  tPre      - (Optional) "Pre" time, relative to alignment event
+         %  tPost     - (Optional) "Post" time, relative to alignment event
+         %  batchRun  - (Optional) Default is false. Set true to save and
+         %                 delete each figure after it is generated.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         
          if nargin < 5
             batchRun = false;
          end
@@ -1242,9 +1332,26 @@ classdef solBlock < handle
          
       end
       
-      % Plot the mean aligned IFR for each channel. Organize subplots by
-      % channel configuration (LAYOUT) of the electrode.
+      % Plot the mean aligned IFR for each channel. 
       function probeAvgIFRplot(obj,trialType,tPre,tPost,batchRun)
+         %PROBEAVGIFRPLOT Plot mean aligned IFR for each channel
+         %
+         % probeAvgIFRplot(obj,trialType,tPre,tPost,batchRun);
+         %
+         % Inputs
+         %  obj       - scalar or array `solBlock` object
+         %  trialType - (Optional) Enumerated trial type that we want to 
+         %              select for plots
+         %  tPre      - (Optional) "Pre" time, relative to alignment event
+         %  tPost     - (Optional) "Post" time, relative to alignment event
+         %  batchRun  - (Optional) Default is false. Set true to save and
+         %                 delete each figure after it is generated.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         
          if nargin < 5
             batchRun = false;
          end
@@ -1329,28 +1436,103 @@ classdef solBlock < handle
    
    % "Get" methods
    methods (Access = public)
-      % Returns the closest timestamp of a trial ONSET, given an input
-      % vector of times (seconds)
+      % Returns the closest timestamp of a trial ONSET (seconds)
       function t = getClosestTrialOnset(obj,tVec)
+         %GETCLOSESTTRIALONSET Returns the closest timestamp of trial start
+         %
+         % t = getClosestTrialOnset(obj,tVec);
+         %
+         % Inputs
+         %  obj  - SCALAR `solBlock` object
+         %  tVec - Vector of candidate times
+         %
+         % Output
+         %  t    - Actual time of closest trial onset
+         
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[GETCLOSESTTRIALONSET]:</strong> ' ...
+                'This method only accepts a scalar `obj` input\n']);
+         end
          ts = obj.getTrials;
          [~,idx] = min(abs(ts - tVec(1)));
          t = ts(idx);
       end
       
-      % Get the normalized position for current figure placement (to make a
-      % cascaded tile of figures across the screen when multiple figures
-      % will be generated by a method)
-      function pos = getFigPos(obj,ii)
-         pos = cfg.default('figpos');
-         scl = cfg.default('figscl');
-         pos(1) = pos(1) + scl * (ii/numel(obj.Children));
-         pos(2) = pos(2) + scl * (ii/numel(obj.Children));
+      % Get the normalized position for current figure placement 
+      function pos = getFigPos(obj,ii,varargin)
+         %GETFIGPOS Return normalized position of current figure
+         %
+         % pos = getFigPos(obj);
+         % pos = getFigPos(obj,ii);
+         % pos = getFigPos(obj,ii,'Position',pos,'Scale',scl);
+         %
+         % Inputs
+         %  obj - Scalar `solBlock` object
+         %        -> If given as an array, throws warning and only uses
+         %           first element to return `pos`
+         %  ii  - Index (scalar integer) corresponding to this figure
+         %        -> Default: random integer based on number of
+         %                    `obj.Children`
+         %  varargin - Optional <'Name',value> pairs
+         %        + 'Position': the original position, to be scaled based
+         %                       on indexing relative to number of child
+         %                       objects
+         %        + 'Scale'   : the maximum (normalized) factor to add to
+         %                       both pos(1) and pos(2)
+         %
+         % Output
+         %  pos   - Updated figure `Position` (normalized coordinates)
+         %     --> Use this to make a cascaded tile of figures across the 
+         %         screen when multiple figures will be generated by a 
+         %         method, so that they don't just all stack one on top of
+         %         the other.
+         
+         if ~isscalar(obj)
+            warning(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[GETFIGPOS]:</strong> ' ...
+                'This method should only accept scalar inputs.\n' ...
+                '\t\t\t\t(Using first element only)\n']);
+             obj = obj(1);
+         end
+         
+         N = numel(obj.Children);
+         if nargin < 2
+            ii = randi(N,1,1);
+         end
+         
+         p = struct;
+         [p.Position,p.Scale] = solBlock.getDefault('figpos','figscl');
+         
+         fn = fieldnames(p);
+         for iV = 1:2:numel(varargin)
+            idx = strcmpi(fn,varargin{iV});
+            if sum(idx)==1
+               p.(fn{idx}) = varargin{iV+1};
+            end
+         end
+         
+         k = ii / N; % Scale factor
+         pos(1) = p.Position(1) + p.Scale * k;
+         pos(2) = p.Position(2) + p.Scale * k;
       end
       
-      % Get ICMS times (for new CYCLE setup); if obj is an array, returns
-      % a cell array where each array element contains a vector of
-      % timestamps for the onset of each ICMS within a recording BLOCK.
-      function ts = getICMS(obj)         
+      % Get ICMS times (for new CYCLE setup)
+      function ts = getICMS(obj)
+         %GETICMS Return array of ICMS pulse onset times
+         %
+         % ts = getICMS(obj);
+         %
+         % Inputs
+         %  obj              - Scalar or array of `solBlock` objects
+         %
+         % Output
+         %  ts               - Vector of timestamps (seconds) of ICMS pulse
+         %                       onsets. If `obj` is an array, then this is
+         %                       a cell array, where each element contains
+         %                       such a vector that matches the
+         %                       corresponding element of `obj`
+         
          % Handle object array input
          if numel(obj) > 1
             ts = cell(numel(obj),1);
@@ -1385,12 +1567,26 @@ classdef solBlock < handle
          
       end
       
-      % Get TRIAL times (for new CYCLE setup); if obj is an array, returns
-      % a cell array where each array element contains a vector of
-      % timestamps for the onset of each TRIAL within a recording BLOCK.
-      % Second argument, 'updateTrialsProp' defaults to false unless
-      % otherwise specified.
+      % Get TRIAL times (for new CYCLE setup)
       function ts = getTrials(obj,updateTrialsProp)
+         %GETTRIALS Return array of trial onset times
+         %
+         % ts = getTrials(obj);
+         % ts = getTrials(obj,updateTrialsProp);
+         %
+         % Inputs
+         %  obj              - Scalar or array of `solBlock` objects
+         %  updateTrialsProp - Default is false; set true to force the
+         %                     `Trials` property to be updated with values
+         %                     returned in `ts`
+         %
+         % Output
+         %  ts               - Vector of timestamps (seconds) of trial
+         %                       onsets. If `obj` is an array, then this is
+         %                       a cell array, where each element contains
+         %                       such a vector that matches the
+         %                       corresponding element of `obj`
+         
          if nargin < 2
             updateTrialsProp = false;
          end
@@ -1438,6 +1634,27 @@ classdef solBlock < handle
       
       % Get "trigger" times (for old digIO setup)
       function ts = getTrigs(obj)
+         %GETTRIGS Returns "trigger" times (from old `digIO` setup)
+         %
+         % ts = getTrigs(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  
+         % Output
+         %  ts  - Array of timestamps of "trig" LOW to HIGH times. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getTrigs(obj(i));
+            end
+            return;
+         end
+         
          in = load(obj.trig,'data');
          if sum(in.data) == 0
             ts = [];
@@ -1449,34 +1666,78 @@ classdef solBlock < handle
          obj.Triggers = ts;
       end
       
-      % Get times when solenoid is turned from LOW to HIGH (e.g. when it
-      % just started extending)
+      % Return array of solenoid extension onset times
       function ts = getSolOnset(obj,db)
+         %GETSOLONSET Returns times when solenoid goes from LOW to HIGH
+         %
+         % ts = getSolOnset(obj);
+         % ts = getSolOnset(obj,db);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  db  - Debounce threshold (samples; default: 1 [no debounce])
+         %  
+         % Output
+         %  ts  - Array of timestamps of times when solenoid extends. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if nargin < 2
+            db = 1; % Default of no debounce
+         end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getSolOnset(obj(i),db);
+            end
+            return;
+         end
+         
          in = load(obj.sol,'data');
          if sum(in.data) == 0
             ts = [];
             return;
-         end
-         
-         if nargin < 2
-            db = 1;
          end
          
          data = find(in.data > 0);
          ts = data([true, diff(data) > db]) ./ obj.fs;
       end
       
-      % Get times when solenoid is turned from HIGH to LOW (e.g. when it
-      % just started retracting)
+      % Return array of solenoid retraction onset times
       function ts = getSolOffset(obj,db)
+         %GETSOLOFFSET Returns times when solenoid goes from HIGH to LOW
+         %
+         % ts = getSolOffset(obj);
+         % ts = getSolOffset(obj,db);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  db  - Debounce threshold (samples; default: 1 [no debounce])
+         %  
+         % Output
+         %  ts  - Array of timestamps of times when solenoid retracts. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if nargin < 2
+            db = 1; % Default of no debounce
+         end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getSolOffset(obj(i),db);
+            end
+            return;
+         end
+         
          in = load(obj.sol,'data');
          if sum(in.data) == 0
             ts = [];
             return;
-         end
-         
-         if nargin < 2
-            db = 1; % Default of no debounce
          end
          
          data = find(in.data > 0);
@@ -1485,7 +1746,19 @@ classdef solBlock < handle
       
       % Return the spike bin (histogram) edge times
       function edges = getSpikeBinEdges(obj)
-         if numel(obj) > 1
+         %GETSPIKEBINEDGES Return spike bin (histogram) edge times
+         %
+         % edges = getSpikeBinEdges(obj);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solBlock` objects
+         %  
+         % Output
+         %  edges - Vector of bin edge times for the spike histogram, which
+         %          contains (# bins + 1) elements. If `obj` is an array,
+         %          then returns a cell array of such vectors.
+         
+         if ~isscalar(obj)
             edges = cell(numel(obj),1);
             for ii = 1:numel(obj)
                edges{ii} = getSpikeBinEdges(obj(ii));
@@ -1532,10 +1805,10 @@ classdef solBlock < handle
          end
          % Handle object array input
          if numel(obj) > 1
-            Children = [];
+            Children = solChannel.empty;
             for ii = 1:numel(obj)
                Children = [Children; ...
-                  obj(ii).setChannels(subf,id)];
+                  obj(ii).setChannels(subf,id)]; %#ok<AGROW>
             end
             return;
          end
@@ -1545,12 +1818,12 @@ classdef solBlock < handle
             [obj.Name subf.raw],...
             [obj.Name id.info]));
          % Construct child CHANNEL array
-         fprintf(1,'Adding CHANNEL child objects to %s...000%\n',obj.Name);
+         fprintf(1,'Adding CHANNEL child objects to %s...000%%\n',obj.Name);
          nCh = numel(in.RW_info);
          Children = solChannel(nCh);
          for iCh = 1:nCh
             Children(iCh) = solChannel(obj,in.RW_info(iCh));
-            fprintf(1,'%03g%\n',round((iCh/nCh)*100));
+            fprintf(1,'\b\b\b\b\b%03d%%\n',round((iCh/nCh)*100));
          end
       end
       

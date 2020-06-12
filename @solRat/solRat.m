@@ -32,6 +32,95 @@ classdef solRat < handle
    end
    
    % METHODS
+   % Class Constructor & Overloaded methods
+   methods
+      % Class constructor
+      function obj = solRat(folder)
+         %SOLRAT Class constructor for `solRat` organization object
+         %
+         %  obj = solRat(folder);
+         
+         % Get folder location
+         if nargin < 1 % If no input
+            clc;
+            [obj.folder,flag] = utils.getPathTo('Select RAT folder');
+            if ~flag
+               obj = [];
+               return;
+            end
+         elseif ischar(folder) % "Standard" input
+            obj.folder = folder;
+         elseif iscell(folder) % Can take cell array of folders
+            nRat = numel(folder);
+            obj = solRat(nRat);
+            for ii = 1:nRat
+               obj(ii) = solRat(folder{ii});
+            end
+            return;
+         elseif isnumeric(folder) && isscalar(folder) % Initialize array
+            nRat = folder;
+            obj = repmat(obj,nRat,1);
+            return;
+         end
+         
+         % Get name of rat
+         obj.Name = obj.parseName;
+         
+         % Initialize blocks
+         obj.Children = obj.initChildBlocks;
+      end
+      
+      % Overload of built-in `openfig` method
+      function openfig(obj)
+         %OPENFIG Overloaded `openfig` method to view figures
+         %
+         % OVERLOADED METHOD for OPENFIG - lets you view rat object figures
+         % more easily.
+         if isempty(obj(1).fbrowser)
+            obj(1).fbrowser = figBrowser(obj);
+         else
+            open(obj(1).fbrowser);
+         end
+      end
+      
+      % Overload of built-in `save` method
+      function save(obj)
+         %SAVE Overloaded method for saving `rat` object
+         %
+         % OVERLOADED METHOD: save(obj);
+         %
+         % Saves a file in the current folder as [obj.Name '.mat']. 
+         %  `obj` is saved as the variable `r`
+         
+         % Handle object arrays
+         if numel(obj) > 1
+            for i = 1:numel(obj)
+               save(obj(i));
+            end
+            return;
+         end
+         
+         savetic = tic; % Start timing save
+         
+         % Notify command window of which SOLRAT is being saved
+         fname = fullfile(pwd,[obj.Name '.mat']);
+         fprintf(1,...
+            'Saving %s (as %s.mat): in progress...\n',...
+            obj.Name,obj.Name);
+         
+         % Save object as variable 'r' for consistency elsewhere
+         r = obj;
+         save(fname,'r','-v7.3');
+         
+         % Update command window
+         backspace_str = repmat('\b',1,15);
+         savetoc = round(toc(savetic));
+         fprintf(1,...
+            [backspace_str 'successful!\n-->\t(%g sec elapsed)\n\n'],...
+            savetoc);
+      end
+   end
+   
    % Public methods such as graphics exports or data handling
    methods (Access = public)
       % Batch export PETH for spike alignments to stimuli
@@ -42,7 +131,7 @@ classdef solRat < handle
          %  obj.batchPETH(trialType,tPre,tPost,binWidth);
          %
          %  Inputs
-         %     obj - Scalar or array of `solRat` objects
+         %     obj       - Scalar or array of `solRat` objects
          %     trialType - (Optional) Type see `cfg.TrialType`
          %
          % Batch export (save and close) PERI-EVENT TIME HISTOGRAMS (PETH)
@@ -210,13 +299,19 @@ classdef solRat < handle
          
          % Add error parsing for indexing
          if Index > (numel(obj.Children)+1)
-            error('Index (%d) is too large for %s.',Index,obj.Name);
+            error(['SOLENOID:' mfilename ':BadIndex'], ...
+               ['\n\t->\t<strong>[BLOCK]:</strong> Index (%d) is ' ...
+                'too large for %s.'],Index,obj.Name);
          end
          if Index < 0
-            error('Index (%d) cannot be negative.',Index);
+            error(['SOLENOID:' mfilename ':IndexOutOfBounds'],...
+               ['\n\t->\t<strong>[BLOCK]:</strong> ' ...
+                'Index (%d) cannot be negative.'],Index);
          end
          if isnan(Index)
-            error('Index is NaN. Did something else go wrong?');
+            error(['SOLENOID:' mfilename ':IndexOutOfBounds'],...
+               ['\n\t->\t<strong>[BLOCK]:</strong> ' ...
+                'Index is NaN. Did something else go wrong?']);
          end
          
          idx = find([obj.Children.Index] == Index,1,'first');
@@ -455,9 +550,9 @@ classdef solRat < handle
          xTickLab = cellfun(@num2str,num2cell(xTick),'UniformOutput',false);
          xTickLab(xTick == 0) = {'\color{red} Surgery'};
          set(ax,'XTick',xTick,'XTickLabel',xTickLab);
-            
+         
          scatter(ax,behavior.Day,behavior.Percent_Success.*100,...
-             scatterParams{:})
+            scatterParams{:})
          title(ax,...
             strcat(obj.Name ,': Recovery on Pellet Retrieval Task'),...
             fontParams{:})
@@ -521,94 +616,6 @@ classdef solRat < handle
       end
    end
    
-   % Class Constructor & Overloaded methods
-   methods
-      % Class constructor
-      function obj = solRat(folder)
-         %SOLRAT Class constructor for `solRat` organization object
-         %
-         %  obj = solRat(folder);
-         
-         % Get folder location
-         if nargin < 1 % If no input
-            clc;
-            [obj.folder,flag] = utils.getPathTo('Select RAT folder');
-            if ~flag
-               obj = [];
-               return;
-            end
-         elseif ischar(folder) % "Standard" input
-            obj.folder = folder;
-         elseif iscell(folder) % Can take cell array of folders
-            nRat = numel(folder);
-            obj = solRat(nRat);
-            for ii = 1:nRat
-               obj(ii) = solRat(folder{ii});
-            end
-            return;
-         elseif isnumeric(folder) && isscalar(folder) % Initialize array
-            nRat = folder;
-            obj = repmat(obj,nRat,1);
-            return;
-         end
-         
-         % Get name of rat
-         obj.Name = obj.parseName;
-         
-         % Initialize blocks
-         obj.Children = obj.initChildBlocks;
-      end
-      
-      % Overload of built-in `openfig` method
-      function openfig(obj)
-         %OPENFIG Overloaded `openfig` method to view figures
-         %
-         % OVERLOADED METHOD for OPENFIG - lets you view rat object figures
-         % more easily.
-         if isempty(obj(1).fbrowser)
-            obj(1).fbrowser = figBrowser(obj);
-         else
-            open(obj(1).fbrowser);
-         end
-      end
-      
-      % Overload of built-in `save` method
-      function save(obj)
-         %SAVE Overloaded method for saving `rat` object
-         %
-         % OVERLOADED METHOD: save(obj);
-         % Saves in current folder as [obj.Name '.mat'], with obj named as
-         % variable 'r'
-         
-         % Handle object arrays
-         if numel(obj) > 1
-            for i = 1:numel(obj)
-               save(obj(i));
-            end
-            return;
-         end
-         
-         savetic = tic; % Start timing save
-         
-         % Notify command window of which SOLRAT is being saved
-         fname = fullfile(pwd,[obj.Name '.mat']);
-         fprintf(1,...
-            'Saving %s (as %s.mat): in progress...\n',...
-            obj.Name,obj.Name);
-         
-         % Save object as variable 'r' for consistency elsewhere
-         r = obj;
-         save(fname,'r','-v7.3');
-         
-         % Update command window
-         backspace_str = repmat('\b',1,15);
-         savetoc = round(toc(savetic));
-         fprintf(1,...
-            [backspace_str 'successful!\n-->\t(%g sec elapsed)\n\n'],...
-            savetoc);
-      end
-   end
-   
    % Private "helper" methods (for initialization, etc.)
    methods (Access = private)
       % Initialize objects for recordings associated with this `solRat`
@@ -668,11 +675,23 @@ classdef solRat < handle
    
    % Static "helper" method for retrieving defaults
    methods (Static = true)
+      % Return empty `solRat` object
+      function obj = empty()
+         %EMPTY  Return empty `solRat` object
+         %
+         % obj = solRat.empty();
+         %
+         % Use this to initialize an empty array of `solRat` for
+         % concatenation, for example.
+         
+         obj = solRat(0);
+      end
+      
       % Return defaults associated with `solRat`
       function varargout = getDefault(varargin)
          %GETDEFAULT Return defaults for parameters associated with `solRat`
          %
-         %  varargout = solRat.(varargin);
+         %  varargout = solRat.getDefault(varargin);
          %  e.g.
          %     param = solRat.getDefault('paramName');
          %     [p1,...,pk] = solRat.getDefault('p1Name',...,'pkName');
@@ -684,16 +703,25 @@ classdef solRat < handle
          %  Wrapper function to get variable number of default fields .
          %
          %  See Also: cfg.default
+         
          % Parse input
-         if nargin > nargout
-            error('More inputs specified than requested outputs.');
-         elseif nargin < nargout
-            error('More outputs requested than inputs specified.');
+         if (nargin > nargout) && (nargout > 0)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More inputs specified than requested outputs']);
+         elseif (nargin < nargout)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More outputs requested than inputs specified']);
          end
          
          % Collect fields into output cell array
-         varargout = cell(1,nargout);
-         [varargout{:}] = cfg.default(varargin{:});
+         if nargout > 0
+            varargout = cell(1,nargout);
+            [varargout{:}] = cfg.default(varargin{:});
+         else
+            cfg.default(varargin{:});
+         end
       end
    end
    
