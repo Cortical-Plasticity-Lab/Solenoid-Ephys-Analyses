@@ -47,7 +47,7 @@ classdef solBlock < handle
    end
 
 % METHODS
-   % Class constructor and overloaded methods
+   % Class constructor, overloaded methods, or main interface methods
    methods
       % SOLBLOCK class constructor
       function obj = solBlock(ratObj,folder)
@@ -129,6 +129,137 @@ classdef solBlock < handle
          % Parse distance of each child channel to stimulation site
          parseStimDistance(obj);
       end
+      
+      % Returns **block** data table for convenient export of dataset
+      function blockTable = makeTables(obj)
+         %MAKETABLES Returns data table elements specific to `solBlock`
+         %
+         %  blockTable = obj.makeTables;
+         %  blockTable = makeTables(objArray);
+         %
+         %  Inputs
+         %     obj - Scalar or Array of `solBlock` objects
+         %  
+         %  Output
+         %     blockTable - Table with the following variables:
+         %        * `BlockID`  - Name of recording block
+         %        * `TrialID`  - Trial-specific identifier (might be
+         %                          replicated for all channels within a
+         %                          Block)
+         %        * `ChannelID`- (Unique) identifier for a single channel
+         %        * `Channel`  - Channel index (1:32) for a given array
+         %        * `Probe`    - Probe index (1:2) 
+         %        * `Hemisphere` - Indicates if probe is in left or right
+         %                          hemisphere
+         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+         %        * `Impedance`  - Individual channel measured impedance
+         %        * `AP`         - X-coordinate (mm) relative to bregma
+         %                          (anteroposterior distance)
+         %        * `ML`         - Y-coordinate (mm) relative to bregma
+         %                          (mediolateral distance)
+         %        * `Depth`      - Depth of recording channel (depends on
+         %                          channels, which are at different depths
+         %                          on individual recording shanks, as well
+         %                          as the overall insertion depth)
+         %        * `StimDistance` - Distance from ICMS site
+         %        * `Solenoid_Location` - Location of Solenoid strike on
+         %                                   peripheral cutaneous region
+         %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
+         %        * `Spikes` - Binned spike counts relative to alignment
+         %                       for a single channel.
+         %        * `LFP`    - LFP time-series relative to alignment for a
+         %                       single channel.
+         %        * `Notes` - Most-likely empty, but allows manual input of
+         %                    notes or maybe a notes struct? Basically
+         %                    something that lets you manually add "tags" 
+         %                    to the data rows.
+         %
+         %
+         % See also: solBlock.getTrialData, solChannel.makeTables,
+         %           solRat.makeTables
+      
+         % Since it can be an array, iterate/recurse over all the blocks
+         if ~isscalar(obj)
+             blockTable = table.empty; % Create empty data table to append
+             for iBlock = 1:numel(obj)
+
+               blockTable = [blockTable; solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
+             end
+             return;
+         end
+      
+         % Need to parse the following variables from Block:
+         %  * `TrialID`  - Since "Block" contains list of all trial instances,
+         %                 each of those instances should get an associated
+         %                 'TrialID' and that can be passed to the
+         %                 `makeTables` method of `solChannel` so that it is
+         %                 added to each trial of individual channel data
+         %                 properly.
+         %  * `TrialType` - Same as `TrialID`
+         %  * `BlockID`  - obj.Name
+         %  * Generally, we will get all information about the electrodes as a
+         %     single data structure that is obtained with every recording.
+         %     However, to be manipulated easily, that metadata needs to be
+         %     associated at an individual Channel level with each channel
+         %     properly. So we should pass that `info` struct, which contains
+         %     things like `Depth` and `XLoc` and `Area` etc. to the method of
+         %     `solChannel` in order to properly associate them. Ideally, that
+         %     `info` struct is already associated with the `solChannel`
+         %     object as one of its properties from the constructor, when such
+         %     data is parsed generally and added to the properties at the
+         %     relevant level. 
+         %
+         %   * The rest of the table comes from
+         %     ```
+         %        trialData = getTrialData(obj); % Not yet written
+         %        channelTable = makeTables(obj.Children,trialData);
+         %     ```
+         %
+         %  Strategy -- 
+         %     1) Create `trialTable` in this method using data from Block
+         %           * Mainly, we can get `TrialID` `TrialTime` and
+         %              `TrialType` (the three main fields that should be
+         %              incorporated to the `trialData` struct array returned
+         %              by `getTrialData(obj)`); those will have to be
+         %              replicated properly either within
+         %              `makeTables(obj.Children);` or at this level so that
+         %              the number of rows match
+         %     2) Create `channelTable` using syntax above
+         %     3) Replicate `trialTable` to same number of rows as 
+         %           `channelTable`
+         %     4) Concatenate the two tables (horizontally) to create
+         %        `blockTable`
+
+         % Get struct array that contains metadata such as stimulus type 
+         % and onset, as well as which channel was stimulate, for each 
+         % trial. This array can then be replicated so that there is an 
+         % equivalent array for each "child" table (channel table) that is 
+         % passed back:
+         trialData = getTrialData(obj);
+
+         % % Return the `channelTable` for all child 'Channel' objects % %
+         % Note 1: `makeTables` for `solChannel` will essentially
+         %          replicate `trialData` array struct, and includes the 
+         %          necessary trial-relevant information in the output 
+         %          `channelTable`
+         % Note 2:  All relative depth/spatial information about the
+         %          `solChannel` object should already be associated with
+         %          that object at this point, from being set in the
+         %          constructor or calls to hidden public methods of
+         %          `solBlock` prior to execution of `makeTables`
+         
+         channelTable = makeTables(obj.Children,trialData); 
+         nRows = size(channelTable,1);
+
+         % Note that `solTable` contains `BlockID` column already
+         solTable = obj.Solenoid_Location;
+         solTable = repmat(solTable,nRows,1);
+         
+         % Concatenate Block-level info with Channel-level info for output
+         blockTable = [solTable, channelTable];
+      
+      end %%%% End of makeTables%%%%
+      
    end
    
    % Public methods
@@ -614,137 +745,6 @@ classdef solBlock < handle
          end
          edges = obj.edges;
       end
-      
-      % Returns **block** data table for convenient export of dataset
-      function blockTable = makeTables(obj)
-         %MAKETABLES Returns data table elements specific to `solBlock`
-         %
-         %  blockTable = obj.makeTables;
-         %  blockTable = makeTables(objArray);
-         %
-         %  Inputs
-         %     obj - Scalar or Array of `solBlock` objects
-         %  
-         %  Output
-         %     blockTable - Table with the following variables:
-         %        * `BlockID`  - Name of recording block
-         %        * `TrialID`  - Trial-specific identifier (might be
-         %                          replicated for all channels within a
-         %                          Block)
-         %        * `ChannelID`- (Unique) identifier for a single channel
-         %        * `Channel`  - Channel index (1:32) for a given array
-         %        * `Probe`    - Probe index (1:2) 
-         %        * `Hemisphere` - Indicates if probe is in left or right
-         %                          hemisphere
-         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
-         %        * `Impedance`  - Individual channel measured impedance
-         %        * `AP`         - X-coordinate (mm) relative to bregma
-         %                          (anteroposterior distance)
-         %        * `ML`         - Y-coordinate (mm) relative to bregma
-         %                          (mediolateral distance)
-         %        * `Depth`      - Depth of recording channel (depends on
-         %                          channels, which are at different depths
-         %                          on individual recording shanks, as well
-         %                          as the overall insertion depth)
-         %        * `StimDistance` - Distance from ICMS site
-         %        * `Solenoid_Location` - Location of Solenoid strike on
-         %                                   peripheral cutaneous region
-         %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
-         %        * `Spikes` - Binned spike counts relative to alignment
-         %                       for a single channel.
-         %        * `LFP`    - LFP time-series relative to alignment for a
-         %                       single channel.
-         %        * `Notes` - Most-likely empty, but allows manual input of
-         %                    notes or maybe a notes struct? Basically
-         %                    something that lets you manually add "tags" 
-         %                    to the data rows.
-         %
-         %
-         % See also: solBlock.getTrialData, solChannel.makeTables,
-         %           solRat.makeTables
-      
-         % Since it can be an array, iterate/recurse over all the blocks
-         if ~isscalar(obj)
-             blockTable = table.empty; % Create empty data table to append
-             for iBlock = 1:numel(obj)
-
-               blockTable = [blockTable; solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
-             end
-             return;
-         end
-      
-         % Need to parse the following variables from Block:
-         %  * `TrialID`  - Since "Block" contains list of all trial instances,
-         %                 each of those instances should get an associated
-         %                 'TrialID' and that can be passed to the
-         %                 `makeTables` method of `solChannel` so that it is
-         %                 added to each trial of individual channel data
-         %                 properly.
-         %  * `TrialType` - Same as `TrialID`
-         %  * `BlockID`  - obj.Name
-         %  * Generally, we will get all information about the electrodes as a
-         %     single data structure that is obtained with every recording.
-         %     However, to be manipulated easily, that metadata needs to be
-         %     associated at an individual Channel level with each channel
-         %     properly. So we should pass that `info` struct, which contains
-         %     things like `Depth` and `XLoc` and `Area` etc. to the method of
-         %     `solChannel` in order to properly associate them. Ideally, that
-         %     `info` struct is already associated with the `solChannel`
-         %     object as one of its properties from the constructor, when such
-         %     data is parsed generally and added to the properties at the
-         %     relevant level. 
-         %
-         %   * The rest of the table comes from
-         %     ```
-         %        trialData = getTrialData(obj); % Not yet written
-         %        channelTable = makeTables(obj.Children,trialData);
-         %     ```
-         %
-         %  Strategy -- 
-         %     1) Create `trialTable` in this method using data from Block
-         %           * Mainly, we can get `TrialID` `TrialTime` and
-         %              `TrialType` (the three main fields that should be
-         %              incorporated to the `trialData` struct array returned
-         %              by `getTrialData(obj)`); those will have to be
-         %              replicated properly either within
-         %              `makeTables(obj.Children);` or at this level so that
-         %              the number of rows match
-         %     2) Create `channelTable` using syntax above
-         %     3) Replicate `trialTable` to same number of rows as 
-         %           `channelTable`
-         %     4) Concatenate the two tables (horizontally) to create
-         %        `blockTable`
-
-         % At this point, `obj` must be scalar
-         BlockID = string(obj.Name);  
-
-         % number of rows = number of channels * number of trials
-         nChannels = numel(obj.Children);
-
-         % Get struct array that contains metadata such as stimulus type 
-         % and onset, as well as which channel was stimulate, for each 
-         % trial. This array can then be replicated so that there is an 
-         % equivalent array for each "child" table (channel table) that is 
-         % passed back:
-         trialData = getTrialData(obj);
-         trialData = repmat(trialData,nChannels,1);
-
-         % Note that at this point, we *must* make sure that trialData 
-         % matches up with the corresponding elements of `channelTable`; 
-         % the pattern for trialData will be [a; b; c; ... a; b; c] whereas
-         % pattern for `channelTable` elements will be 
-         % [1; 1; 1; ... nCh; nCh; nCh], where [a,b,c] are trials and 
-         % [1,2,...nCh] are channel indices.
-
-         % % Return the `channelTable` for all child 'Channel' objects % %
-         channelTable = makeTables(obj.Children); 
-         BlockID = repelem(BlockID,size(channelTable,1),1);
-         
-         % make the table 
-         trialTable = struct2table(trialData);
-         blockTable = [table(BlockID), trialTable,channelTable];
-      
-      end %%%% End of makeTables%%%%
       
       % Return data related to each trial
       function trialData = getTrialData(obj)
@@ -1456,15 +1456,17 @@ classdef solBlock < handle
          locTable = readtable(fname);
          obj.Location_Table = locTable(strcmpi(locTable.BlockID,obj.Name),:);
          obj.Location_Table.Properties.UserData = struct(...
-            'type','Location');
+            'type','ProbeLocation');
          obj.Location_Table.Properties.Description = ...
-            'Insertion site coordinates for recording probes';
+            'Insertion site coordinates and information regarding recording probe configuration';
          obj.Location_Table.Properties.VariableUnits = {...
-            'Experiment','Port','Cortical Area','mm','mm','microns','degrees'};
+            'Experiment','Port','Cortical Area','Hemisphere','Hemisphere','mm','mm','microns','degrees'};
          obj.Location_Table.Properties.VariableDescriptions = {...
             'Experiment recording block name',...
             'Intan probe port indicating separate arrays',...
             'Area targeted by each probe (Rostral Forelimb Area; RFA; premotor) or Forelimb Sensory Cortex (S1)',...
+            'Is Probe in Left or Right Hemisphere (typically contralateral to solenoid)',...
+            'Is Ischemia in Left or Right Hemisphere (all same as Probe in main 7 rats)',...
             'Anteroposterior distance from bregma (mm)',...
             'Mediolateral distance from bregma (mm)', ...
             'Insertion depth of highest channel (microns)',...
@@ -1500,7 +1502,32 @@ classdef solBlock < handle
          end
          
          solTable = readtable(fname);
-         obj.Solenoid_Location = solTable(ismember(solTable.BlockID,obj.Name),:);
+         % Note: this requires that the file pointed to by `fname` MUST
+         %       have at least one row named after the correct element of
+         %       `BlockID`; if there is not exactly one row, then something
+         %       is wrong since there was never more than one Solenoid
+         %       used. If no solenoid was used, that is fine, it should
+         %       simply be a row that has the BlockID only and all other
+         %       variables (except for possibly `Notes`) empty
+         blockRow = ismember(solTable.BlockID,obj.Name);
+         nRow = sum(blockRow);
+         if nRow == 1
+            obj.Solenoid_Location = solTable(blockRow,:);
+         elseif nRow == 0 % Do some error checking on input data table
+            error(['SOLENOID:' mfilename ':BadDataTable'],...
+               ['\n\t->\t<strong>[PARSESOLENOIDINFO]</strong> ' ...
+                'Missing row in spreadsheet (%s) for block ' ...
+                '<strong>%s</strong\n\t\t\t\t' ...
+                '(Should contain exactly <strong>one</strong> row ' ...
+                'with this BlockID)\n'],fname,obj.Name);
+         else
+            error(['SOLENOID:' mfilename ':BadDataTable'],...
+               ['\n\t->\t<strong>[PARSESOLENOIDINFO]</strong> ' ...
+                'Multiple rows in spreadsheet (%s) for block ' ...
+                '<strong>%s</strong\n\t\t\t\t' ...
+                '(Should only contain <strong>one</strong> row ' ...
+                'per unique BlockID)\n'],fname,obj.Name);
+         end
       end
       
       % Set (construct) the child CHANNEL objects
@@ -1541,16 +1568,17 @@ classdef solBlock < handle
          end
          
          % Load channel RAW data INFO file
-         in = load(fullfile(obj.folder,...
-            [obj.Name subf.raw],...
-            [obj.Name id.info]));
+         raw = fullfile(obj.folder,[obj.Name subf.raw],[obj.Name id.info]);
+         in = load(raw);
          % Construct child CHANNEL array
-         fprintf(1,...
-            'Adding CHANNEL child objects to %s...000%%\n',...
-            obj.Name);
+         fprintf(1,['\n\t->\t<strong>[SOLBLOCK.SETCHANNELS]:</strong> ' ...
+            'Adding <strong>solChannel</strong> objects to ' ...
+            'solBlock <strong>%s</strong>...000%%\n'],obj.Name);
          nCh = numel(in.RW_info);
          Children = solChannel(nCh);
+         locData = obj.Location_Table;
          for iCh = 1:nCh
+            
             Children(iCh) = solChannel(obj,in.RW_info(iCh));
             fprintf(1,'\b\b\b\b\b%03d%%\n',round((iCh/nCh)*100));
          end

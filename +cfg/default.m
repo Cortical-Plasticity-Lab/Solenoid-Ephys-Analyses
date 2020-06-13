@@ -20,7 +20,7 @@ function varargout = default(varargin)
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
-out.site_location_table = 'Locations.xlsx';
+out.site_location_table = 'Probe-Info.xlsx';
 out.solenoid_location_table = 'Solenoid-Info.xlsx';
 out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
 %put the list of rat names ex: MM-T1, order matches namingValue

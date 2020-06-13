@@ -13,9 +13,10 @@ classdef solChannel < handle
    % Properties with public `get` access, but must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = false)
       Area           % Recording area ("RFA", "CFA", "S1", etc.)
-      Depth          % Site depth, relative to dorsal surface (microns)
+      Depth                (1,1) double = nan      % Site depth, relative to dorsal surface (microns)
       Hemisphere     % Left or Right hemisphere
-      Impedance      % electrode impedance (kOhms)
+      Impedance            (1,1) double = nan       % electrode impedance (kOhms)
+      Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[],'Layout',[]); % Struct with data about this probe
       Stim_Distance_table % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
                           %    a new row for each channel. Variables are:
@@ -1266,7 +1267,7 @@ classdef solChannel < handle
       end
       
       % Parse Channel depth for object or each element in object array
-      function parseChannelLocation(obj,depth,angle,cX,cY)
+      function parseChannelLocation(obj,cX,cY)
          %PARSECHANNELLOCATION Parse channel location & depth 
          %
          % parseChannelLocation(obj);
