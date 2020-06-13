@@ -19,7 +19,7 @@ classdef solChannel < handle
       Impedance            (1,1) double = nan       % electrode impedance (kOhms)
       Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[],'Orientation',""); % Struct with data about this probe
       ML                   (1,1) double = nan       % electrode mediolateral distance from Bregma (+ == lateral)
-      Stim_Distance_table % Table with distances from stim channel
+      StimData            % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
                           %    a new row for each channel. Variables are:
                           %      * Name (`obj.Name` of stim channel)
@@ -118,6 +118,176 @@ classdef solChannel < handle
          
       end  
       
+      % Return LFP aligned to TRIALS for this channel
+      function [data,t] = getAlignedLFP(obj,trialType)
+         %GETALIGNEDLFP Return LFP aligned to trials for this channel
+         %
+         %  [data,t] = getAlignedLFP(obj);
+         %  [data,t] = getAlignedLFP(obj,trialType);
+         %  
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) if not specified, returns all trials;
+         %                          otherwise, use this as `cfg.TrialType`
+         %                          element to enumerate subset of trials
+         %                          to return.
+         % Output
+         %  data      - Data matrix, where rows are trials and columns are
+         %              time-samples. All data corresponds to a single
+         %              channel. If `obj` is an array, then this is
+         %              returned as a cell array with each element
+         %              corresponding to matched elements of `obj` array
+         %  t         - Vector of times corresponding to columns of `data`
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if ~isscalar(obj)
+            data = cell(size(obj));
+            for i = 1:numel(obj)
+               if i == 1
+                  [data{i},t] = getAlignedLFP(obj(i),trialType);
+               else
+                  data{i} = getAlignedLFP(obj(i),trialType);
+               end
+            end
+            return;
+         end
+         
+         data = getLFP(obj);
+         edges = getSpikeBinEdges(obj); %#ok<*PROP>
+         
+         trials = getTrials(obj,trialType);
+         vec = round(edges(1)*obj.fs_d) : round(edges(end)*obj.fs_d);
+         itrials = round(trials * obj.fs_d);
+         itrials = reshape(itrials,numel(itrials),1);
+         
+         t = vec / obj.fs_d * 1e3;
+         
+         vec = vec + itrials;
+         n = numel(data);
+         
+         vec(any(vec < 1,2),:) = [];
+         vec(any(vec > n,2),:) = [];
+         
+         data = data(vec);
+         
+      end
+      
+      % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to TRIAL
+      function [data,t,t_trial] = getAlignedIFR(obj,trialType)
+         %GETALIGNEDIFR Return IFR aligned to trials for this channel
+         %
+         %  [data,t] = getAlignedIFR(obj);
+         %  [data,t] = getAlignedIFR(obj,trialType);
+         %  
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) if not specified, returns all trials;
+         %                          otherwise, use this as `cfg.TrialType`
+         %                          element to enumerate subset of trials
+         %                          to return.
+         % Output
+         %  data      - Data matrix, where rows are trials and columns are
+         %              time-samples. All data corresponds to a single
+         %              channel. If `obj` is an array, then this is
+         %              returned as a cell array with each element
+         %              corresponding to matched elements of `obj` array
+         %  t         - Vector of times corresponding to columns of `data`
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if ~isscalar(obj)
+            data = cell(size(obj));
+            for i = 1:numel(obj)
+               if i == 1
+                  [data{i},t] = getAlignedIFR(obj(i),trialType);
+               else
+                  data{i} = getAlignedIFR(obj(i),trialType);
+               end
+            end
+            return;
+         end
+         
+         data = getIFR(obj);
+         trials = getTrials(obj,trialType);
+         trials = reshape(round(trials*obj.fs_d),numel(trials),1);
+         t = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
+         tvec = round(t*obj.fs_d);
+         
+         vec = tvec + trials;
+         n = numel(data);
+         
+         vec(any(vec < 1,2),:) = [];
+         vec(any(vec > n,2),:) = [];
+         
+         data = data(vec);
+         
+         if nargout > 1
+            t = t * 1e3; % scale to ms
+         end
+         
+         if nargout > 2
+            t_trial = vec * obj.fs_d;
+         end
+      end
+      
+      % Returns matrix of counts of binned spikes
+      function binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
+         %GETBINNEDSPIKES Returns matrix of counts of binned spikes
+         %
+         % binCounts = getBinnedSpikes(obj);
+         % binCounts = getBinnedSpikes(obj,trialType);
+         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost);
+         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
+         %
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) only get matrix for trials of
+         %                 `TrialType`
+         %  tPre      - (Optional) relative time (seconds) to start bins 
+         %  tPost     - (Optional) relative time (seconds) to end bins
+         %  binWidth  - (Optional) width of bins (seconds) for counting
+         %                 spike times relative to trial onset
+         % Output
+         %  binCounts - Matrix of counts of binned spikes, where each row
+         %              corresponds to a single trial
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if nargin == 5
+            % Set the spike bin edges if this arg is given
+            obj.setSpikeBinEdges(tPre,tPost,binWidth);
+         end
+         
+         % Do we clip bin counts to one (per trial)?
+         %  -> Makes more sense to do if looking at **sorted** single-unit
+         %     activity
+         %  -> For multi-unit activity, it's not inconceivable to see
+         %     multiple spikes within a 2-ms epoch, simply due to the
+         %     possibility of multiple sources generating said spikes.
+         clipBinCounts = cfg.default('clip_bin_counts');
+         
+         edges = obj.getSpikeBinEdges;
+         
+         tSpike = getSpikes(obj);
+         trials = obj.getTrials(trialType);
+         binCounts = zeros(numel(trials),numel(edges)-1);
+         
+         for iT = 1:numel(trials)
+            binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
+         end
+         
+         if clipBinCounts
+            binCounts = min(binCounts,1); % Clip to 1 spike per bin
+         end
+      end
+      
       % Returns **channel** data table for convenient export of dataset
       function channelTable = makeTables(obj,trialData,tPre,tPost)
          %MAKETABLES Returns data table elements specific to `solChannel`
@@ -160,25 +330,34 @@ classdef solChannel < handle
          %                    something that lets you manually add "tags" 
          %                    to the data rows.
          
-         if nargin < 3
-            tPre = solChannel.getDefault('tpre');
-         end
-         
-         if nargin < 4
-            tPost = solChannel.getDefault('tpost');
-         end
-         
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
             channelTable = table.empty; % Create empty data table to append
-            if isscalar(probeDepth)
-               probeDepth = repelem(probeDepth,size(obj));
-            end
-            for iChannel = 1:numel(obj)
-               channelTable = [channelTable; ...
-                  makeTable(obj(iChannel),probeDepth(iChannel))];
+            switch nargin
+               case 2
+                  for iChannel = 1:numel(obj)
+                     channelTable = [channelTable; ...
+                        makeTable(obj(iChannel),trialData)];
+                  end
+               case 3
+                  for iChannel = 1:numel(obj)
+                     channelTable = [channelTable; ...
+                        makeTable(obj(iChannel),trialData,tPre)];
+                  end
+               otherwise
+                  for iChannel = 1:numel(obj)
+                     channelTable = [channelTable; ...
+                        makeTable(obj(iChannel),trialData,tPre,tPost)];
+                  end
             end
             return;
+         end
+         
+         % Get `tPre` and `tPost` depending on # input args
+         if nargin < 3
+            [~,tPre,tPost] = getSpikeBinEdges(obj);
+         elseif nargin < 4
+            [~,~,tPost] = getSpikeBinEdges(obj);
          end
          
          % Get number of rows that this `channelTable` will be
@@ -193,7 +372,7 @@ classdef solChannel < handle
          AP = obj.AP;
          ML = obj.ML;
          Impedance = obj.Impedance;
-         stimTable = obj.Stim_Distance_Table;
+         stimTable = obj.StimData;
          nStim = size(stimTable,1);
          Stim_Ch = reshape(stimTable.Name,1,nStim);
          Stim_AP = reshape(stimTable.AP,1,nStim);
@@ -210,9 +389,17 @@ classdef solChannel < handle
          trialTable = solChannel.trialData2Table(trialData);
          
          % Return all binned spikes (for all trials) on this channel
-         channelTable.Spikes = getBinnedSpikes(obj);
+         allTrials = cfg.TrialType('All');
+         Spikes = getBinnedSpikes(obj,allTrials,tPre,tPost);
          
+         % Return all aligned LFP data
+         LFP = getAlignedLFP(obj,allTrials);
          
+         % Concatenate trialTable with channels tables
+         channelTable = [trialTable, channelTable, table(Spikes, LFP,...
+            'VariableDescriptions',...
+            {'Histogram bin counts of spikes by trial',...
+             'Decimated LFP voltage signal (microvolts) during trial'})];
          
       end %%%% End of makeTables%%%%
    end
@@ -474,177 +661,6 @@ classdef solChannel < handle
             'EdgeColor','none',...
             'FaceColor',pars.col{obj.Hemisphere});
          
-      end
-      
-      % Return LFP aligned to TRIALS for this channel
-      function [data,t] = getAlignedLFP(obj,trialType)
-         %GETALIGNEDLFP Return LFP aligned to trials for this channel
-         %
-         %  [data,t] = getAlignedLFP(obj);
-         %  [data,t] = getAlignedLFP(obj,trialType);
-         %  
-         % Inputs
-         %  obj       - Scalar or array of `solChannel` objects
-         %  trialType - (Optional) if not specified, returns all trials;
-         %                          otherwise, use this as `cfg.TrialType`
-         %                          element to enumerate subset of trials
-         %                          to return.
-         % Output
-         %  data      - Data matrix, where rows are trials and columns are
-         %              time-samples. All data corresponds to a single
-         %              channel. If `obj` is an array, then this is
-         %              returned as a cell array with each element
-         %              corresponding to matched elements of `obj` array
-         %  t         - Vector of times corresponding to columns of `data`
-         
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if ~isscalar(obj)
-            data = cell(size(obj));
-            for i = 1:numel(obj)
-               if i == 1
-                  [data{i},t] = getAlignedLFP(obj(i),trialType);
-               else
-                  data{i} = getAlignedLFP(obj(i),trialType);
-               end
-            end
-            return;
-         end
-         
-         data = getLFP(obj);
-         edges = obj.getSpikeBinEdges; %#ok<*PROP>
-         
-         
-         trials = getTrials(obj,trialType);
-         vec = round(edges(1)*obj.fs_d) : round(edges(end)*obj.fs_d);
-         itrials = round(trials * obj.fs_d);
-         itrials = reshape(itrials,numel(itrials),1);
-         
-         t = vec / obj.fs_d * 1e3;
-         
-         vec = vec + itrials;
-         n = numel(data);
-         
-         vec(any(vec < 1,2),:) = [];
-         vec(any(vec > n,2),:) = [];
-         
-         data = data(vec);
-         
-      end
-      
-      % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to TRIAL
-      function [data,t,t_trial] = getAlignedIFR(obj,trialType)
-         %GETALIGNEDIFR Return IFR aligned to trials for this channel
-         %
-         %  [data,t] = getAlignedIFR(obj);
-         %  [data,t] = getAlignedIFR(obj,trialType);
-         %  
-         % Inputs
-         %  obj       - Scalar or array of `solChannel` objects
-         %  trialType - (Optional) if not specified, returns all trials;
-         %                          otherwise, use this as `cfg.TrialType`
-         %                          element to enumerate subset of trials
-         %                          to return.
-         % Output
-         %  data      - Data matrix, where rows are trials and columns are
-         %              time-samples. All data corresponds to a single
-         %              channel. If `obj` is an array, then this is
-         %              returned as a cell array with each element
-         %              corresponding to matched elements of `obj` array
-         %  t         - Vector of times corresponding to columns of `data`
-         
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if ~isscalar(obj)
-            data = cell(size(obj));
-            for i = 1:numel(obj)
-               if i == 1
-                  [data{i},t] = getAlignedIFR(obj(i),trialType);
-               else
-                  data{i} = getAlignedIFR(obj(i),trialType);
-               end
-            end
-            return;
-         end
-         
-         data = getIFR(obj);
-         trials = getTrials(obj,trialType);
-         trials = reshape(round(trials*obj.fs_d),numel(trials),1);
-         t = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
-         tvec = round(t*obj.fs_d);
-         
-         vec = tvec + trials;
-         n = numel(data);
-         
-         vec(any(vec < 1,2),:) = [];
-         vec(any(vec > n,2),:) = [];
-         
-         data = data(vec);
-         
-         if nargout > 1
-            t = t * 1e3; % scale to ms
-         end
-         
-         if nargout > 2
-            t_trial = vec * obj.fs_d;
-         end
-      end
-      
-      % Returns matrix of counts of binned spikes
-      function binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
-         %GETBINNEDSPIKES Returns matrix of counts of binned spikes
-         %
-         % binCounts = getBinnedSpikes(obj);
-         % binCounts = getBinnedSpikes(obj,trialType);
-         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost);
-         % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
-         %
-         % Inputs
-         %  obj       - Scalar or array of `solChannel` objects
-         %  trialType - (Optional) only get matrix for trials of
-         %                 `TrialType`
-         %  tPre      - (Optional) relative time (seconds) to start bins 
-         %  tPost     - (Optional) relative time (seconds) to end bins
-         %  binWidth  - (Optional) width of bins (seconds) for counting
-         %                 spike times relative to trial onset
-         % Output
-         %  binCounts - Matrix of counts of binned spikes, where each row
-         %              corresponds to a single trial
-         
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if nargin == 5
-            % Set the spike bin edges if this arg is given
-            obj.setSpikeBinEdges(tPre,tPost,binWidth);
-         end
-         
-         % Do we clip bin counts to one (per trial)?
-         %  -> Makes more sense to do if looking at **sorted** single-unit
-         %     activity
-         %  -> For multi-unit activity, it's not inconceivable to see
-         %     multiple spikes within a 2-ms epoch, simply due to the
-         %     possibility of multiple sources generating said spikes.
-         clipBinCounts = cfg.default('clip_bin_counts');
-         
-         edges = obj.getSpikeBinEdges;
-         
-         tSpike = getSpikes(obj);
-         trials = obj.getTrials(trialType);
-         binCounts = zeros(numel(trials),numel(edges)-1);
-         
-         for iT = 1:numel(trials)
-            binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
-         end
-         
-         if clipBinCounts
-            binCounts = min(binCounts,1); % Clip to 1 spike per bin
-         end
       end
       
       % Returns BANDPASS FILTERED (UNIT) data for this channel
@@ -912,10 +928,11 @@ classdef solChannel < handle
       end
       
       % Return SPIKE BIN EDGES used to generate spike histograms or rasters
-      function edges = getSpikeBinEdges(obj)
+      function [edges,tPre,tPost] = getSpikeBinEdges(obj)
          %GETSPIKEBINEDGES Return spike bin edges used in histogram 
          %
          %  edges = getSpikeBinEdges(obj);
+         %  [edges,tPre,tPost] = getSpikeBinEdges(obj);
          %
          % Inputs
          %  obj   - Scalar or array of `solChannel` objects
@@ -926,19 +943,26 @@ classdef solChannel < handle
          %           (e.g. PETH) for `obj`; if `obj` is array, then this is
          %           returned as a cell array, where each element is such a
          %           vector of edge times.
+         %  tPre  - Time (sec) of first element of `edges` (convenience)
+         %  tPost - Time (sec) of last element of `edges` (convenience)
          
          if ~isscalar(obj)
             edges = cell(size(obj));
+            tPre = nan(size(obj));
+            tPost = nan(size(obj));
             for i = 1:numel(obj)
-               edges{i} = getSpikeBinEdges(obj(i));
+               [edges{i},tPre(i),tPost(i)] = getSpikeBinEdges(obj(i));
             end
             return;
          end
          
          if isempty(obj.edges)
-            obj.setSpikeBinEdges;
+            setSpikeBinEdges(obj);
          end
          edges = obj.edges;
+         tPre = edges(1);
+         tPost = edges(end);
+
       end
       
       % Return times of ICMS stimuli
@@ -958,24 +982,10 @@ classdef solChannel < handle
          %  ts              - Vector of `stim` times (ICMS stimuli)
          %  stimCh          - Vector indicating which stimulation channels
          %                       were used (indexing vector).
-         %
-         % If `obj` is an array, then both `ts` and `stimCh` are returned
-         % as cell arrays with cell elements matching corresponding
-         % elements of `obj` input
          
          if nargin < 2
             force_overwrite = false;
-         end
-         
-         if ~isscalar(obj)
-            ts = cell(size(obj));
-            stimCh = cell(size(obj));
-            for i = 1:numel(obj)
-               [ts{i},stimCh{i}] = getStims(obj,force_overwrite);
-            end
-            return;
-         end
-         
+         end         
          
          stimCh = [];
          ts = [];
@@ -1403,8 +1413,10 @@ classdef solChannel < handle
             delete(fig);
          end
       end
-      
-      
+   end
+   
+   % Public but hidden `set` methods that probably only in constructor
+   methods (Access = public, Hidden = true)
       % Set the RAW data file for this channel
       function setRaw(obj,f,id)
          %SETRAW  Set RAW data file for this channel
@@ -1708,7 +1720,7 @@ classdef solChannel < handle
       end   
    end
    
-   % Protected method (only called by `solChannel` or `solBlock`)
+   % Restricted methods (only called by `solChannel` or `solBlock`)
    methods (Access = {?solChannel, ?solBlock})
       % Assign distance to ICMS site(s)
       function setStimChannelDistance(obj,Name,AP,ML,Depth)
@@ -1730,7 +1742,7 @@ classdef solChannel < handle
          %  Depth - Distance (from dorsal surface of brain; microns)
          %
          % Output
-         %  -- none -- Updates the `solChannel.Stim_Distance_Table`
+         %  -- none -- Updates the `solChannel.StimData`
          %             property, which has one row per stim site (or only
          %             one row if no stimulation site)
          
@@ -1747,17 +1759,19 @@ classdef solChannel < handle
          % site is more superficial to the stim site.
          DV = bsxfun(@minus,obj.Depth,Depth) .* 1e-3; % scale to mm 
          Distance = sqrt((AP + ML + DV).^2);
-         obj.Stim_Distance_Table = table(Name,Distance,AP,ML,DV,...
-            'Description','Distance (mm) to site(s) delivering ICMS',...
-            'VariableUnits',{'Channel','mm','mm','mm','mm'},...
-            'VariableDescriptions',...
+         stimTable = table(Name,Distance,AP,ML,DV);
+         stimTable.Properties.Description = ...
+            'Distance (mm) to site(s) delivering ICMS';
+         stimTable.Properties.VariableUnits = ...
+           {'Channel','mm','mm','mm','mm'};
+         stimTable.Properties.VariableDescriptions = ...
            {'Name of ICMS channel',...
             'Euclidean distance from stim site',...
             'Anteroposterior distance relative to stim site (+ == rostral)',...
             'Mediolateral distance relative to stim site (+ == lateral)',...
-            'Dorsoventral distance relative to stim site (+ == ventral)'});
-         obj.Stim_Distance_Table.Properties.UserData = struct('type',...
-            'StimDistance');
+            'Dorsoventral distance relative to stim site (+ == ventral)'};
+         stimTable.Properties.UserData = struct('type','StimDistance');
+         obj.StimData = stimTable;
       end
    end
    
@@ -1941,7 +1955,7 @@ classdef solChannel < handle
             end
             return;
          end
-         pInfo = strsplit(ChannelID,'-');
+         pInfo = strsplit(obj.Name,'-');
          Probe     = pInfo(1);
          Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
          
@@ -2147,22 +2161,37 @@ classdef solChannel < handle
          % Output
          %  trialTable - Table with one row per trial
          
-         TrialID = vertcat(trialData.ID);
-         Number = vertcat(trialData.Number);
-         Time = vertcat(trialData.Time);
-         Type = vertcat(trialData.Type);
-         ICMS_Onset = vertcat(trialData.ICMS_Onset);
-         ICMS_Channel = vertcat(trialData.ICMS_Channel);
-         Solenoid_Onset = vertcat(trialData.Solenoid_Onset);
-         Solenoid_Offset = vertcat(trialData.Solenoid_Offset);
-         Solenoid_Target = vertcat(trialData.Solenoid_Target);
-         Solenoid_Paw = vertcat(trialData.Solenoid_Paw);
-         Solenoid_Abbrev = vertcat(trialData.Solenoid_Abbrev);
-         Notes = vertcat(trialData.Notes);
-         trialTable = table(TrialID,Number,Time,Type,...
-            ICMS_Onset,ICMS_Channel,...
-            Solenoid_Onset,Solenoid_Offset,Solenoid_Target,...
-            Solenoid_Paw,Solenoid_Abbrev,Notes);
+%          TrialID = vertcat(trialData.ID);
+%          Number = vertcat(trialData.Number);
+%          Time = vertcat(trialData.Time);
+%          Type = vertcat(trialData.Type);
+%          ICMS_Onset = vertcat(trialData.ICMS_Onset);
+%          ICMS_Channel = vertcat(trialData.ICMS_Channel);
+%          Solenoid_Onset = vertcat(trialData.Solenoid_Onset);
+%          Solenoid_Offset = vertcat(trialData.Solenoid_Offset);
+%          Solenoid_Target = vertcat(trialData.Solenoid_Target);
+%          Solenoid_Paw = vertcat(trialData.Solenoid_Paw);
+%          Solenoid_Abbrev = vertcat(trialData.Solenoid_Abbrev);
+%          Notes = vertcat(trialData.Notes);
+%          trialTable = table(TrialID,Number,Time,Type,...
+%             ICMS_Onset,ICMS_Channel,...
+%             Solenoid_Onset,Solenoid_Offset,Solenoid_Target,...
+%             Solenoid_Paw,Solenoid_Abbrev,Notes);
+         trialTable = struct2table(trialData);
+         trialTable.Properties.Description = 'Trial metadata table';
+         trialTable.Properties.UserData = struct('type','TrialData');
+         trialTable.Properties.VariableDescriptions = {...
+            'Unique Trial "Key" identifier',...
+            'Type of trial (1: ICMS; 2: Solenoid; 3: Sol+ICMS)',...
+            'Time of trial (sec) relative to recording onset',...
+            'Number of trial relative to start of all trials in recording',...
+            'Relative delay (sec) to ICMS pulse onset',...
+            'Index to channel(s) delivering intracortical microstimulation (ICMS)',...
+            'Relative delay (sec) to extension onset for solenoid',...
+            'Relative delay (sec) to retraction onset for solenoid',...
+            'Peripheral cutaneous target for solenoid',...
+            'Abbreviation from Tutunculer 2006 convention for target',...
+            'Misc recording block notes'};
       end
    end
 end

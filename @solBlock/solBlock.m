@@ -152,14 +152,19 @@ classdef solBlock < handle
       end
       
       % Returns **block** data table for convenient export of dataset
-      function blockTable = makeTables(obj)
+      function blockTable = makeTables(obj,tPre,tPost)
          %MAKETABLES Returns data table elements specific to `solBlock`
          %
          %  blockTable = obj.makeTables;
          %  blockTable = makeTables(objArray);
+         %  blockTable = makeTables(obj,tPre,tPost);
          %
          %  Inputs
-         %     obj - Scalar or Array of `solBlock` objects
+         %     obj          - Scalar or Array of `solBlock` objects
+         %     tPre         - Time (sec) prior to alignment event for data
+         %                    to start accumulating
+         %     tPost        - Time (sec) after alignment event for data to
+         %                    stop accumulating
          %  
          %  Output
          %     blockTable - Table with the following variables:
@@ -202,11 +207,31 @@ classdef solBlock < handle
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
              blockTable = table.empty; % Create empty data table to append
-             for iBlock = 1:numel(obj)
-
-               blockTable = [blockTable; solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
+             switch nargin
+                case 1
+                   for iBlock = 1:numel(obj)
+                     blockTable = [blockTable; ...
+                        solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
+                   end
+                case 2
+                   for iBlock = 1:numel(obj)
+                     blockTable = [blockTable; ...
+                        solBlock.makeTable(obj(iBlock),tPre)]; %#ok<AGROW>
+                   end
+                otherwise
+                   for iBlock = 1:numel(obj)
+                     blockTable = [blockTable; ...
+                        solBlock.makeTable(obj(iBlock),tPre,tPost)]; %#ok<AGROW>
+                   end
              end
              return;
+         end
+         
+         % Get `tPre` and `tPost` depending on # input args
+         if nargin < 2
+            [~,tPre,tPost] = getSpikeBinEdges(obj);
+         elseif nargin < 3
+            [~,~,tPost] = getSpikeBinEdges(obj);
          end
       
          % Need to parse the following variables from Block:
@@ -269,7 +294,7 @@ classdef solBlock < handle
          %          constructor or calls to hidden public methods of
          %          `solBlock` prior to execution of `makeTables`
          
-         channelTable = makeTables(obj.Children,trialData); 
+         channelTable = makeTables(obj.Children,trialData,tPre,tPost); 
          nRows = size(channelTable,1);
 
          % Note that `solTable` contains `BlockID` column already
@@ -740,10 +765,11 @@ classdef solBlock < handle
       end
       
       % Return the spike bin (histogram) edge times
-      function edges = getSpikeBinEdges(obj)
+      function [edges,tPre,tPost] = getSpikeBinEdges(obj)
          %GETSPIKEBINEDGES Return spike bin (histogram) edge times
          %
-         % edges = getSpikeBinEdges(obj);
+         %  edges = getSpikeBinEdges(obj);
+         %  [edges,tPre,tPost] = getSpikeBinEdges(obj);
          %
          % Inputs
          %  obj   - Scalar or array of `solBlock` objects
@@ -752,11 +778,15 @@ classdef solBlock < handle
          %  edges - Vector of bin edge times for the spike histogram, which
          %          contains (# bins + 1) elements. If `obj` is an array,
          %          then returns a cell array of such vectors.
+         %  tPre  - Time (sec) of first element of `edges` (convenience)
+         %  tPost - Time (sec) of last element of `edges` (convenience)
          
          if ~isscalar(obj)
             edges = cell(numel(obj),1);
+            tPre = nan(size(obj));
+            tPost = nan(size(obj));
             for ii = 1:numel(obj)
-               edges{ii} = getSpikeBinEdges(obj(ii));
+               [edges{ii},tPre(ii),tPost(ii)] = getSpikeBinEdges(obj(ii));
             end
             return;
          end
@@ -765,6 +795,8 @@ classdef solBlock < handle
             setSpikeBinEdges(obj);
          end
          edges = obj.edges;
+         tPre = edges(1);
+         tPost = edges(end);
       end
       
       % Return data related to each trial
@@ -833,8 +865,8 @@ classdef solBlock < handle
          % % Use `deal` to assign struct array elements from properties % %
          time = num2cell(obj.Trials);
          [trialData.Time] = deal(time{:});
-         ID = utils.makeKey(nTrial,'unique',sprintf('B%02d_',obj.Index));
-         [trialData.ID] = deal(ID{:});
+         TrialID = utils.makeKey(nTrial,'unique',sprintf('B%02d_',obj.Index));
+         [trialData.TrialID] = deal(TrialID{:});
          trialtype = num2cell(obj.TrialType);
          [trialData.Type] = deal(trialtype{:});
          trialNumber = num2cell((1:nTrial)');
@@ -1553,7 +1585,7 @@ classdef solBlock < handle
             error(['SOLENOID:' mfilename ':BadDataTable'],...
                ['\n\t->\t<strong>[PARSESOLENOIDINFO]</strong> ' ...
                 'Multiple rows in spreadsheet (%s) for block ' ...
-                '<strong>%s</strong\n\t\t\t\t' ...
+                '<strong>%s</strong>\n\t\t\t\t' ...
                 '(Should only contain <strong>one</strong> row ' ...
                 'per unique BlockID)\n'],fname,obj.Name);
          end
@@ -1888,7 +1920,7 @@ classdef solBlock < handle
          
          % Get ICMS info
          obj.ICMS_Channel_Index = icms_channel_index;
-         if isnan(icms_channel_index)
+         if isnan(icms_channel_index(1))
             obj.ICMS_Channel_Name = "None";
          else
             obj.ICMS_Channel_Name = vertcat(...
