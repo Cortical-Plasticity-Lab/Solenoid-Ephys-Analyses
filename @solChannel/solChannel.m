@@ -22,7 +22,7 @@ classdef solChannel < handle
       Stim_Distance_table % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
                           %    a new row for each channel. Variables are:
-                          %      * Stim_Channel
+                          %      * Name (`obj.Name` of stim channel)
                           %      * AP (anteroposterior offset)
                           %      * ML (mediolateral offset)
                           %      * DV (dorsoventral offset)
@@ -54,7 +54,7 @@ classdef solChannel < handle
    end
    
    % METHODS
-   % Class constructor and overloaded methods
+   % Class constructor, overloaded, and most-used methods
    methods
       % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info,locData)
@@ -117,6 +117,104 @@ classdef solChannel < handle
          setFileAssociations(obj,subf,id);
          
       end  
+      
+      % Returns **channel** data table for convenient export of dataset
+      function channelTable = makeTables(obj,trialData,tPre,tPost)
+         %MAKETABLES Returns data table elements specific to `solChannel`
+         %
+         %  channelTable = makeTables(obj,trialData);
+         %  channelTable = makeTables(obj,trialData,tPre,tPost);
+         %
+         %  Inputs
+         %     obj          - Scalar or Array of `solBlock` objects
+         %     probeDepth   - Depth (mm) of total probe for this channel
+         %     tPre         - Time (sec) prior to alignment event for data
+         %                    to start accumulating
+         %     tPost        - Time (sec) after alignment event for data to
+         %                    stop accumulating
+         %
+         %  Output
+         %     channelTable - Table with the following variables:
+         %        * `ChannelID`- (Unique) identifier for a single channel
+         %        * `Channel`  - Channel index (1:32) for a given array
+         %        * `Probe`    - Probe index (1:2)
+         %        * `Hemisphere` - Indicates if probe is in left or right
+         %                          hemisphere
+         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+         %        * `Impedance`  - Individual channel measured impedance
+         %        * `AP`         - X-coordinate (mm) relative to bregma
+         %                          (anteroposterior distance)
+         %        * `ML`         - Y-coordinate (mm) relative to bregma
+         %                          (mediolateral distance)
+         %        * `Depth`      - Depth of recording channel (depends on
+         %                          channels, which are at different depths
+         %                          on individual recording shanks, as well
+         %                          as the overall insertion depth)
+         %        * `StimDistance` - Distance from ICMS site
+         %        * `Spikes` - Binned spike counts relative to alignment 
+         %                       for a single channel.
+         %        * `LFP`    - LFP time-series relative to alignment for a
+         %                       single channel.
+         %        * `Notes` - Most-likely empty, but allows manual input of
+         %                    notes or maybe a notes struct? Basically
+         %                    something that lets you manually add "tags" 
+         %                    to the data rows.
+         
+         if nargin < 3
+            tPre = solChannel.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solChannel.getDefault('tpost');
+         end
+         
+         % Since it can be an array, iterate/recurse over all the blocks
+         if ~isscalar(obj)
+            channelTable = table.empty; % Create empty data table to append
+            if isscalar(probeDepth)
+               probeDepth = repelem(probeDepth,size(obj));
+            end
+            for iChannel = 1:numel(obj)
+               channelTable = [channelTable; ...
+                  makeTable(obj(iChannel),probeDepth(iChannel))];
+            end
+            return;
+         end
+         
+         % Get number of rows that this `channelTable` will be
+         nTrial = numel(trialData);
+         
+         % SolChannel stuff
+         ChannelID = obj.Name;
+         [Probe,Channel] = parseNameInfo(obj);
+         
+         Hemisphere = obj.Hemisphere;
+         Depth = obj.Depth;
+         AP = obj.AP;
+         ML = obj.ML;
+         Impedance = obj.Impedance;
+         stimTable = obj.Stim_Distance_Table;
+         nStim = size(stimTable,1);
+         Stim_Ch = reshape(stimTable.Name,1,nStim);
+         Stim_AP = reshape(stimTable.AP,1,nStim);
+         Stim_ML = reshape(stimTable.ML,1,nStim);
+         Stim_DV = reshape(stimTable.DV,1,nStim);
+         Stim_Dist = reshape(stimTable.Distance,1,nStim);
+         
+         channelTable = table(ChannelID,Channel,Probe,...
+            Hemisphere,Depth,AP,ML,Impedance,...
+            Stim_Ch,Stim_AP,Stim_ML,Stim_DV,Stim_Dist);
+         channelTable = repmat(channelTable,nTrial,1);
+         
+         % % Create "trialTable" for trial data to match channelTable % %
+         trialTable = solChannel.trialData2Table(trialData);
+         
+         % Return all binned spikes (for all trials) on this channel
+         channelTable.Spikes = getBinnedSpikes(obj);
+         
+         
+         
+      end %%%% End of makeTables%%%%
    end
    
    % Public methods
@@ -288,9 +386,15 @@ classdef solChannel < handle
          
       end
       
-      % Return figure handle to average INSTANTANEOUS FIRING RATE (IFR;
-      % spike rate) in alignment to TRIALS
+      % Return figure handle to average IFR plots aligned to trials
       function fig = avgIFRplot(obj,trialType,startStop,ii,makeNewFig)
+         %AVGIFRPLOT Return figure handle with IFR plotted for trials
+         %
+         % fig = avgIFRplot(obj);
+         % fig = avgIFRplot(obj,trialType);
+         % fig = avgIFRplot(obj,trialType,startStop);
+         % fig = avgIFRplot(obj,trialType,startStop,ii,makeNewFig);
+         
          if isempty(obj)
             fig = [];
             return;
@@ -374,8 +478,39 @@ classdef solChannel < handle
       
       % Return LFP aligned to TRIALS for this channel
       function [data,t] = getAlignedLFP(obj,trialType)
+         %GETALIGNEDLFP Return LFP aligned to trials for this channel
+         %
+         %  [data,t] = getAlignedLFP(obj);
+         %  [data,t] = getAlignedLFP(obj,trialType);
+         %  
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) if not specified, returns all trials;
+         %                          otherwise, use this as `cfg.TrialType`
+         %                          element to enumerate subset of trials
+         %                          to return.
+         % Output
+         %  data      - Data matrix, where rows are trials and columns are
+         %              time-samples. All data corresponds to a single
+         %              channel. If `obj` is an array, then this is
+         %              returned as a cell array with each element
+         %              corresponding to matched elements of `obj` array
+         %  t         - Vector of times corresponding to columns of `data`
+         
          if nargin < 2
             trialType = cfg.TrialType('All');
+         end
+         
+         if ~isscalar(obj)
+            data = cell(size(obj));
+            for i = 1:numel(obj)
+               if i == 1
+                  [data{i},t] = getAlignedLFP(obj(i),trialType);
+               else
+                  data{i} = getAlignedLFP(obj(i),trialType);
+               end
+            end
+            return;
          end
          
          data = getLFP(obj);
@@ -401,9 +536,41 @@ classdef solChannel < handle
       
       % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to TRIAL
       function [data,t,t_trial] = getAlignedIFR(obj,trialType)
+         %GETALIGNEDIFR Return IFR aligned to trials for this channel
+         %
+         %  [data,t] = getAlignedIFR(obj);
+         %  [data,t] = getAlignedIFR(obj,trialType);
+         %  
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) if not specified, returns all trials;
+         %                          otherwise, use this as `cfg.TrialType`
+         %                          element to enumerate subset of trials
+         %                          to return.
+         % Output
+         %  data      - Data matrix, where rows are trials and columns are
+         %              time-samples. All data corresponds to a single
+         %              channel. If `obj` is an array, then this is
+         %              returned as a cell array with each element
+         %              corresponding to matched elements of `obj` array
+         %  t         - Vector of times corresponding to columns of `data`
+         
          if nargin < 2
             trialType = cfg.TrialType('All');
          end
+         
+         if ~isscalar(obj)
+            data = cell(size(obj));
+            for i = 1:numel(obj)
+               if i == 1
+                  [data{i},t] = getAlignedIFR(obj(i),trialType);
+               else
+                  data{i} = getAlignedIFR(obj(i),trialType);
+               end
+            end
+            return;
+         end
+         
          data = getIFR(obj);
          trials = getTrials(obj,trialType);
          trials = reshape(round(trials*obj.fs_d),numel(trials),1);
@@ -527,13 +694,50 @@ classdef solChannel < handle
       end
       
       % Returns DECIMATED SAMPLE RATE (for LFP) for this channel
-      function getfs_d(obj)
+      function fs = getfs_d(obj)
+         %GETFS_D Return decimated sample rate (for LFP) for this channel
+         %
+         % fs = getfs_d(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array `solChannel` object
+         %
+         % Output
+         %  fs  - Scalar or array matching `obj`, with values that
+         %        correspond to the decimated sample rate for LFP on a
+         %        particular `block`
+         
+         if ~isscalar(obj)
+            fs = nan(size(obj));
+            for i = 1:numel(obj)
+               fs(i) = getfs_d(obj(i));
+            end
+            return;
+         end
          in = load(obj.ds,'fs');
-         obj.fs_d = in.fs;
+         fs = in.fs;
+         obj.fs_d = fs;
       end
       
       % Returns LOWPASS FILTERED (DECIMATED; LFP) data for this channel
       function [data,t] = getLFP(obj,ch,vec)
+         %GETLFP Return decimated, lowpass filtered data for this channel
+         %
+         % [data,t] = getLFP(obj,ch,vec);
+         %  
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  ch  - Indexing vector to subset of `obj` if input is array
+         %        (default if not specified is to return for all `obj`)
+         %  vec - "Mask" vector (default is `inf`, which returns all
+         %        samples) in case you want to only return a subset of
+         %        samples corresponding to some vector of interest.
+         %
+         % Output
+         %  data - Data matrix where columns are samples and rows
+         %           correspond to elements of `obj`
+         %  t    - Time vector corresponding to columns of `data`
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
@@ -541,18 +745,20 @@ classdef solChannel < handle
             vec = inf;
          end
          if numel(obj) > 1
-            
-            data = [];
             for ii = 1:numel(ch)
-               data = [data; getLFP(obj(ch(ii)),ch(ii),vec)];
+               if ii == 1
+                  [data,t] = getLFP(obj(ch(ii)),ch(ii),vec);
+               else
+                  data = [data; getLFP(obj(ch(ii)),ch(ii),vec)];
+               end
             end
             return;
          end
          
-         obj.getfs_d;
+         fs = obj.getfs_d;
          in = load(obj.ds,'data');
          if nargout > 1
-            t = (0:(numel(in.data)-1))/obj.fs_d;
+            t = (0:(numel(in.data)-1))/fs;
          end
          
          if ~isinf(vec)
@@ -605,6 +811,24 @@ classdef solChannel < handle
       
       % Returns RAW data for this channel (and corresponding sample times)
       function [data,t] = getRaw(obj,ch,vec)
+         %GETLFP Return raw data for this channel
+         %
+         %  data = getRaw(obj)
+         %  [data,t] = getRaw(obj,ch,vec);
+         %  
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  ch  - Indexing vector to subset of `obj` if input is array
+         %        (default if not specified is to return for all `obj`)
+         %  vec - "Mask" vector (default is `inf`, which returns all
+         %        samples) in case you want to only return a subset of
+         %        samples corresponding to some vector of interest.
+         %
+         % Output
+         %  data - Data matrix where columns are samples and rows
+         %           correspond to elements of `obj`
+         %  t    - Time vector corresponding to columns of `data`
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
@@ -613,10 +837,12 @@ classdef solChannel < handle
          end
          
          if numel(obj) > 1
-            
-            data = [];
             for ii = 1:numel(ch)
-               data = [data; getRaw(obj(ch(ii)),ch(ii),vec)]; %#ok<*AGROW>
+               if ii == 1
+                  [data,t] = getRaw(obj(ch(ii)),ch(ii),vec);
+               else
+                  data = [data; getRaw(obj(ch(ii)),ch(ii),vec)]; %#ok<*AGROW>
+               end
             end
             return;
          end
@@ -687,22 +913,69 @@ classdef solChannel < handle
       
       % Return SPIKE BIN EDGES used to generate spike histograms or rasters
       function edges = getSpikeBinEdges(obj)
+         %GETSPIKEBINEDGES Return spike bin edges used in histogram 
+         %
+         %  edges = getSpikeBinEdges(obj);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solChannel` objects
+         %  
+         % Output
+         %  edges - If `obj` is scalar, then this is a vector of the bin
+         %           edge times (sec) used to produce any of the histograms
+         %           (e.g. PETH) for `obj`; if `obj` is array, then this is
+         %           returned as a cell array, where each element is such a
+         %           vector of edge times.
+         
+         if ~isscalar(obj)
+            edges = cell(size(obj));
+            for i = 1:numel(obj)
+               edges{i} = getSpikeBinEdges(obj(i));
+            end
+            return;
+         end
+         
          if isempty(obj.edges)
             obj.setSpikeBinEdges;
          end
          edges = obj.edges;
       end
       
-      % Return times of ICMS stimuli (as a point process vector of times)
-      % Second output argument gives channels that were stimulated
-      % Second input argument defaults to false unless specified as true,
-      % in which case the ICMS info file is overwritten. If no ICMS info
-      % file exists, a new one is created.
+      % Return times of ICMS stimuli
       function [ts,stimCh] = getStims(obj,force_overwrite)
+         %GETSTIMS Return times of ICMS stimuli as vector of times
+         %
+         %  ts = getStims(obj);
+         %  [ts,stimCh] = getStims(obj,force_overwrite);
+         %
+         % Inputs
+         %  obj             - Scalar or array of `solChannel` objects
+         %  force_overwrite - (Optional) Default is false; if true, then
+         %                                force the stim data to be
+         %                                re-parsed and overwritten.
+         %
+         % Output
+         %  ts              - Vector of `stim` times (ICMS stimuli)
+         %  stimCh          - Vector indicating which stimulation channels
+         %                       were used (indexing vector).
+         %
+         % If `obj` is an array, then both `ts` and `stimCh` are returned
+         % as cell arrays with cell elements matching corresponding
+         % elements of `obj` input
          
          if nargin < 2
             force_overwrite = false;
          end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            stimCh = cell(size(obj));
+            for i = 1:numel(obj)
+               [ts{i},stimCh{i}] = getStims(obj,force_overwrite);
+            end
+            return;
+         end
+         
          
          stimCh = [];
          ts = [];
@@ -739,11 +1012,34 @@ classdef solChannel < handle
          save(obj(1).Parent.stim,'-struct','out');
       end
       
-      % Return times of TRIALS as a vector of time stamps. Can specify a
-      % subset of trial types using second arg (see cfg.TrialType)
+      % Return times of TRIALS as a vector of times (seconds)
       function ts = getTrials(obj,trialType)
+         %GETTRIALS Return times of experimental trials as vector
+         %
+         %  ts = getTrials(obj);
+         %  ts = getTrials(obj,trialType);
+         %
+         % Inputs
+         %  obj             - Scalar or array of `solChannel` objects
+         %  trialType       - Use `cfg.TrialType()` to only return a subset
+         %                    of trials (default is cfg.TrialType('All');)
+         %
+         % Output
+         %  ts              - Vector of `trial` times (sec)
+         %                    * If `obj` is an array, then `ts` is returned
+         %                      as a cell array with cell elements matching
+         %                      corresponding elements of `obj` input.
+         
          if nargin < 2
             trialType = cfg.TrialType('All');
+         end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getTrials(obj(i),trialType);
+            end
+            return;
          end
          
          if trialType >= 100
@@ -757,15 +1053,53 @@ classdef solChannel < handle
       
       % Return times of "triggers" (TRIALS) as a vector of time stamps
       function ts = getTrigs(obj)
+         %GETTRIGS Return times of "triggers" (old; pilot data)
+         %
+         %  ts = getTrigs(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %
+         % Output
+         %  ts  - Array of timestamps (sec) of "triggers"
+         %            * If `obj` is an array, then `ts` is returned
+         %              as a cell array with cell elements matching
+         %              corresponding elements of `obj` input.
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getTrigs(obj(i));
+            end
+            return;
+         end
+         
          if isempty(obj.Parent.Triggers)
             obj.Parent.ParseStimuliTimes;
          end
          ts = obj.Parent.Triggers;
       end
       
-      % Returns the INSTANTEOUS FIRING RATE (IFR; spike rate) estimate for
-      % this channel, as well as the corresponding sample times
+      % Returns the full-trial IFR estimate and sample times
       function [data,t] = getIFR(obj,ch,vec)
+         %GETIFR Returns full-trial firing rate estimate and sample times
+         %
+         %  data = getIFR(obj);
+         %  [data,t] = getIFR(obj,ch,vec);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  ch  - Indexing vector to subset of `obj` if input is array
+         %        (default if not specified is to return for all `obj`)
+         %  vec - "Mask" vector (default is `inf`, which returns all
+         %        samples) in case you want to only return a subset of
+         %        samples corresponding to some vector of interest.
+         %
+         % Output
+         %  data - Data matrix where columns are samples and rows
+         %           correspond to elements of `obj`
+         %  t    - Time vector corresponding to columns of `data`
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
@@ -773,10 +1107,12 @@ classdef solChannel < handle
             vec = inf;
          end
          if numel(obj) > 1
-            
-            data = [];
             for ii = 1:numel(ch)
-               data = [data; getIFR(obj(ch(ii)),ch(ii),vec)];
+               if ii == 1
+                  [data,t] = getIFR(obj(ch(ii)),ch(ii),vec);
+               else
+                  data = [data; getIFR(obj(ch(ii)),ch(ii),vec)];
+               end
             end
             return;
          end
@@ -854,83 +1190,6 @@ classdef solChannel < handle
          end
          save(obj.rate,'data','fs','-v7.3');
       end
-      
-      % Returns **channel** data table for convenient export of dataset
-      function channelTable = makeTables(obj,probeDepth,tPre,tPost)
-         %MAKETABLES Returns data table elements specific to `solChannel`
-         %
-         %  channelTable = makeTables(obj,trialData);
-         %
-         %  Inputs
-         %     obj          - Scalar or Array of `solBlock` objects
-         %     probeDepth   - Depth (mm) of total probe for this channel
-         %
-         %  Output
-         %     channelTable - Table with the following variables:
-         %        * `ChannelID`- (Unique) identifier for a single channel
-         %        * `Channel`  - Channel index (1:32) for a given array
-         %        * `Probe`    - Probe index (1:2)
-         %        * `Hemisphere` - Indicates if probe is in left or right
-         %                          hemisphere
-         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
-         %        * `Impedance`  - Individual channel measured impedance
-         %        * `AP`         - X-coordinate (mm) relative to bregma
-         %                          (anteroposterior distance)
-         %        * `ML`         - Y-coordinate (mm) relative to bregma
-         %                          (mediolateral distance)
-         %        * `Depth`      - Depth of recording channel (depends on
-         %                          channels, which are at different depths
-         %                          on individual recording shanks, as well
-         %                          as the overall insertion depth)
-         %        * `StimDistance` - Distance from ICMS site
-         %        * `Spikes` - Binned spike counts relative to alignment 
-         %                       for a single channel.
-         %        * `LFP`    - LFP time-series relative to alignment for a
-         %                       single channel.
-         %        * `Notes` - Most-likely empty, but allows manual input of
-         %                    notes or maybe a notes struct? Basically
-         %                    something that lets you manually add "tags" 
-         %                    to the data rows.
-         
-         if nargin < 3
-            tPre = solChannel.getDefault('tpre');
-         end
-         
-         if nargin < 4
-            tPost = solChannel.getDefault('tpost');
-         end
-         
-         % Since it can be an array, iterate/recurse over all the blocks
-         if ~isscalar(obj)
-            channelTable = table.empty; % Create empty data table to append
-            if isscalar(probeDepth)
-               probeDepth = repelem(probeDepth,size(obj));
-            end
-            for iChannel = 1:numel(obj)
-               channelTable = [channelTable; ...
-                  makeTable(obj(iChannel),probeDepth(iChannel))];
-            end
-            return;
-         end
-         
-         % SolChannel stuff
-         
-         ChannelID = obj.Name;
-         [Probe,Channel] = parseNameInfo(obj);
-         
-         Hemisphere = obj.Hemisphere;
-         Depth = obj.Depth;
-         Impedance = obj.Impedance;
-         
-         channelTable = table(ChannelID,Channel,Probe,...
-            Hemisphere,Depth,Impedance);
-         
-         % Return all binned spikes (for all trials) on this channel
-         Spikes = getBinnedSpikes(obj);
-         
-         
-         
-      end %%%% End of makeTables%%%%
   
       % Return figure handle to (channel) peri-event time histogram (PETH)
       function fig = PETH(obj,edges,trialType,ii,h)
@@ -1148,6 +1407,22 @@ classdef solChannel < handle
       
       % Set the RAW data file for this channel
       function setRaw(obj,f,id)
+         %SETRAW  Set RAW data file for this channel
+         %
+         %  setRaw(obj);
+         %  setRaw(obj,f,id);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.raw;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.raw;)
+         %
+         % Output
+         %  -- none -- Set the file association for `raw` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.raw;
@@ -1158,6 +1433,13 @@ classdef solChannel < handle
             f = subf.raw;
          end
          
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setRaw(obj(i),f,id);
+            end
+            return;
+         end
+         
          obj.raw = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
             sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
             obj.port_number,...
@@ -1166,6 +1448,22 @@ classdef solChannel < handle
       
       % Set the FILTERED data file for this channel
       function setFilt(obj,f,id)
+         %SETFILT  Set FILTERED data file for this channel
+         %
+         %  setFilt(obj);
+         %  setFilt(obj,f,id);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.filt;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.filt;)
+         %
+         % Output
+         %  -- none -- Set the file association for `filt` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.filt;
@@ -1176,6 +1474,13 @@ classdef solChannel < handle
             f = subf.filt;
          end
          
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setFilt(obj(i),f,id);
+            end
+            return;
+         end
+         
          obj.filt = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
             sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
             obj.port_number,...
@@ -1184,6 +1489,22 @@ classdef solChannel < handle
       
       % Set the DOWNSAMPLED LFP data file for this channel
       function setDS(obj,f,id)
+         %SETDS  Set DOWNSAMPLED-LFP data file for this channel
+         %
+         %  setDS(obj);
+         %  setDS(obj,f,id);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.ds;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.ds;)
+         %
+         % Output
+         %  -- none -- Set the file association for `ds` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.ds;
@@ -1194,6 +1515,13 @@ classdef solChannel < handle
             f = subf.ds;
          end
          
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setDS(obj(i),f,id);
+            end
+            return;
+         end
+         
          obj.ds = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
             sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
             obj.port_number,...
@@ -1202,6 +1530,24 @@ classdef solChannel < handle
       
       % Set the RATE ESTIMATE data file for this channel
       function setRate(obj,f,id,doRateEstimate)
+         %SETRATE  Set RATE ESTIMATE data file for this channel
+         %
+         %  setRate(obj);
+         %  setRate(obj,f,id,doRateEstimate);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.rate;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.rate;)
+         %  doRateEstimate - (default: false); if true, re-estimate rate
+         %                                      and save to file
+         %
+         % Output
+         %  -- none -- Set the file association for `rate` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 4
             doRateEstimate = false;
          end
@@ -1216,8 +1562,15 @@ classdef solChannel < handle
             f = subf.rate;
          end
          
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setRate(obj(i),f,id,doRateEstimate);
+            end
+            return;
+         end
+         
          if isempty(obj.ifr)
-            obj.ifr = cfg.default('rate');
+            obj.ifr = solChannel.getDefault('rate');
          end
          
          obj.rate = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
@@ -1230,12 +1583,28 @@ classdef solChannel < handle
             obj.native_order));
          
          if (exist(obj.rate,'file')==0) && (doRateEstimate)
-            obj.estimateRate;
+            estimateRate(obj);
          end
       end
       
       % Set the SPIKE data file for this channel
       function setSpikes(obj,f,id)
+         %SETSPIKES  Set SPIKE data file for this channel
+         %
+         %  setSpikes(obj);
+         %  setSpikes(obj,f,id);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.spikes;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.spikes;)
+         %
+         % Output
+         %  -- none -- Set file association for `spikes` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.spikes;
@@ -1246,30 +1615,50 @@ classdef solChannel < handle
             f = subf.spikes;
          end
          
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setSpikes(obj(i),f,id);
+            end
+            return;
+         end
+         
          obj.spikes = fullfile(obj.Parent.folder,[obj.Parent.Name f],...
             sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
             obj.port_number,...
             obj.native_order));
       end
       
-      % Set the BIN EDGES used to generate HISTOGRAMS or AVERAGE IFR plots
-      % for this channel
+      % Set the BIN EDGES used to generate HISTOGRAMS or AVERAGE IFR
       function setSpikeBinEdges(obj,tPre,tPost,binWidth)
+         %SETSPIKEBINEDGES Set bin edge times for histograms or IFR plots
+         %
+         %  setSpikeBinEdges(obj,tPre,tPost,binWidth);
+         %
+         % Inputs
+         %  obj      - Scalar or array of `solChannel` objects
+         %  tPre     - Time (sec) prior to event
+         %  tPost    - Time (sec) after event
+         %  binWidth - Width (sec) of each time bin for counts
+         %
+         % Output
+         %  -- none -- Set the `obj.edges` property for each element of
+         %              `obj` array
+         
          if nargin < 4
-            binWidth = cfg.default('binwidth');
+            binWidth = solChannel.getDefault('binwidth');
          end
          
          if nargin < 3
-            tPost = cfg.default('tpost');
+            tPost = solChannel.getDefault('tpost');
          end
          
          if nargin < 2
-            tPre = cfg.default('tpre');
+            tPre = solChannel.getDefault('tpre');
          end
          
-         if numel(obj) > 1
+         if ~isscalar(obj)
             for ii = 1:numel(obj)
-               obj(ii).setSpikeBinEdges(tPre,tPost,binWidth);
+               setSpikeBinEdges(obj(ii),tPre,tPost,binWidth);
             end
             return;
          end
@@ -1279,6 +1668,22 @@ classdef solChannel < handle
       
       % Set the STIM data file for this channel
       function setStims(obj,f,id)
+         %SETSTIMS  Set STIM data file for this channel
+         %
+         %  setStims(obj);
+         %  setStims(obj,f,id);
+         %
+         % Inputs
+         %  obj - Array or scalar `solChannel` object
+         %  f   - Folder tag (e.g. subf = cfg.default('subf'); 
+         %                         f = subf.stim;)
+         %  id  - File ID tag (e.g. ID = cfg.default('id');
+         %                          id = ID.stim;)
+         %
+         % Output
+         %  -- none -- Set file association for `stim` files on any of
+         %              the channels corresponding to elements of `obj`
+         
          if nargin < 3
             ID = cfg.default('id');
             id = ID.stim;
@@ -1287,6 +1692,13 @@ classdef solChannel < handle
          subf = cfg.default('subf');
          if nargin < 2
             f = subf.dig;
+         end
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setStims(obj(i),f,id);
+            end
+            return;
          end
          
          obj.stim = fullfile(obj.Parent.folder,[obj.Parent.Name f],subf.stim,...
@@ -1435,6 +1847,8 @@ classdef solChannel < handle
          iShank = rem(obj.custom_order,nShank)+1; % Convert to 1-indexed
          r = (iShank - ((1 + nShank)/2)) * shankSpacing; % Radius
          theta = obj.Probe.Angle;
+         C_ap = obj.Probe.AP;
+         C_ml = obj.Probe.ML; 
          
          % For `theta = 0` it would be aligned perfectly to midline. In
          % that case, we consider two different probe orientations:
@@ -1442,11 +1856,11 @@ classdef solChannel < handle
          % or "caudal" (shank 1 would then be the furthest-possible caudal)
          switch obj.Probe.Orientation
             case "Rostral"
-               obj.AP = [];
-               obj.ML = [];
+               obj.AP = C_ap + r*cos(theta); % cos( x) = cos(-x)
+               obj.ML = C_ml - r*sin(theta); % sin(-x) = -sin(x)
             case "Caudal"
-               obj.AP = [];
-               obj.ML = [];
+               obj.AP = C_ap - r*cos(theta); % cos( x) = cos(-x)
+               obj.ML = C_ml + r*sin(theta); % sin(-x) = -sin(x)
             otherwise
                error(['SOLENOID:' mfilename ':BadValue'],...
                   ['\n\t->\t<strong>[PARSECHANNELLOCATION]:</strong> ' ...
@@ -1716,6 +2130,39 @@ classdef solChannel < handle
          x = [X(1), X(1), X(2), X(2)];
          y = [Y(1) Y(2) Y(2) Y(1)];
          
+      end
+   end
+   
+   % Private static methods
+   methods (Static = true, Access = private)
+      % Convert `trialData` array struct to table format
+      function trialTable = trialData2Table(trialData)
+         %TRIALDATA2TABLE Convert `trialData` array struct to table format
+         %
+         %  trialTable = solChannel.trialData2Table(trialData);
+         %
+         % Inputs
+         %  trialData  - Struct array with one element per trial
+         %
+         % Output
+         %  trialTable - Table with one row per trial
+         
+         TrialID = vertcat(trialData.ID);
+         Number = vertcat(trialData.Number);
+         Time = vertcat(trialData.Time);
+         Type = vertcat(trialData.Type);
+         ICMS_Onset = vertcat(trialData.ICMS_Onset);
+         ICMS_Channel = vertcat(trialData.ICMS_Channel);
+         Solenoid_Onset = vertcat(trialData.Solenoid_Onset);
+         Solenoid_Offset = vertcat(trialData.Solenoid_Offset);
+         Solenoid_Target = vertcat(trialData.Solenoid_Target);
+         Solenoid_Paw = vertcat(trialData.Solenoid_Paw);
+         Solenoid_Abbrev = vertcat(trialData.Solenoid_Abbrev);
+         Notes = vertcat(trialData.Notes);
+         trialTable = table(TrialID,Number,Time,Type,...
+            ICMS_Onset,ICMS_Channel,...
+            Solenoid_Onset,Solenoid_Offset,Solenoid_Target,...
+            Solenoid_Paw,Solenoid_Abbrev,Notes);
       end
    end
 end

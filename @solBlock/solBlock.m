@@ -1,8 +1,29 @@
 classdef solBlock < handle
-%SOLBLOCK Class for organizing data from an individual recording
+%SOLBLOCK  Class for organizing data from an individual recording
 %
-%  obj = solBlock(); 
-%  obj = solBlock(ratObj,folder);
+%   obj = solBlock(); 
+%   obj = solBlock(ratObj,folder);
+%
+% solBlock Properties
+%  Name - Recording BLOCK name
+%  Parent - Parent solRat handle
+%  Children - Array of solChannel child object handles
+%  Index - From name convention: "R19-###_2019_MM_DD_[Index]"
+%  fs - Amplifier sample rate (Hz)
+%  ICMS_Channel_index - Index of channel(s) delivering ICMS (NaN if none)
+%  ICMS_Channel_Name - solChannel.Name property of channels delivering ICMS ("None" if no ICMS)
+%  ICMS_Onset_Latency - Array of ICMS start times (1 per pulse, per stimulated channel)
+%  Location_Table - Table with Probe location data
+%  Solenoid_Location - Table of Solenoid location data and metadata
+%  Solenoid_Onset_latency - Array of solenoid extension times relative to trial start (sec)
+%  Solenoid_Offset_latency - Array of solenoid retraction times relative to trial start (sec)
+%  Trials - "Trial" timestamps (new/main experimental data)
+%  Triggers - "Trial" triggers (old pilot data)
+%  TrialType - Array of cfg.TrialType corresponding to whether each trial delivers ICMS, Solenoid, or Solenoid+ICMS stimuli
+%
+% solBlock Methods
+%  solBlock   - Class constructor
+%  makeTables - Return BLOCK table for metadata and data table export
 
 % PROPERTIES
    % Unchangeable properties set on object construction
@@ -20,7 +41,7 @@ classdef solBlock < handle
       ICMS_Channel_Name        % Name of ICMS stimulation channel
       ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
       Location_Table           % Table with location data for each probe (note that reference angle is 0 at horizontal to ref. GRID; positive with clockwise rotation)
-      Solenoid_Location        % Location of cutaneous peripheral stimulus (e.g. "Wrist", "Paw", "Digit-[1 thru 5]")
+      Solenoid_Location        % Table of solenoid location data and metadata
       Solenoid_Onset_Latency   % Array of solenoid extend times (1 per pulse, within a trial)
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
       Trials                   % "Trial" timestamps (NEW / CYCLE setup)
@@ -853,6 +874,13 @@ classdef solBlock < handle
          off(solTrials,:) = obj.Solenoid_Offset_Latency;
          off = mat2cell(off,ones(1,nTrial),nSolPulse);
          [trialData.Solenoid_Offset] = deal(off{:});
+         
+         % % General Block-related Solenoid info % %
+         solTable = obj.Solenoid_Location;
+         [trialData.Solenoid_Target] = deal(string(solTable.Location{1}));
+         [trialData.Solenoid_Paw] = deal(string(solTable.Paw{1}));
+         [trialData.Solenoid_Abbrev] = deal(string(solTable.TAG{1}));
+         [trialData.Notes] = deal(string(solTable.Notes{1}));
       end
       
       % Plot organized subplots for PETH of each channel
@@ -1492,7 +1520,7 @@ classdef solBlock < handle
          %             for each element of `obj`
          
          if nargin < 2
-            fname = solBlock.getDefault('solenoid_location_table'):
+            fname = solBlock.getDefault('solenoid_location_table');
          end
          
          if ~isscalar(obj)
