@@ -20,6 +20,7 @@ classdef solBlock < handle
       ICMS_Channel_Name        % Name of ICMS stimulation channel
       ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
       Location_Table           % Table with location data for each probe (note that reference angle is 0 at horizontal to ref. GRID; positive with clockwise rotation)
+      Solenoid_Location        % Location of cutaneous peripheral stimulus (e.g. "Wrist", "Paw", "Digit-[1 thru 5]")
       Solenoid_Onset_Latency   % Array of solenoid extend times (1 per pulse, within a trial)
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
       Trials                   % "Trial" timestamps (NEW / CYCLE setup)
@@ -193,24 +194,50 @@ classdef solBlock < handle
          
       end
       
-      % Plot the peri-event time histogram for each channel, save the
-      % figure, and close the figure once it has been saved.
+      % Plot the peri-event time histogram for each channel as batch run
       function batchPETH(obj,trialType,tPre,tPost,binWidth,subset)
+         %BATCHPETH Plot the peri-event time histogram for each channel
+         %
+         % fig = batchPETH(obj,trialType,tPre,tPost,binWidth,subset);
+         %
+         % Inputs
+         %  obj - scalar or array `solBlock` object
+         %  trialType - Enumerated trial type to select for PETH plots
+         %  tPre      - "Pre" time, relative to alignment event
+         %  tPost     - "Post" time, relative to alignment event
+         %  binWidth  - Bin size (seconds) for histogram bars
+         %  subset    - (Optional) if obj is array, then this should be
+         %              cell array of same size. If not provided, plot all
+         %              trials for a given `solBlock` obj. If given, each
+         %              cell array element should be an indexing array that
+         %              indexes which trials to include from the restricted
+         %              set of trials set by `trialType` argument.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         %
+         % See also: solBlock.PETH, solChannel.PETH, solBlock.probePETH
+         
          if nargin < 5
-            binWidth = cfg.default('binwidth');
+            binWidth = solBlock.getDefault('binwidth');
          end
          
          if nargin < 4
-            tPost = cfg.default('tpost');
+            tPost = solBlock.getDefault('tpost');
          end
          
          if nargin < 3
-            tPre = cfg.default('tpre');
+            tPre = solBlock.getDefault('tpre');
          end
          
          if nargin < 2
-            trialType = cfg.TrialType('All');
+            trialType = solBlock.getDefault('All');
          end
+         
+         % Only use `subset` for each element of obj, since it may be
+         % different for each (depending on number of child channels)
          
          if numel(obj) > 1
             for ii = 1:numel(obj)
@@ -229,18 +256,14 @@ classdef solBlock < handle
          
          edgeVec = tPre:binWidth:tPost;
 
-         subf = cfg.default('subf');
-         id = cfg.default('id');
+         [subf,id] = solBlock.getDefault('subf','id');
          
          outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
          if exist(outpath,'dir')==0
             mkdir(outpath);
          end
          
-%          obj.parseStimuliTimes
-         
          for ii = subset
-
             f = PETH(obj.Children(ii),edgeVec,trialType,ii);
             
             savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
@@ -632,6 +655,10 @@ classdef solBlock < handle
          %                    notes or maybe a notes struct? Basically
          %                    something that lets you manually add "tags" 
          %                    to the data rows.
+         %
+         %
+         % See also: solBlock.getTrialData, solChannel.makeTables,
+         %           solRat.makeTables
       
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
@@ -760,6 +787,9 @@ classdef solBlock < handle
          %                                          start of trial (sec).
          %                                          If no solenoid strike,
          %                                          this is `inf`
+         %
+         % See also: solBlock.makeTables, solChannel.makeTables,
+         %           solRat.makeTables
          
          % % Iterate on array % %
          if ~isscalar(obj)
@@ -824,20 +854,42 @@ classdef solBlock < handle
       
       % Plot organized subplots for PETH of each channel
       function probePETH(obj,trialType,tPre,tPost,binWidth,batchRun)
+         %PROBEPETH Plot the PETH with subplots organized by channel layout
+         %
+         % fig = probePETH(obj,trialType,tPre,tPost,binWidth,batchRun);
+         %
+         % Inputs
+         %  obj - scalar or array `solBlock` object
+         %  trialType - Enumerated trial type to select for PETH plots
+         %  tPre      - "Pre" time, relative to alignment event
+         %  tPost     - "Post" time, relative to alignment event
+         %  binWidth  - Bin size (seconds) for histogram bars
+         %  batchRun  - (Optional) default is false. Set true to generate
+         %                 figures as a batch run in which figures are
+         %                 generated, saved to a file, and deleted (saves
+         %                 on graphics memory when running a loop).
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         %
+         % See also: solBlock.PETH, solBlock.batchPETH, solChannel.PETH
+         
          if nargin < 6
             batchRun = false;
          end
          
          if nargin < 5
-            binWidth = cfg.default('binwidth');
+            binWidth = solBlock.getDefault('binwidth');
          end
          
          if nargin < 4
-            tPost = cfg.default('tpost');
+            tPost = solBlock.getDefault('tpost');
          end
          
          if nargin < 3
-            tPre = cfg.default('tpre');
+            tPre = solBlock.getDefault('tpre');
          end
          
          if nargin < 2
@@ -856,27 +908,36 @@ classdef solBlock < handle
          
          edgeVec = tPre:binWidth:tPost;   
          
-         [a_loc,b_loc] = solBlock.getDefault('probe_a_loc','probe_b_loc');
-         
-         aFig = figure('Name',sprintf('%s - %s PETH (%s trials)',...
-            obj.Name,a_loc,char(trialType)),...
-            'Units','Normalized',...
-            'Position',[0.1 0.1 0.4 0.8],...
-            'Color','w');
+         % Get label whether it's RFA or S1
+         if isempty(obj.Location_Table)
+            [a_loc,b_loc] = solBlock.getDefault(...
+               'probe_a_loc','probe_b_loc');
+         else
+            locs = obj.Location_Table;
+            a_loc = locs.Area{ismember(locs.Probe,'A')};
+            b_loc = locs.Area{ismember(locs.Probe,'B')};
+         end
          
          if isempty(obj.Layout) % If no Layout, use default from config
             setLayout(obj);
          end
-           
+         % First, make figure for Probe-A
+         aFig = figure(...
+            'Name',sprintf('%s - %s PETH (%s trials)',...
+            obj.Name,a_loc,char(trialType)),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.4 0.8],...
+            'Color','w');           
          c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
          for ii = 1:numel(c)
             idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
-            subplot(round(numel(obj.Layout)/4),4,ii);
-            PETH(c(idx),edgeVec,trialType,1,false);
+            ax = subplot(round(numel(obj.Layout)/4),4,ii);
+            PETH(c(idx),edgeVec,trialType,1,ax);
          end
          suptitle(sprintf('%s (n = %g)',a_loc,nTrial));
-         
-         bFig = figure('Name',sprintf('%s - %s PETH (%s trials)',...
+         % Next, make figure for Probe-B
+         bFig = figure(...
+            'Name',sprintf('%s - %s PETH (%s trials)',...
             obj.Name,b_loc,char(trialType)),...
             'Units','Normalized',...
             'Position',[0.5 0.1 0.4 0.8],...
@@ -891,9 +952,7 @@ classdef solBlock < handle
          suptitle(sprintf('%s (n = %g)',b_loc,nTrial));
          
          if batchRun
-            subf = cfg.default('subf');
-            id = cfg.default('id');
-            
+            [subf,id] = solBlock.getDefault('subf','id');            
             outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
             if exist(outpath,'dir')==0
                mkdir(outpath);
@@ -911,6 +970,30 @@ classdef solBlock < handle
       
       % Plot the peri-event time histogram (PETH)
       function fig = PETH(obj,trialType,tPre,tPost,binWidth,subset)
+         %PETH Plot the peri-event time histogram for each channel
+         %
+         % fig = PETH(obj,trialType,tPre,tPost,binWidth,subset);
+         %
+         % Inputs
+         %  obj - scalar or array `solBlock` object
+         %  trialType - Enumerated trial type to select for PETH plots
+         %  tPre      - "Pre" time, relative to alignment event
+         %  tPost     - "Post" time, relative to alignment event
+         %  binWidth  - Bin size (seconds) for histogram bars
+         %  subset    - (Optional) if obj is array, then this should be
+         %              cell array of same size. If not provided, plot all
+         %              trials for a given `solBlock` obj. If given, each
+         %              cell array element should be an indexing array that
+         %              indexes which trials to include from the restricted
+         %              set of trials set by `trialType` argument.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         %
+         % See also: solBlock.batchPETH, solBlock.probePETH
+         
          if nargin < 6
             subset = 1:numel(obj.Children);
          else
@@ -932,12 +1015,9 @@ classdef solBlock < handle
          if nargin < 2
             trialType = cfg.TrialType('All');
          end
-         
-%          obj.parseStimuliTimes;
-         
+
          edgeVec = tPre:binWidth:tPost;         
          fig = PETH(obj.Children(subset),edgeVec,trialType);
-         
       end
       
       % Plot spike raster for each channel of this recording
@@ -1388,28 +1468,6 @@ classdef solBlock < handle
             'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
       end
       
-      % Parse distance to stimulation electrode
-      function parseStimDistance(obj)
-         %PARSESTIMDISTANCE Parse distance to stimulation electrode
-         %
-         % parseStimDistance(obj);
-         %
-         % Inputs
-         %  obj - Scalar or array `solBlock` object
-         %
-         % Output
-         %  -- none -- Updates `solChannel.Stim_Distance_Table` property of
-         %              each element of `obj.Children`
-         
-         if ~isscalar(obj)
-            for i = 1:numel(obj)
-               parseStimDistance(obj(i));
-            end
-            return;
-         end
-         
-      end
-      
       % Set (construct) the child CHANNEL objects
       function Children = setChannels(obj,subf,id)
          %SETCHANNELS Creates child `solChannel` objects
@@ -1708,7 +1766,7 @@ classdef solBlock < handle
       function setStims(obj,tStim,icms_channel_index)
          %SETSTIMS Set ICMS stimulus times
          %
-         % setStims(obj);
+         % setStims(obj); -> Called in constructor
          % setStims(obj,tStim);
          % setStims(obj,tStim,icms_channel_index);
          %
@@ -1759,6 +1817,9 @@ classdef solBlock < handle
                end
             end
          end
+         
+         % Set the distance to any stimulation channels for all child obj
+         parseStimDistance(obj);
       end
       
       % Set Trial times
@@ -1851,15 +1912,41 @@ classdef solBlock < handle
          Index = str2double(tag{end});
       end
       
-      % Parse trile FILE
+      % Parse distance to stimulation electrode
+      function parseStimDistance(obj)
+         %PARSESTIMDISTANCE Parse distance to stimulation electrode
+         %
+         % parseStimDistance(obj); -> Called in `solBlock.setStims`
+         %
+         % Inputs
+         %  obj - Scalar or array `solBlock` object
+         %
+         % Output
+         %  -- none -- Updates `solChannel.Stim_Distance_Table` property of
+         %              each element of `obj.Children`
+         %
+         % See also: solBlock.setChildren, solBlock.setStims
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseStimDistance(obj(i));
+            end
+            return;
+         end
+         
+         
+      end
+      
+      % Parse trial FILE
       function successful_parse_flag = parseTrials(obj)
          %PARSETRIALS Parse trial file
          %
-         % Parse trial FILE (if not present, because Max is dumb and forgot
-         % to enable the analog inputs on a couple of recording blocks); it
-         % can be reconstructed from the combination of ICMS and SOLENOID 
-         % digital streams, so this is just there to "fix" a few "bad"
-         % recordings.
+         % Note: 
+         %  This method is just there because Max once or twice forgot
+         %  to enable the analog inputs on a couple of recording blocks. 
+         %  Fortunately, that information can be reconstructed from the 
+         %  combination of ICMS and SOLENOID digital streams, so this is 
+         %  just there to "fix" a few "bad" recordings.
          %
          % successful_parse_flag = parseTrials(obj);
          
@@ -1937,7 +2024,7 @@ classdef solBlock < handle
                 '`solBlock` objects only']);
          end
          if nargin < 3
-            thresh = cfg.default('trial_duration');
+            thresh = solBlock.getDefault('trial_duration');
          end
          
          if nargin < 2

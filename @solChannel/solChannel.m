@@ -10,11 +10,11 @@ classdef solChannel < handle
       Parent         % SOLBLOCK object handle (experiment)
    end
    
-   % Properties that are not hidden but can't be changed other than by
-   % class methods.
+   % Properties with public `get` access, but must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = false)
+      Area           % Recording area ("RFA", "CFA", "S1", etc.)
+      Depth          % Site depth, relative to dorsal surface (microns)
       Hemisphere     % Left or Right hemisphere
-      Depth          % relative electrode site depth (microns)
       Impedance      % electrode impedance (kOhms)
       Stim_Distance_table % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
@@ -26,7 +26,7 @@ classdef solChannel < handle
                           %      * Distance (Euclidean distance)
    end
    
-   % Hidden properties that can be accessed outside of the class
+   % Properties with public `get` access, but hidden and must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = true)
       raw    % File: RAW data
       filt   % File: BANDPASS FILTERED (unit band) data
@@ -42,8 +42,7 @@ classdef solChannel < handle
       edges  % Edges for histogram binning
    end
    
-   % Immutable properties that don't need to be listed with the other
-   % public properties that are set on object construction
+   % Immutable properties that are not displayed in public properties list
    properties (GetAccess = public, SetAccess = immutable, Hidden = true)
       port_number    % PROBE used for this recording
       native_order   % Original channel order on INTAN RHS
@@ -52,8 +51,8 @@ classdef solChannel < handle
    end
    
    % METHODS
-   % Class constructor and data-handling methods
-   methods (Access = public)
+   % Class constructor and overloaded methods
+   methods
       % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info)
          %SOLCHANNEL Constructor for `solChannel` object
@@ -105,290 +104,260 @@ classdef solChannel < handle
          % Set file associations
          setFileAssociations(obj,subf,id);
          
-      end
-      
-      % Compute the instantaneous firing rate (IFR) and save to files
-      function estimateRate(obj,ch)
-         %ESTIMATERATE Estimate instantaneous firing rate (IFR) 
+      end  
+   end
+   
+   % Public methods
+   methods (Access = public)
+      % Add markers denoting ICMS to a given axes
+      function addStimulusMarkers(obj,ax,graphicsObj,pct)
+         %ADDSTIMULUS Add markers denoting ICMS to a given axes
          %
-         % estimateRate(obj);
-         % estimateRate(obj,ch);
+         % addStimulusMarkers(obj,ax,graphicsObj,pct);
          %
          % Inputs
-         %  obj - Scalar or array of `solChannel` objects
-         %  ch  - (optional) indexing into `obj` input
-         %
-         % Output
-         %  -- none -- Create IFR estimates in diskfiles associated with
-         %             this `solChannel` object or each `solChannel` object
-         %             in `obj` array.
+         %  obj         - Scalar or array of `solChannel` objects
+         %  ax          - Axes to add stimulus markers to
+         %                 -> If `obj` is array, then ax should be array of
+         %                    equal size as `obj` (even if all are added to
+         %                    same axes; in this case, just create an array
+         %                    of the same ax to match size of `obj`)
+         %  graphicsObj - (Optional); default is empty graphics placeholder
+         %                 Currently handles changing color of either:
+         %                 -> `matlab.graphics.chart.primitive.Line` or
+         %                 -> `matlab.graphics.chart.primitive.Bar` 
+         %  pct         - (Optional; default 0.9); percent of max. height
+         %                    for superimposing timing indicator lines.
          
+         if nargin < 4
+            pct = solChannel.getDefault('indicator_pct');
+         end
+         
+         if nargin < 3
+            graphicsObj = gobjects(1);
+         end
+         
+         if ~isscalar(obj)
+            if isscalar(ax)
+               ax = repelem(ax,numel(obj),1);
+            end
+            for i = 1:numel(obj)
+               addStimulusMarkers(obj(i),ax(i),graphicsObj,pct);
+            end
+            return;
+         end
+         
+         % Superimpose lines indicating timing of ICMS pulses
+         set(ax,'NextPlot','add');
+         Y = pct * get(ax,'YLim');
+         for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
+            for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
+               tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
+               if obj.Parent.ICMS_Channel_Index(ik) == obj.Index
+                  line(ax,tOnset,Y,...
+                     'Color','m',...
+                     'LineStyle','-',...
+                     'LineWidth',2);
+               else
+                  line(ax,tOnset,Y,...
+                     'Color','m',...
+                     'LineStyle','--',...
+                     'LineWidth',1.5);
+               end
+            end
+         end
+         
+         % Axes X-scale is in milliseconds
+         tStart = obj.Parent.Solenoid_Onset_Latency * 1e3;
+         tStop = obj.Parent.Solenoid_Offset_Latency * 1e3;
+         if numel(tStart) ~= numel(tStop)
+            error(['SOLENOID:' mfilename ':EventParsingError'],...
+               ['\n\t->\t<strong>[ADDSTIMULUSMARKERS]:</strong> ' ...
+                'Something is wrong, mismatch in parsed number ' ...
+                'of solenoid onset (%g) vs offset (%g) pulses.'],...
+               numel(tStart),numel(tStop));
+         end
+         
+         % Superimpose PATCH rectangle graphics objects where there would
+         % be expected SOLENOID stimuli
+         for ii = 1:numel(tStart)
+            X = [tStart(ii),tStop(ii)];
+            [x,y] = solChannel.getGraphicsRectXY(X,Y);
+            patch(ax,x,y,[0.25 0.25 0.25],...
+               'FaceAlpha',0.3,'EdgeColor','none');
+         end
+         
+         % Change the color of the graphics objects depending on whether
+         % this is a STIMULATION channel for ICMS
+         if  ismember(obj.Index,obj.Parent.ICMS_Channel_Index)
+            set(ax,'Color','y');
+            if nargin > 2
+               if isa(graphicsObj,'matlab.graphics.chart.primitive.Bar')
+                  set(graphicsObj,'FaceColor','k');
+               elseif isa(graphicsObj,'matlab.graphics.chart.primitive.Line')
+                  set(graphicsObj,'Color','k');
+               end
+            end
+            
+         end
+      end
+      
+      % Return figure handle to peri-event LFP (average) for this channel
+      function fig = avgLFPplot(obj,trialType,startStop,ii,makeNewFig)
+         if isempty(obj)
+            fig = [];
+            return;
+         end
+         
+         if nargin < 5
+            makeNewFig = true;
+         end
+         if nargin < 4
+            ii = 1;
+         end
+         if nargin < 3
+            edges = obj.getSpikeBinEdges;
+            startStop = [edges(1), edges(end)];
+         end
          if nargin < 2
-            ch = 1:numel(obj);
+            trialType = cfg.TrialType('All');
+         end
+         if numel(obj) > 1
+            fig = [];
+            for ii = 1:numel(obj)
+               fig = [fig; avgLFPplot(obj(ii),trialType,startStop,ii,makeNewFig)];
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Trials)
+            fig = [];
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         pars = cfg.default('ds');
+         if isempty(obj.fs_d)
+            in = load(obj.ds,'fs');
+            obj.fs_d = in.fs;
+         end
+         
+         
+         [lfp,t] = obj.getAlignedLFP(trialType);
+         
+         if makeNewFig
+            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+               obj.Parent.Name,obj.Name,char(trialType)),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+         end
+         
+         mu = mean(lfp,1);
+         sd = std(lfp,[],1) ./ sqrt(size(mu,1));
+         
+         p = plot(t,mu,...
+            'Color',pars.col{obj.Hemisphere},...
+            'LineWidth',pars.lw);
+         
+         xlim(pars.xlimit);
+         ylim(pars.ylimit);
+         
+         obj.addStimulusMarkers(gca,p);
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','LFP (\muV)');
+         
+         errbary = [mu + sd, fliplr(mu - sd)];
+         errbarx = [t, fliplr(t)];
+         patch(errbarx,errbary,pars.col{obj.Hemisphere},...
+            'FaceAlpha',0.3,...
+            'EdgeColor','none',...
+            'FaceColor',pars.col{obj.Hemisphere});
+         
+      end
+      
+      % Return figure handle to average INSTANTANEOUS FIRING RATE (IFR;
+      % spike rate) in alignment to TRIALS
+      function fig = avgIFRplot(obj,trialType,startStop,ii,makeNewFig)
+         if isempty(obj)
+            fig = [];
+            return;
+         end
+         
+         if nargin < 5
+            makeNewFig = true;
+         end
+         if nargin < 4
+            ii = 1;
+         end
+         if nargin < 3
+            edges = obj.getSpikeBinEdges;
+            startStop = [edges(1), edges(end)];
+         end
+         if nargin < 2
+            trialType = cfg.TrialType('All');
          end
          
          if numel(obj) > 1
-            for ii = 1:numel(ch)
-               estimateRate(obj(ch(ii)),ch(ii));
+            fig = [];
+            for ii = 1:numel(obj)
+               fig = [fig; avgIFRplot(obj(ii),trialType,startStop,ii,makeNewFig)];
             end
             return;
          end
          
-         ts = getSpikes(obj,ch,'ts');
-         % Get number of samples in record
-         m = matfile(obj.ds);
-         n = size(m.data,2);
-         if isempty(obj.fs_d)
-            obj.fs_d = m.fs;
-         end
-         clear m;
-         
-         % Get number of samples for smooth width
-         W = round(obj.ifr.w * 1e-3 * obj.fs_d);
-         fs = obj.fs_d; %#ok<*PROPLC>
-         
-         data = zeros(1,n);
-         if isempty(ts)
-            save(obj.rate,'data','fs','-v7.3');
+         if isempty(obj.Parent.Trials)
+            fig = [];
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
             return;
          end
-         data(min(max(round(ts*obj.fs_d),1),n)) = 1;
-         data = utils.fastsmooth(data,W,obj.ifr.kernel,0);
          
-         [pname,~,~] = fileparts(obj.rate);
-         if exist(pname,'dir')==0
-            mkdir(pname);
+         if isempty(obj.ifr)
+            obj.ifr = cfg.default('rate');
          end
-         save(obj.rate,'data','fs','-v7.3');
+         pars = cfg.default('ifr');
+         
+         if isempty(obj.fs_d)
+            obj.getfs_d;
+         end
+         tvec = startStop(1):(1/obj.fs_d):startStop(2); % relative sample times
+         [ifr,t] = obj.getAlignedIFR(trialType);
+         ifr = sqrt(abs(ifr));
+         ifr = (ifr - mean(ifr,2)) ./ std(ifr,[],1);
+         %          tvec = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
+         %          binCounts = obj.getBinnedSpikes;
+         %          ifr = utils.fastsmooth(binCounts,15,'pg',0,1);
+         
+         if makeNewFig
+            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+               obj.Parent.Name,obj.Name,char(trialType)),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+         end
+         
+         %          t = tvec * 1e3;
+         mu = mean(ifr,1);
+         sd = std(ifr,[],1) ./ sqrt(size(mu,1));
+         
+         p = plot(t,mu,...
+            'Color',pars.col{obj.Hemisphere},...
+            'LineWidth',pars.lw);
+         
+         xlim(pars.xlimit);
+         ylim(pars.ylimit);
+         
+         obj.addStimulusMarkers(gca,p);
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','IFR');
+         
+         errbary = [mu + sd, fliplr(mu - sd)];
+         errbarx = [t, fliplr(t)];
+         patch(errbarx,errbary,pars.col{obj.Hemisphere},...
+            'FaceAlpha',0.3,...
+            'EdgeColor','none',...
+            'FaceColor',pars.col{obj.Hemisphere});
+         
       end
       
-      % Returns **channel** data table for convenient export of dataset
-      function channelTable = makeTables(obj,probeDepth,tPre,tPost)
-         %MAKETABLES Returns data table elements specific to `solChannel`
-         %
-         %  channelTable = makeTables(obj,trialData);
-         %
-         %  Inputs
-         %     obj          - Scalar or Array of `solBlock` objects
-         %     probeDepth   - Depth (mm) of total probe for this channel
-         %
-         %  Output
-         %     channelTable - Table with the following variables:
-         %        * `ChannelID`- (Unique) identifier for a single channel
-         %        * `Channel`  - Channel index (1:32) for a given array
-         %        * `Probe`    - Probe index (1:2)
-         %        * `Hemisphere` - Indicates if probe is in left or right
-         %                          hemisphere
-         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
-         %        * `Impedance`  - Individual channel measured impedance
-         %        * `AP`         - X-coordinate (mm) relative to bregma
-         %                          (anteroposterior distance)
-         %        * `ML`         - Y-coordinate (mm) relative to bregma
-         %                          (mediolateral distance)
-         %        * `Depth`      - Depth of recording channel (depends on
-         %                          channels, which are at different depths
-         %                          on individual recording shanks, as well
-         %                          as the overall insertion depth)
-         %        * `StimDistance` - Distance from ICMS site
-         %        * `Spikes` - Binned spike counts relative to alignment 
-         %                       for a single channel.
-         %        * `LFP`    - LFP time-series relative to alignment for a
-         %                       single channel.
-         %        * `Notes` - Most-likely empty, but allows manual input of
-         %                    notes or maybe a notes struct? Basically
-         %                    something that lets you manually add "tags" 
-         %                    to the data rows.
-         
-         if nargin < 3
-            tPre = solChannel.getDefault('tpre');
-         end
-         
-         if nargin < 4
-            tPost = solChannel.getDefault('tpost');
-         end
-         
-         % Since it can be an array, iterate/recurse over all the blocks
-         if ~isscalar(obj)
-            channelTable = table.empty; % Create empty data table to append
-            if isscalar(probeDepth)
-               probeDepth = repelem(probeDepth,size(obj));
-            end
-            for iChannel = 1:numel(obj)
-               channelTable = [channelTable; ...
-                  makeTable(obj(iChannel),probeDepth(iChannel))];
-            end
-            return;
-         end
-         
-         % SolChannel stuff
-         
-         ChannelID = string(obj.Name);
-         pInfo = strsplit(ChannelID,'-');
-         Probe     = pInfo(1);
-         Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
-         Hemisphere = obj.Hemisphere;
-         Depth = obj.Depth;
-         Impedance = obj.Impedance;
-         
-         channelTable = table(ChannelID,Channel,Probe,...
-            Hemisphere,Depth,Impedance);
-         
-         
-         getBinnedSpikes(obj,cfg.TrialType('All'));
-         
-         % get the Histogram (spikes; PETH) and LFP data timeseries
-         binCell = {nRows,1};
-         %for loop over the whole table
-         for iRow = 1:height(blockTable)
-             %first need to get which channel that row is
-             iChan = table2array(blockTable(iRow,'Channel'));
-             %get the binned spikes for that channel, allTrials is 118x500 double
-             % Ex 118 --> Number of trials
-             % Ex 500 --> Number of time bins (-500 : 500 ms; 2-ms bins)
-             allTrials = 
-             %get the specific trial in question using the trialNumber as index
-             %each cell in binCell should return a 1x500 double
-             binCell{iRow} = allTrials(table2array(blockTable(iRow,'trialNumber')),:);
-         end
-
-         %have to some reason transpose it to get it to be nx1
-         binCellt = binCell';
-
-         %add it to the table
-         blockTable.Spikes = binCellt;
-
-         % ChannelID and ProbeID
-         % this variable/section will need to be changed
-         % unsure how these filenames correspond with each of the channels from
-         % solRat object
-         % is P1 Ch 0 always == channel 1?
-         wav_sneo_folder = strcat(obj.Name,'_wav-sneo_CAR_Spikes'); 
-
-         probeList = {};
-         chList = [];
-
-         %gets all mat files only
-         matFiles = dir(fullfile(wav_sneo_folder,'*.mat')); 
-         for i = 1:length(matFiles)
-           fileName = matFiles(i).name;
-           fileSplit = split(fileName, '_');
-           probeList(i) = fileSplit(end-2);
-           %have to get rid of the .mat on this
-           chSplit = split(fileSplit(end), '.');
-           chList(i) = str2double(chSplit(end-1));
-         end
-
-         % check to see if any channels were removed
-         % if they werent, then assume:
-         % probe 1 ch0 -> channel 1
-         % probe 2 ch0 -> channel 33
-         probeTable = strings(nRows,1);
-         chTable = zeros(nRows,1);
-         % +1 is needed because chList values start at 0
-         if length(unique(chList))*length(unique(probeList)) == nChannels
-             for iRow = 1:height(blockTable)
-                 %get the channel of that row
-                 iChan = table2array(blockTable(iRow,'Channel'));
-                 % if its greater than the max + 1 then subract 1
-                 if iChan <= max(chList) + 1
-                     chTable(iRow) = iChan - 1; 
-                 % otherwise subract (max + 2), 2 is the offset
-                 else
-                     chTable(iRow) = iChan - max(chList) - 2;            
-                 end
-                 probeTable(iRow) = probeList{iChan};
-             end
-
-         else
-             warning(['SOLENOID:' mfilename ':DataFormat'],...
-                ['\n\t->\t<strong>[MAKETABLES]:</strong> ' ...
-                 'Channel might have been removed. The indexing for ' ...
-                 'ChannelID & ProbeID may be incorrect']);
-         end
-
-         %add it to the table
-         blockTable.ChannelID = chTable;
-         blockTable.ProbeID = probeTable;
-
-         % move the variable around so its next to the other channel stuff
-         blockTable = movevars(blockTable,'ProbeID','After','Channel');
-         blockTable = movevars(blockTable,'ChannelID','After','ProbeID');
-
-         % Load in the _DS mat files and parse them using timestamps
-
-         % Default PETH parameters
-         tpre = -0.250;
-         tpost = 0.750;
-         % fs is 1000 for the _DS data
-         %fsDS = 1000;
-         timeStamps = obj.Trials;
-
-         % using fs and the timeStamps create a nTrials x 2 array of 
-         % indices first value is the start of that 1s window (in samples),
-         % second is end these indices can then be used to index into mat 
-         % files and grab data
-         DS_folder = strcat(obj.Name,'_DS');
-
-         %gets all mat files only
-         matFiles = dir(fullfile(DS_folder,'*.mat')); 
-
-         %load the first mat file to get the fs
-         firstMat = matFiles(1).name; 
-         fsDS = getfield(load(firstMat,'fs'),'fs');
-
-         windowInd = zeros(nTrials, 2);
-         for i = 1:nTrials
-             % should I round up or down? 
-             % the boundary is never on a whole number index
-             % right now round down on the beginning, and round up on the end
-             % tpre is a negative number, so add it 
-             windowInd(i,1) = floor(timeStamps(i)*fsDS+(tpre*fsDS));
-             windowInd(i,2) = ceil(timeStamps(i)*fsDS+(tpost*fsDS));
-         end
-
-         %now use windowInd to access the mat files and parse the data
-         %using cells because some windows may be off by 1 due to rounding
-         lfp = cell(nRows,1);
-         % loop through the .mat files in _DS
-         % iterate through all the files
-         for i = 1:length(matFiles)
-           fileName = matFiles(i).name;
-           data = getfield(load(firstMat,'data'),'data');%get data from .mat
-           fileSplit = split(fileName, '_');
-           probe = fileSplit(end-2);
-           %have to get rid of the .mat on this
-           chSplit = split(fileSplit(end), '.');
-           ch = str2double(chSplit(end-1));
-
-           % find the rows where you have that channel and probe
-           % there might be a faster way to do this? not sure
-           % iterate through all rows
-           for iRow = 1:height(blockTable)
-               % if the channel is correct
-               chI = table2array(blockTable(iRow,'ChannelID'));
-               if chI == ch
-                   % if the probe is correct
-                   if strcmp(table2array(blockTable(iRow,'ProbeID')), cell2mat(probe))
-
-                       % grab the indicies we parsed earlier and get that data
-                       ind = table2array(blockTable(iRow,'trialNumber'));
-                       t = windowInd(ind,:);
-                       %data array is loaded above from filename
-                       lfp{iRow} = data(t(1):t(2));
-                   end
-               end
-           end
-
-         end
-
-         % add it to the table
-         blockTable.LFP = lfp;
-         
-      end %%%% End of makeTables%%%%
-   end
-   
-   % "Get" methods
-   methods (Access = public)
       % Return LFP aligned to TRIALS for this channel
       function [data,t] = getAlignedLFP(obj,trialType)
          if nargin < 2
@@ -779,11 +748,353 @@ classdef solChannel < handle
          end
       end
       
+      % Compute the instantaneous firing rate (IFR) and save to files
+      function estimateRate(obj,ch)
+         %ESTIMATERATE Estimate instantaneous firing rate (IFR) 
+         %
+         % estimateRate(obj);
+         % estimateRate(obj,ch);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  ch  - (optional) indexing into `obj` input
+         %
+         % Output
+         %  -- none -- Create IFR estimates in diskfiles associated with
+         %             this `solChannel` object or each `solChannel` object
+         %             in `obj` array.
+         
+         if nargin < 2
+            ch = 1:numel(obj);
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(ch)
+               estimateRate(obj(ch(ii)),ch(ii));
+            end
+            return;
+         end
+         
+         ts = getSpikes(obj,ch,'ts');
+         % Get number of samples in record
+         m = matfile(obj.ds);
+         n = size(m.data,2);
+         if isempty(obj.fs_d)
+            obj.fs_d = m.fs;
+         end
+         clear m;
+         
+         % Get number of samples for smooth width
+         W = round(obj.ifr.w * 1e-3 * obj.fs_d);
+         fs = obj.fs_d; %#ok<*PROPLC>
+         
+         data = zeros(1,n);
+         if isempty(ts)
+            save(obj.rate,'data','fs','-v7.3');
+            return;
+         end
+         data(min(max(round(ts*obj.fs_d),1),n)) = 1;
+         data = utils.fastsmooth(data,W,obj.ifr.kernel,0);
+         
+         [pname,~,~] = fileparts(obj.rate);
+         if exist(pname,'dir')==0
+            mkdir(pname);
+         end
+         save(obj.rate,'data','fs','-v7.3');
+      end
       
-   end
-   
-   % "Set" methods
-   methods (Access = public)
+      % Returns **channel** data table for convenient export of dataset
+      function channelTable = makeTables(obj,probeDepth,tPre,tPost)
+         %MAKETABLES Returns data table elements specific to `solChannel`
+         %
+         %  channelTable = makeTables(obj,trialData);
+         %
+         %  Inputs
+         %     obj          - Scalar or Array of `solBlock` objects
+         %     probeDepth   - Depth (mm) of total probe for this channel
+         %
+         %  Output
+         %     channelTable - Table with the following variables:
+         %        * `ChannelID`- (Unique) identifier for a single channel
+         %        * `Channel`  - Channel index (1:32) for a given array
+         %        * `Probe`    - Probe index (1:2)
+         %        * `Hemisphere` - Indicates if probe is in left or right
+         %                          hemisphere
+         %        * `Area`       - Indicates if probe is in RFA/CFA/S1
+         %        * `Impedance`  - Individual channel measured impedance
+         %        * `AP`         - X-coordinate (mm) relative to bregma
+         %                          (anteroposterior distance)
+         %        * `ML`         - Y-coordinate (mm) relative to bregma
+         %                          (mediolateral distance)
+         %        * `Depth`      - Depth of recording channel (depends on
+         %                          channels, which are at different depths
+         %                          on individual recording shanks, as well
+         %                          as the overall insertion depth)
+         %        * `StimDistance` - Distance from ICMS site
+         %        * `Spikes` - Binned spike counts relative to alignment 
+         %                       for a single channel.
+         %        * `LFP`    - LFP time-series relative to alignment for a
+         %                       single channel.
+         %        * `Notes` - Most-likely empty, but allows manual input of
+         %                    notes or maybe a notes struct? Basically
+         %                    something that lets you manually add "tags" 
+         %                    to the data rows.
+         
+         if nargin < 3
+            tPre = solChannel.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solChannel.getDefault('tpost');
+         end
+         
+         % Since it can be an array, iterate/recurse over all the blocks
+         if ~isscalar(obj)
+            channelTable = table.empty; % Create empty data table to append
+            if isscalar(probeDepth)
+               probeDepth = repelem(probeDepth,size(obj));
+            end
+            for iChannel = 1:numel(obj)
+               channelTable = [channelTable; ...
+                  makeTable(obj(iChannel),probeDepth(iChannel))];
+            end
+            return;
+         end
+         
+         % SolChannel stuff
+         
+         ChannelID = string(obj.Name);
+         pInfo = strsplit(ChannelID,'-');
+         Probe     = pInfo(1);
+         Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
+         Hemisphere = obj.Hemisphere;
+         Depth = obj.Depth;
+         Impedance = obj.Impedance;
+         
+         channelTable = table(ChannelID,Channel,Probe,...
+            Hemisphere,Depth,Impedance);
+         
+         % Return all binned spikes (for all trials) on this channel
+         Spikes = getBinnedSpikes(obj);
+         
+         
+         
+      end %%%% End of makeTables%%%%
+  
+      % Return figure handle to (channel) peri-event time histogram (PETH)
+      function fig = PETH(obj,edges,trialType,ii,h)
+         %PETH Return figure handle to (channel) peri-event time histogram
+         %
+         % fig = PETH(obj,edges,trialType);
+         % fig = PETH(obj,edges,trialType,ii);
+         % fig = PETH(obj,edges,trialType,ii,h);
+         %
+         % Inputs
+         %  obj        - Scalar or array of `solChannel` objects
+         %  edges      - Bin edges for generating histogram counts
+         %  trialType  - Enumerated class specifying  type of trials to
+         %               generate the counts for in the PETH figure
+         %  ii         - (Optional) index indicating channel index within
+         %                          some parent iterator
+         %  h          - (Optional) default is empty (in which case new
+         %                  figure is generated); can be passed as graphics
+         %                  container to put the new PETH plot in
+         %
+         % Output
+         %  fig        - `matlab.ui.Figure` handle object that
+         %                contains the PETH plot
+         %
+         % See also: solBlock.batchPETH
+         
+         if isempty(obj)
+            fig = [];
+            return;
+         end
+         
+         if nargin < 5
+            h = [];
+         end
+         if nargin < 4
+            ii = 1;
+         end
+         if numel(obj) > 1
+            fig = [];
+            for ii = 1:numel(obj)
+               fig = [fig; PETH(obj(ii),edges,trialType,ii,h)];
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Trials)
+            fig = [];
+            fprintf(1,...
+               'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         col = cfg.default('barcols');
+         obj.edges = edges;
+         tvec = edges(1:(end-1))+(mode(diff(edges))/2);
+         
+         binCounts = sum(obj.getBinnedSpikes(trialType),1);
+         [axParams,yLim,labelsIndex] = solChannel.getDefault(...
+            'axparams','ylimit','labelsindex');
+         if isempty(h)
+            fig = figure('Name',sprintf('%s: %s (%s) PETH',...
+               obj.Parent.Name,obj.Name,cfg.TrialType(trialType)),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+            ax = axes(fig,axParams{:});
+         else
+            switch class(h)
+               case 'matlab.ui.Figure'
+                  fig = h;
+                  ax = axes(fig,axParams{:});
+               case 'matlab.graphics.axis.Axes'
+                  ax = h;
+                  if isa(h.Parent,'matlab.ui.Figure')
+                     fig = h.Parent;
+                  else
+                     fig = gcf;
+                  end
+               case 'matlab.ui.container.Panel'
+                  if isa(h.Parent,'matlab.ui.Figure')
+                     fig = h.Parent;
+                  else
+                     fig = gcf;
+                  end
+                  ax = axes(h,axParams{:});
+               otherwise
+                  error(['SOLENOID:' mfilename ':BadContainer'],...
+                     ['\n\t->\t<strong>[PETH]:</strong> ' ...
+                      'Unexpected container class (`h`): ''%s''\n' ...
+                      '\t\t\t\t(Should be figure, axes, or panel)\n'],...
+                      class(h));
+            end
+         end
+         
+         b = bar(ax,tvec*1e3,mean(binCounts,1),1,...
+            'FaceColor',col{obj.Hemisphere},...
+            'EdgeColor','none');
+         
+         xlim(ax,[obj.edges(1) obj.edges(end)]*1e3);
+         ylim(ax,yLim);
+         
+         addStimulusMarkers(obj,ax,b);
+         if ii == labelsIndex
+            % Only add the actual <x,y> abscissa labels to one subplot
+            solChannel.addAxesLabels(ax,obj.Name,...
+               'Time (ms)','Count');
+         else
+            solChannel.addAxesLabels(ax,obj.Name);
+         end
+      end
+      
+      % Plot spike times in rows (trials) as vertical bars (impulses)
+      function fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth)
+         %PLOTRASTER Plot spike raster of spikes across trials for channel
+         %
+         % fig = plotRaster(obj);
+         % fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth);
+         %
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - `cfg.TrialType` of which trials to include
+         %  tPre      - Time (sec) prior to alignment
+         %  tPost     - Time (sec) after alignment
+         %  batch     - (default is false): if set to true, delete `fig`
+         %                 after saving it for each element of `obj`
+         %  binWidth  - Time (sec) width of each raster "bin"
+         %
+         % Output
+         %  fig       - Array of figure handles corresponding to elements
+         %                 of `obj`
+         if isempty(obj)
+            fig = gobjects(1);
+            return;
+         end
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if nargin < 3
+            tPre = solChannel.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solChannel.getDefault('tpost');
+         end
+         
+         if nargin < 5
+            batch = false;
+         end
+         
+         if nargin >= 6
+            setSpikeBinEdges(obj,tPre,tPost,binWidth);
+         end
+         
+         if numel(obj) > 1
+            fig = gobjects(size(obj));
+            for ii = 1:numel(obj)
+               fig(ii) = plotRaster(obj(ii),trialType,tPre,tPost,batch);
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Trials)
+            fig = gobjects(1);
+            fprintf(1,...
+               'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
+            return;
+         end
+         
+         col = cfg.default('barcols');
+         spikes = obj.getBinnedSpikes;
+         edges = obj.getSpikeBinEdges;
+         
+         fig = figure(...
+            'Name',sprintf('%s: %s Raster (%s trials)',...
+            obj.Parent.Name,obj.Name,char(trialType)),...
+            'Color','w',...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.8 0.8]);
+         
+         [ax,h] = utils.plotSpikeRaster(logical(spikes),...
+            'PlotType','vertline',...
+            'rasterWindowOffset',edges(1),...
+            'TimePerBin',mode(diff(edges)),...
+            'FigHandle',fig,...
+            'LineFormat',struct('Color',col{obj.Hemisphere},...
+            'LineWidth',1.5,...
+            'LineStyle','-'));
+         
+         obj.addStimulusMarkers(ax,h,1);
+         solChannel.addAxesLabels(ax,obj.Name,'Time (sec)','Trial');
+         
+         if ~isempty(obj.Parent) && batch
+            
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+            
+            outpath = fullfile(obj.Parent.folder,...
+               [obj.Parent.Name subf.figs],subf.rasterplots);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(fig,fullfile(outpath,...
+               [obj.Name id.rasterplots '_' char(trialType) '.fig']));
+            saveas(fig,fullfile(outpath,...
+               [obj.Name id.rasterplots '_' char(trialType) '.png']));
+            delete(fig);
+         end
+      end
+      
+      
       % Set the RAW data file for this channel
       function setRaw(obj,f,id)
          if nargin < 3
@@ -931,388 +1242,110 @@ classdef solChannel < handle
             sprintf('%s_%s%g_Ch_%03g.mat',obj.Parent.Name,id,...
             obj.port_number,...
             obj.native_order));
-      end
-      
+      end   
    end
    
-   % "Graphics" methods
-   methods (Access = public)
-      % Add markers denoting ICMS to a given axes
-      function addStimulusMarkers(obj,ax,graphicsObj,pct)
-         if nargin < 4
-            pct = 0.9;
-         end
-         
-         % Superimpose lines indicating timing of ICMS pulses
-         set(ax,'NextPlot','add');
-         Y = pct * get(ax,'YLim');
-         for ii = 1:size(obj.Parent.ICMS_Onset_Latency,1)
-            for ik = 1:size(obj.Parent.ICMS_Onset_Latency,2)
-               tOnset = ones(1,2) * obj.Parent.ICMS_Onset_Latency(ii,ik) * 1e3;
-               if obj.Parent.ICMS_Channel_Index(ik) == obj.Index
-                  line(tOnset,Y,...
-                     'Color','m',...
-                     'LineStyle','-',...
-                     'LineWidth',2);
-               else
-                  line(tOnset,Y,...
-                     'Color','m',...
-                     'LineStyle','--',...
-                     'LineWidth',1.5);
-               end
-            end
-         end
-         
-         % Axes X-scale is in milliseconds
-         tStart = obj.Parent.Solenoid_Onset_Latency * 1e3;
-         tStop = obj.Parent.Solenoid_Offset_Latency * 1e3;
-         if numel(tStart) ~= numel(tStop)
-            error('Something is wrong, mismatch in parsed number of solenoid onset (%g) vs offset (%g) pulses.',...
-               numel(tStart),numel(tStop));
-         end
-         
-         % Superimpose PATCH rectangle graphics objects where there would
-         % be expected SOLENOID stimuli
-         for ii = 1:numel(tStart)
-            X = [tStart(ii),tStop(ii)];
-            [x,y] = solChannel.getGraphicsRectXY(X,Y);
-            patch(x,y,[0.25 0.25 0.25],'FaceAlpha',0.3,'EdgeColor','none');
-         end
-         
-         % Change the color of the graphics objects depending on whether
-         % this is a STIMULATION channel for ICMS
-         if  ismember(obj.Index,obj.Parent.ICMS_Channel_Index)
-            set(ax,'Color','y');
-            if nargin > 2
-               if isa(graphicsObj,'matlab.graphics.chart.primitive.Bar')
-                  set(graphicsObj,'FaceColor','k');
-               elseif isa(graphicsObj,'matlab.graphics.chart.primitive.Line')
-                  set(graphicsObj,'Color','k');
-               end
-            end
-            
-         end
-      end
-      
-      % Return figure handle to peri-event LFP (average) for this channel
-      function fig = avgLFPplot(obj,trialType,startStop,ii,makeNewFig)
-         if isempty(obj)
-            fig = [];
-            return;
-         end
-         
-         if nargin < 5
-            makeNewFig = true;
-         end
-         if nargin < 4
-            ii = 1;
-         end
-         if nargin < 3
-            edges = obj.getSpikeBinEdges;
-            startStop = [edges(1), edges(end)];
-         end
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
+   % Private "helper" methods
+   methods (Access = private)
+      % Parse Channel Index for object or each element in object array
+      function parseChannelIndex(obj)
          if numel(obj) > 1
-            fig = [];
             for ii = 1:numel(obj)
-               fig = [fig; avgLFPplot(obj(ii),trialType,startStop,ii,makeNewFig)];
+               obj(ii).parseChannelIndex;
             end
             return;
          end
          
-         if isempty(obj.Parent.Trials)
-            fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
-            return;
-         end
+         ch_ord = obj.native_order + 1; % Native order is zero-indexed
+         ch_port = obj.port_number - 1; % If Port "1" don't offset
          
-         pars = cfg.default('ds');
-         if isempty(obj.fs_d)
-            in = load(obj.ds,'fs');
-            obj.fs_d = in.fs;
-         end
+         % Total number of channels is parsed from parent Layout
+         nCh_total = numel(obj.Parent.Layout);
          
-         
-         [lfp,t] = obj.getAlignedLFP(trialType);
-         
-         if makeNewFig
-            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
-               obj.Parent.Name,obj.Name,char(trialType)),...
-               'Color','w',...
-               'Units','Normalized',...
-               'Position',obj.Parent.getFigPos(ii));
-         end
-         
-         mu = mean(lfp,1);
-         sd = std(lfp,[],1) ./ sqrt(size(mu,1));
-         
-         p = plot(t,mu,...
-            'Color',pars.col{obj.Hemisphere},...
-            'LineWidth',pars.lw);
-         
-         xlim(pars.xlimit);
-         ylim(pars.ylimit);
-         
-         obj.addStimulusMarkers(gca,p);
-         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','LFP (\muV)');
-         
-         errbary = [mu + sd, fliplr(mu - sd)];
-         errbarx = [t, fliplr(t)];
-         patch(errbarx,errbary,pars.col{obj.Hemisphere},...
-            'FaceAlpha',0.3,...
-            'EdgeColor','none',...
-            'FaceColor',pars.col{obj.Hemisphere});
-         
+         obj.Index = ch_ord + (ch_port * nCh_total);
       end
       
-      % Return figure handle to average INSTANTANEOUS FIRING RATE (IFR;
-      % spike rate) in alignment to TRIALS
-      function fig = avgIFRplot(obj,trialType,startStop,ii,makeNewFig)
-         if isempty(obj)
-            fig = [];
-            return;
-         end
-         
-         if nargin < 5
-            makeNewFig = true;
-         end
-         if nargin < 4
-            ii = 1;
-         end
-         if nargin < 3
-            edges = obj.getSpikeBinEdges;
-            startStop = [edges(1), edges(end)];
-         end
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if numel(obj) > 1
-            fig = [];
-            for ii = 1:numel(obj)
-               fig = [fig; avgIFRplot(obj(ii),trialType,startStop,ii,makeNewFig)];
-            end
-            return;
-         end
-         
-         
-         
-         if isempty(obj.Parent.Trials)
-            fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
-            return;
-         end
-         
-         if isempty(obj.ifr)
-            obj.ifr = cfg.default('rate');
-         end
-         pars = cfg.default('ifr');
-         
-         if isempty(obj.fs_d)
-            obj.getfs_d;
-         end
-         tvec = startStop(1):(1/obj.fs_d):startStop(2); % relative sample times
-         [ifr,t] = obj.getAlignedIFR(trialType);
-         ifr = sqrt(abs(ifr));
-         ifr = (ifr - mean(ifr,2)) ./ std(ifr,[],1);
-         %          tvec = obj.edges(1:(end-1)) + mode(diff(obj.edges))/2;
-         %          binCounts = obj.getBinnedSpikes;
-         %          ifr = utils.fastsmooth(binCounts,15,'pg',0,1);
-         
-         if makeNewFig
-            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
-               obj.Parent.Name,obj.Name,char(trialType)),...
-               'Color','w',...
-               'Units','Normalized',...
-               'Position',obj.Parent.getFigPos(ii));
-         end
-         
-         %          t = tvec * 1e3;
-         mu = mean(ifr,1);
-         sd = std(ifr,[],1) ./ sqrt(size(mu,1));
-         
-         p = plot(t,mu,...
-            'Color',pars.col{obj.Hemisphere},...
-            'LineWidth',pars.lw);
-         
-         xlim(pars.xlimit);
-         ylim(pars.ylimit);
-         
-         obj.addStimulusMarkers(gca,p);
-         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','IFR');
-         
-         errbary = [mu + sd, fliplr(mu - sd)];
-         errbarx = [t, fliplr(t)];
-         patch(errbarx,errbary,pars.col{obj.Hemisphere},...
-            'FaceAlpha',0.3,...
-            'EdgeColor','none',...
-            'FaceColor',pars.col{obj.Hemisphere});
-         
-      end
-      
-      % Return figure handle to peri-event time histogram (PETH) for
-      % spiking on this channel
-      function fig = PETH(obj,edges,trialType,ii,makeNewFig)
-         if isempty(obj)
-            fig = [];
-            return;
-         end
-         
-         if nargin < 5
-            makeNewFig = true;
-         end
-         if nargin < 4
-            ii = 1;
-         end
-         if numel(obj) > 1
-            fig = [];
-            for ii = 1:numel(obj)
-               fig = [fig; PETH(obj(ii),edges,trialType,ii,makeNewFig)];
-            end
-            return;
-         end
-         
-         if isempty(obj.Parent.Trials)
-            fig = [];
-            fprintf(1,...
-               'Trial times not yet parsed for %s (%s).\n',...
-               obj.Parent.Name,obj.Name);
-            return;
-         end
-         
-         col = cfg.default('barcols');
-         obj.edges = edges;
-         tvec = edges(1:(end-1))+(mode(diff(edges))/2);
-         
-         binCounts = sum(obj.getBinnedSpikes(trialType),1);
-         
-         if makeNewFig
-            fig = figure('Name',sprintf('%s: %s (%s) PETH',...
-               obj.Parent.Name,obj.Name,cfg.TrialType(trialType)),...
-               'Color','w',...
-               'Units','Normalized',...
-               'Position',obj.Parent.getFigPos(ii));
-         end
-         
-         b = bar(tvec*1e3,mean(binCounts,1),1,...
-            'FaceColor',col{obj.Hemisphere},...
-            'EdgeColor','none');
-         
-         xlim([obj.edges(1) obj.edges(end)]*1e3);
-         ylim(cfg.default('ylimit'));
-         
-         obj.addStimulusMarkers(gca,b);
-         if ii == 23
-            solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Count');
-         else
-            solChannel.addAxesLabels(gca,obj.Name);
-         end
-      end
-      
-      % Plot spike times in rows (trials) as vertical bars (impulses)
-      function fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth)
-         %PLOTRASTER Plot spike raster of spikes across trials for channel
+      % Parse Channel depth for object or each element in object array
+      function parseChannelLocation(obj,depth,angle,cX,cY)
+         %PARSECHANNELLOCATION Parse channel location & depth 
          %
-         % fig = plotRaster(obj);
-         % fig = plotRaster(obj,trialType,tPre,tPost,batch,binWidth);
+         % parseChannelLocation(obj);
          %
          % Inputs
-         %  obj       - Scalar or array of `solChannel` objects
-         %  trialType - `cfg.TrialType` of which trials to include
-         %  tPre      - Time (sec) prior to alignment
-         %  tPost     - Time (sec) after alignment
-         %  batch     - (default is false): if set to true, delete `fig`
-         %                 after saving it for each element of `obj`
-         %  binWidth  - Time (sec) width of each raster "bin"
+         %  obj - Scalar or array of `solChannel` objects
          %
          % Output
-         %  fig       - Array of figure handles corresponding to elements
-         %                 of `obj`
-         if isempty(obj)
-            fig = gobjects(1);
+         %  -- none -- Makes association with correct channel location,
+         %             depth, based on the name of the recording channel.
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).parseChannelDepth;
+            end
             return;
+         end
+         
+         % Set the Hemisphere
+         obj.Hemisphere = cfg.Hem(obj.port_number);
+         
+         % Recordings all performed with rows indicating depth
+         rec_layout_ord = obj.custom_order;
+         [n,a,b] = solChannel.getDefault('nshank','spacing','offset');
+         
+         % Compute depth "index" of this site, based on # shanks (recording
+         % order from custom_order is incremented by elements of rows
+         % first, then by columns (e.g. [0, 1, 2, 3,
+         %                               4, 5, 6, 7] indexing).
+         x = floor(rec_layout_ord/n); % "Row Index"
+         
+         obj.Depth = a*x + b;
+      end
+      
+      % Associate individual channel *.mat files
+      function setFileAssociations(obj,subf,id)
+         %SETFILEASSOCIATIONS Associate individual channel *.mat files
+         %
+         % setFileAssociations(obj,subf,id);
+         %
+         % Inputs
+         %  obj  - scalar or array of `solBlock` object
+         %  subf - struct where each field corresponds to a particular
+         %           sub-folder name or tag to check at the "Block"
+         %           hierarchical level
+         %  id   - struct where each field corresponds to a particular
+         %           "file id" tag that is used for each file of the
+         %           corresponding fieldname type
+         %
+         % Output
+         %  -- none -- Creates associations with the correct files in the
+         %             properties of solBlock `obj` or array of such
+         %             objects.
+         
+         % Parse input args
+         if nargin < 3
+            subf = cfg.default('subf');
          end
          
          if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if nargin < 3
-            tPre = solChannel.getDefault('tpre');
-         end
-         
-         if nargin < 4
-            tPost = solChannel.getDefault('tpost');
-         end
-         
-         if nargin < 5
-            batch = false;
-         end
-         
-         if nargin >= 6
-            setSpikeBinEdges(obj,tPre,tPost,binWidth);
-         end
-         
-         if numel(obj) > 1
-            fig = gobjects(size(obj));
-            for ii = 1:numel(obj)
-               fig(ii) = plotRaster(obj(ii),trialType,tPre,tPost,batch);
-            end
-            return;
-         end
-         
-         if isempty(obj.Parent.Trials)
-            fig = gobjects(1);
-            fprintf(1,...
-               'Trial times not yet parsed for %s (%s).\n',...
-               obj.Parent.Name,obj.Name);
-            return;
-         end
-         
-         col = cfg.default('barcols');
-         spikes = obj.getBinnedSpikes;
-         edges = obj.getSpikeBinEdges;
-         
-         fig = figure(...
-            'Name',sprintf('%s: %s Raster (%s trials)',...
-            obj.Parent.Name,obj.Name,char(trialType)),...
-            'Color','w',...
-            'Units','Normalized',...
-            'Position',[0.1 0.1 0.8 0.8]);
-         
-         [ax,h] = utils.plotSpikeRaster(logical(spikes),...
-            'PlotType','vertline',...
-            'rasterWindowOffset',edges(1),...
-            'TimePerBin',mode(diff(edges)),...
-            'FigHandle',fig,...
-            'LineFormat',struct('Color',col{obj.Hemisphere},...
-            'LineWidth',1.5,...
-            'LineStyle','-'));
-         
-         obj.addStimulusMarkers(ax,h,1);
-         solChannel.addAxesLabels(ax,obj.Name,'Time (sec)','Trial');
-         
-         if ~isempty(obj.Parent) && batch
-            
-            subf = cfg.default('subf');
             id = cfg.default('id');
-            
-            outpath = fullfile(obj.Parent.folder,...
-               [obj.Parent.Name subf.figs],subf.rasterplots);
-            if exist(outpath,'dir')==0
-               mkdir(outpath);
-            end
-            
-            savefig(fig,fullfile(outpath,...
-               [obj.Name id.rasterplots '_' char(trialType) '.fig']));
-            saveas(fig,fullfile(outpath,...
-               [obj.Name id.rasterplots '_' char(trialType) '.png']));
-            delete(fig);
          end
+         
+         % Handle array of object inputs
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               obj(ii).setFileAssociations(subf,id);
+            end
+            return;
+         end
+         
+         % Set all file associations
+         obj.setRaw(subf.raw,id.raw);
+         obj.setFilt(subf.filt,id.filt);
+         obj.setDS(subf.ds,id.ds);
+         obj.setSpikes(subf.spikes,id.spikes);
+         obj.setStims(subf.dig,id.stim);
+         obj.setRate(subf.rate,id.rate,cfg.default('do_rate_estimate'));
       end
-      
    end
    
    % Static methods
@@ -1434,116 +1467,23 @@ classdef solChannel < handle
          end
       end
       
-      % Return [x,y] coordinates for vertices of a graphics rectangle,
-      % given inputs X & Y that are each 2-element vectors that specify the
-      % max and min bounds of the rect in X-Y dims.
+      % Return [x,y] for 2D rectangle vertices
       function [x,y] = getGraphicsRectXY(X,Y)
+         %GETGRAPHICSRECTXY Return [x,y] for 2D rectangle vertices
+         %
+         % [x,y] = solChannel.getGraphicsRectXY(X,Y);
+         %
+         % Inputs
+         %  X - 2-element vector that is [lower, upper] bounds on x-dim
+         %  Y - 2-element vector that is [lower, upper] bounds on y-dim
+         %
+         % Output
+         %  x - 4-element vector to be used for rectangle vertices x-dim
+         %  y - 4-element vector to be used for rectangle vertices y-dim
+         
          x = [X(1), X(1), X(2), X(2)];
          y = [Y(1) Y(2) Y(2) Y(1)];
          
-      end
-   end
-   
-   % Private "helper" methods
-   methods (Access = private)
-      % Parse Channel Index for object or each element in object array
-      function parseChannelIndex(obj)
-         if numel(obj) > 1
-            for ii = 1:numel(obj)
-               obj(ii).parseChannelIndex;
-            end
-            return;
-         end
-         
-         ch_ord = obj.native_order + 1; % Native order is zero-indexed
-         ch_port = obj.port_number - 1; % If Port "1" don't offset
-         
-         % Total number of channels is parsed from parent Layout
-         nCh_total = numel(obj.Parent.Layout);
-         
-         obj.Index = ch_ord + (ch_port * nCh_total);
-      end
-      
-      % Parse Channel depth for object or each element in object array
-      function parseChannelLocation(obj,depth,angle,cX,cY)
-         %PARSECHANNELLOCATION Parse channel location & depth 
-         %
-         % parseChannelLocation(obj);
-         %
-         % Inputs
-         %  obj - Scalar or array of `solChannel` objects
-         %
-         % Output
-         %  -- none -- Makes association with correct channel location,
-         %             depth, based on the name of the recording channel.
-         
-         if numel(obj) > 1
-            for ii = 1:numel(obj)
-               obj(ii).parseChannelDepth;
-            end
-            return;
-         end
-         
-         % Set the Hemisphere
-         obj.Hemisphere = cfg.Hem(obj.port_number);
-         
-         % Recordings all performed with rows indicating depth
-         rec_layout_ord = obj.custom_order;
-         [n,a,b] = solChannel.getDefault('nshank','spacing','offset');
-         
-         % Compute depth "index" of this site, based on # shanks (recording
-         % order from custom_order is incremented by elements of rows
-         % first, then by columns (e.g. [0, 1, 2, 3,
-         %                               4, 5, 6, 7] indexing).
-         x = floor(rec_layout_ord/n); % "Row Index"
-         
-         obj.Depth = a*x + b;
-      end
-      
-      % Associate individual channel *.mat files
-      function setFileAssociations(obj,subf,id)
-         %SETFILEASSOCIATIONS Associate individual channel *.mat files
-         %
-         % setFileAssociations(obj,subf,id);
-         %
-         % Inputs
-         %  obj  - scalar or array of `solBlock` object
-         %  subf - struct where each field corresponds to a particular
-         %           sub-folder name or tag to check at the "Block"
-         %           hierarchical level
-         %  id   - struct where each field corresponds to a particular
-         %           "file id" tag that is used for each file of the
-         %           corresponding fieldname type
-         %
-         % Output
-         %  -- none -- Creates associations with the correct files in the
-         %             properties of solBlock `obj` or array of such
-         %             objects.
-         
-         % Parse input args
-         if nargin < 3
-            subf = cfg.default('subf');
-         end
-         
-         if nargin < 2
-            id = cfg.default('id');
-         end
-         
-         % Handle array of object inputs
-         if numel(obj) > 1
-            for ii = 1:numel(obj)
-               obj(ii).setFileAssociations(subf,id);
-            end
-            return;
-         end
-         
-         % Set all file associations
-         obj.setRaw(subf.raw,id.raw);
-         obj.setFilt(subf.filt,id.filt);
-         obj.setDS(subf.ds,id.ds);
-         obj.setSpikes(subf.spikes,id.spikes);
-         obj.setStims(subf.dig,id.stim);
-         obj.setRate(subf.rate,id.rate,cfg.default('do_rate_estimate'));
       end
    end
 end
