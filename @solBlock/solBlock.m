@@ -123,6 +123,9 @@ classdef solBlock < handle
          % Set the solenoid latencies
          setSolenoidLatencies(obj);
          
+         % Parse solenoid location data
+         parseSolenoidInfo(obj);
+         
          % Parse distance of each child channel to stimulation site
          parseStimDistance(obj);
       end
@@ -1466,6 +1469,38 @@ classdef solBlock < handle
             'Mediolateral distance from bregma (mm)', ...
             'Insertion depth of highest channel (microns)',...
             'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
+      end
+      
+      % Parse solenoid location information based on spreadsheet table
+      function parseSolenoidInfo(obj,fname)
+         %PARSESOLENOIDINFO Parses solenoid location info from table
+         %
+         % parseSolenoidInfo(obj);
+         % parseSolenoidInfo(obj,fname); -> Different from `cfg.default`
+         %
+         % Inputs
+         %  obj   - Scalar or array `solBlock` object
+         %  fname - (Optional) if using a different filename than default
+         %                     specified by 
+         %                       `cfg.default('solenoid_location_table');`
+         %
+         % Output
+         %  -- none -- Updates `solBlock.Solenoid_Location` table property
+         %             for each element of `obj`
+         
+         if nargin < 2
+            fname = solBlock.getDefault('solenoid_location_table'):
+         end
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseSolenoidInfo(obj(i),fname);
+            end
+            return;
+         end
+         
+         solTable = readtable(fname);
+         obj.Solenoid_Location = solTable(ismember(solTable.BlockID,obj.Name),:);
       end
       
       % Set (construct) the child CHANNEL objects
