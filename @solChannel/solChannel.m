@@ -13,10 +13,12 @@ classdef solChannel < handle
    % Properties with public `get` access, but must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = false)
       Area           % Recording area ("RFA", "CFA", "S1", etc.)
-      Depth                (1,1) double = nan      % Site depth, relative to dorsal surface (microns)
+      AP                   (1,1) double = nan       % electrode anteroposterior distance from Bregma (+ == rostral; anterior)
+      Depth                (1,1) double = nan       % Site depth, relative to dorsal surface (microns)
       Hemisphere     % Left or Right hemisphere
       Impedance            (1,1) double = nan       % electrode impedance (kOhms)
-      Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[],'Layout',[]); % Struct with data about this probe
+      Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[]); % Struct with data about this probe
+      ML                   (1,1) double = nan       % electrode mediolateral distance from Bregma (+ == lateral)
       Stim_Distance_table % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
                           %    a new row for each channel. Variables are:
@@ -55,17 +57,23 @@ classdef solChannel < handle
    % Class constructor and overloaded methods
    methods
       % Class constructor for SOLCHANNEL object
-      function obj = solChannel(block,info)
+      function obj = solChannel(block,info,locData)
          %SOLCHANNEL Constructor for `solChannel` object
          %
          % obj = solChannel(solBlockObj,info);
+         % obj = solChannel(solBlockObj,info,locData);
          %
          % Inputs
          %  solBlockObj - "Parent" `solBlock` object (must be provided)
+         %                 -> Should be given as a scalar
          %  info        - struct with channel-specific "info" that is
          %                 obtained at the Block level (due to how the
          %                 recording information gets extracted). Therefore
          %                 this is passed as an input argument.
+         %  locData     - (Optional) input table (from parent
+         %                          `solBlock.Location_Table` property). If
+         %                          not specified, then defaults are
+         %                          assumed from `info` struct data.
          %
          % Output
          %  obj         - Scalar or array `solChannel` object that contains
@@ -86,8 +94,7 @@ classdef solChannel < handle
          % Set public immutable properties
          obj.Parent = block;
          obj.Impedance = info.electrode_impedance_magnitude / 1000;
-         obj.Name = info.custom_channel_name;
-         fprintf(1,repmat('\b',1,5));
+         obj.Name = string(info.custom_channel_name);
          
          % Set "hidden" properties
          obj.port_number = info.port_number;
@@ -97,8 +104,12 @@ classdef solChannel < handle
          
          % Parse channel's INDEX and LOCATION (Depth, Hemisphere)
          parseChannelIndex(obj);
-         parseChannelLocation(obj);
-         
+         if nargin < 3
+            parseChannelLocation(obj);
+         else
+            parseChannelLocation(obj,locData);
+         end
+            
          % Get configured defaults
          [subf,id] = solChannel.getDefault('subf','id');
          
@@ -233,7 +244,8 @@ classdef solChannel < handle
          
          if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -308,7 +320,8 @@ classdef solChannel < handle
          
          if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
             return;
          end
          
@@ -864,10 +877,9 @@ classdef solChannel < handle
          
          % SolChannel stuff
          
-         ChannelID = string(obj.Name);
-         pInfo = strsplit(ChannelID,'-');
-         Probe     = pInfo(1);
-         Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
+         ChannelID = obj.Name;
+         [Probe,Channel] = parseNameInfo(obj);
+         
          Hemisphere = obj.Hemisphere;
          Depth = obj.Depth;
          Impedance = obj.Impedance;
@@ -1267,39 +1279,147 @@ classdef solChannel < handle
       end
       
       % Parse Channel depth for object or each element in object array
-      function parseChannelLocation(obj,cX,cY)
+      function parseChannelLocation(obj,locData)
          %PARSECHANNELLOCATION Parse channel location & depth 
          %
          % parseChannelLocation(obj);
+         % parseChannelLocation(obj,locData);
          %
          % Inputs
-         %  obj - Scalar or array of `solChannel` objects
+         %  obj     - Scalar or array of `solChannel` objects
+         %  locData - Table with probe location data
+         %              -> If `obj` is array, then this should be passed as
+         %                 a cell array of such tables, each element
+         %                 corresponding to a matched element of `obj`
          %
          % Output
          %  -- none -- Makes association with correct channel location,
          %             depth, based on the name of the recording channel.
          
          if numel(obj) > 1
-            for ii = 1:numel(obj)
-               obj(ii).parseChannelDepth;
+            if nargin < 2
+               for ii = 1:numel(obj)
+                  parseChannelDepth(obj(ii));
+               end
+            else
+               for ii = 1:numel(obj)
+                  parseChannelDepth(obj(ii),locData{ii});
+               end
             end
             return;
          end
          
-         % Set the Hemisphere
-         obj.Hemisphere = cfg.Hem(obj.port_number);
+         Probe = parseNameInfo(obj);
+         if nargin < 2 % If no `locData` use `cfg.default` values
+            parseLayoutInfo(obj);
+            [areaKey,thetaKey,mlKey,apKey] = solChannel.getDefault(...
+               'areakey','thetakey','mlkey','apkey');
+            obj.Area = areaKey.(Probe);
+            obj.Hemisphere = cfg.Hem(obj.port_number);
+            obj.Probe.Angle = thetaKey.(Probe);
+            obj.Probe.ML = mlKey.(Probe);
+            obj.Probe.AP = apKey.(Probe);
+         else % Parse relevant properties from `locData` table
+            locData = locData(ismember(locData.Probe,Probe),:);
+            parseLayoutInfo(obj,locData.Depth(1));
+            obj.Area = locData.Area{1};
+            obj.Hemisphere = locData.Hemisphere{1};
+            obj.Probe.Angle = locData.Angle(1);
+            obj.Probe.AP = locData.AP(1);
+            obj.Probe.ML = locData.ML(1);
+         end % obj.Probe struct is now complete; still need channel loc
          
-         % Recordings all performed with rows indicating depth
-         rec_layout_ord = obj.custom_order;
-         [n,a,b] = solChannel.getDefault('nshank','spacing','offset');
+         % Relative to probe "center" coordinates, we can now estimate the
+         % actual channel AP and ML coordinates using the rotation angle of
+         % the probe along with which shank it is on. 
+         [shankSpacing,nShank] = solChannel.getDefault(...
+            'shankspacing','nshank');
          
+         % First, determine which shank it was on so that we can get the
+         % rotation radius. The radius for an even number of shanks
+         % will be [shank - (1 + nShank)/2] * shankSpacing, where `shank`
+         % is the shank index. 
+         iShank = rem(obj.custom_order,nShank)+1; % Convert to 1-indexed
+         r = (iShank - ((1 + nShank)/2)) * shankSpacing; % Radius
+         
+         % For `theta = 0` it would be aligned perfectly to midline. In
+         % that case, `
+      end
+      
+      % Parse default `locData` table based on other info
+      function parseLayoutInfo(obj,tipDepth)
+         %PARSELAYOUTINFO Return default `locData` based on info
+         %
+         % parseLayoutInfo(obj);
+         % parseLayoutInfo(obj,tipDepth);
+         %  
+         % Inputs
+         %  obj      - Scalar `solChannel` object
+         %  tipDepth - (Optional) Depth of tip (microns); if provided, then
+         %                        value used in `depthkey` variable from
+         %                        `cfg.default` is overridden.
+         %
+         % Output
+         %  -- none -- Updates `solChannel.Depth` property
+         %
+         % See also: solChannel.parseChannelLocation, solBlock.setChannels
+
+         % Load relevant defaults
+         [channelSpacing,tipOffset,depthKey,nShank,nRow] = ...
+            solChannel.getDefault(...
+               'spacing','offset','depthkey','nshank','nchannelpershank');
+         % Use `Probe` as key for assignment
+         Probe = parseNameInfo(obj);  
+         % If `tipDepth` isn't given, use default value from key
+         if nargin < 2
+            tipDepth = depthKey.(Probe);
+         end         
+
+         % Note: This method will fail if `nchannelpershank` is not set
+         %       correctly, which is only a consideration for the earliest
+         %       pilot rats (when there was only 16-channels instead of
+         %       32-channels per probe) -- Those need to have
+         %       `nchannelpershank` and `spacing` in cfg.default updated.
+         %
          % Compute depth "index" of this site, based on # shanks (recording
          % order from custom_order is incremented by elements of rows
          % first, then by columns (e.g. [0, 1, 2, 3,
          %                               4, 5, 6, 7] indexing).
-         x = floor(rec_layout_ord/n); % "Row Index"
+         % Recordings all performed with rows indicating depth
+         rowsFromBottom = nRow - floor(obj.custom_order/nShank); % "Row Index"
+         deepestChannel = (tipDepth - tipOffset);
+         obj.Depth = deepestChannel - channelSpacing*rowsFromBottom;
+      end
+      
+      % Parse Probe name and Channel index from `obj.Name`
+      function [Probe,Channel] = parseNameInfo(obj)
+         %PARSENAMEINFO Return port identifier and channel index from name
+         %
+         % [Probe,Channel] = parseNameInfo(obj);
+         %
+         % Inputs
+         %  obj     - Scalar or array of `solChannel` objects
+         %
+         % Output
+         %  Probe   - String corresponding to "Port" (leading element of
+         %            `obj.Name`). If `obj` is an array, returned as array
+         %            of same size with matching elements.
+         %  Channel - Numeric index (1-indexed) corresponding to index on
+         %            this probe based on obj.Name. If `obj` is an array,
+         %            then this is returned as an array of same size.
          
-         obj.Depth = a*x + b;
+         if ~isscalar(obj)
+            Probe = strings(size(obj));
+            Channel = nan(size(obj));
+            for i = 1:numel(obj)
+               [Probe(i),Channel(i)] = parseNameInfo(obj(i));
+            end
+            return;
+         end
+         pInfo = strsplit(ChannelID,'-');
+         Probe     = pInfo(1);
+         Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
+         
       end
       
       % Associate individual channel *.mat files

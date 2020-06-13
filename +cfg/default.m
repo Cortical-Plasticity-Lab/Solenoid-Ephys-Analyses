@@ -84,10 +84,17 @@ out.L = {  '019','021','000','029',...
 %          '013','010','004','007'};
 
 % Probe depth parameters
-out.offset =  -50;
-out.spacing = -100;
-out.nshank = 4;
+out.offset =  50;  % (microns from bottom channel to tip)
+out.spacing = 100; % (microns between channels on a shank)
+out.nshank = 4;            % # of shanks on the electrode
+out.nchannelpershank = 8;  % # of channels on each shank
 out.depth = -500;
+out.shankspacing = 400; % microns, distance between array shanks
+out.depthkey = struct('A',1600,'B',1300); % A : RFA -- 1600 microns; B : S1 -- 1300 microns
+out.thetakey = struct('A',0,'B',45);      % degrees (rotated from midline; + is clockwise)
+out.areakey = struct('A','RFA','B','S1'); % areas
+out.mlkey = struct('A',2.5,'B', 3.5); % (mm) Lateral from bregma
+out.apkey = struct('A',2.5,'B',-0.5); % (mm) Anterior (rostral) from bregma
 
 % Defaults for graphics things
 out.color_order = [0.0 0.0 0.0; ...
