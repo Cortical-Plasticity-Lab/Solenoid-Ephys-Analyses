@@ -1861,9 +1861,10 @@ classdef solBlock < handle
          % Get ICMS info
          obj.ICMS_Channel_Index = icms_channel_index;
          if isnan(icms_channel_index)
-            obj.ICMS_Channel_Name = 'none';
+            obj.ICMS_Channel_Name = "None";
          else
-            obj.ICMS_Channel_Name = {obj.Children(icms_channel_index).Name};
+            obj.ICMS_Channel_Name = vertcat(...
+               obj.Children(icms_channel_index).Name);
          end
          
          % Set the onset latency 
@@ -1997,7 +1998,14 @@ classdef solBlock < handle
             return;
          end
          
-         
+         if strcmp(obj.ICMS_Channel_Name(1),"None")
+            setStimChannelDistance(obj.Children,"None",nan,nan,nan);
+         else
+            [ap,ml,depth] = getLocation(obj.Children,...
+               obj.ICMS_Channel_Name);
+            setStimChannelDistance(obj.Children,...
+               obj.ICMS_Channel_Name,ap,ml,depth);
+         end
       end
       
       % Parse trial FILE

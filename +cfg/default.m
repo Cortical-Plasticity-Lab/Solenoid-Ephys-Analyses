@@ -92,9 +92,10 @@ out.depth = -500;
 out.shankspacing = 400; % microns, distance between array shanks
 out.depthkey = struct('A',1600,'B',1300); % A : RFA -- 1600 microns; B : S1 -- 1300 microns
 out.thetakey = struct('A',0,'B',45);      % degrees (rotated from midline; + is clockwise)
-out.areakey = struct('A','RFA','B','S1'); % areas
+out.areakey = struct('A',"RFA",'B',"S1"); % areas
 out.mlkey = struct('A',2.5,'B', 3.5); % (mm) Lateral from bregma
 out.apkey = struct('A',2.5,'B',-0.5); % (mm) Anterior (rostral) from bregma
+out.orientationkey = struct('A',"Caudal",'B',"Rostral");
 
 % Defaults for graphics things
 out.color_order = [0.0 0.0 0.0; ...

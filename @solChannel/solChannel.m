@@ -17,7 +17,7 @@ classdef solChannel < handle
       Depth                (1,1) double = nan       % Site depth, relative to dorsal surface (microns)
       Hemisphere     % Left or Right hemisphere
       Impedance            (1,1) double = nan       % electrode impedance (kOhms)
-      Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[]); % Struct with data about this probe
+      Probe                (1,1) struct = struct('AP',[],'ML',[],'TipDepth',[],'Angle',[],'Orientation',""); % Struct with data about this probe
       ML                   (1,1) double = nan       % electrode mediolateral distance from Bregma (+ == lateral)
       Stim_Distance_table % Table with distances from stim channel
                           % -> If multiple stimulation sites, then there is
@@ -563,6 +563,44 @@ classdef solChannel < handle
          else
             data = in.data;
          end
+      end
+      
+      % Returns AP, ML, and Depth coordinates for this channel
+      function [AP,ML,Depth] = getLocation(obj,name)
+         %GETLOCATION Return AP, ML, and Depth coordinates for this channel
+         %
+         % [AP,ML,Depth] = getLocation(obj);
+         % [AP,ML,Depth] = getLocation(objArray,name); 
+         %  -> Return array of each coordinate corresponding to subset
+         %     matching `name` argument
+         %
+         % Inputs
+         %  obj  - Scalar or array of `solChannel` objects
+         %  name - (Optional) Scalar or array of strings to use to match
+         %              specific elements from `obj`. If this is used, then
+         %              only matching coordinates are returned.
+         %
+         % Output
+         %  AP    - `obj.AP` (anteroposterior distance in mm from Bregma)
+         %  ML    - `obj.ML` (anteroposterior distance in mm from Bregma)
+         %  Depth - `obj.Depth` (depth from dorsal surface in microns)
+         
+         if nargin > 1
+            AP = nan(size(name));
+            ML = nan(size(name));
+            Depth = nan(size(name));
+            allNames = vertcat(obj.Name);
+            for ii = 1:numel(name)
+               idx = strcmpi(allNames,name(ii));
+               if sum(idx) == 1
+                  [AP(ii),ML(ii),Depth(ii)] = getLocation(obj(idx));
+               end
+            end
+            return;
+         end
+         AP = obj.AP;
+         ML = obj.ML;
+         Depth = obj.Depth;
       end
       
       % Returns RAW data for this channel (and corresponding sample times)
@@ -1258,6 +1296,59 @@ classdef solChannel < handle
       end   
    end
    
+   % Protected method (only called by `solChannel` or `solBlock`)
+   methods (Access = {?solChannel, ?solBlock})
+      % Assign distance to ICMS site(s)
+      function setStimChannelDistance(obj,Name,AP,ML,Depth)
+         %SETSTIMCHANNELDISTANCE  Sets distance from stimulation site(s)
+         %
+         % setStimChannelDistance(obj,Name,AP,ML,Depth);
+         % setStimChannelDistance(obj,"None",nan,nan,nan); 
+         %  -> If no stim channel
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solChannel` objects
+         %  Name  - `solChannel.Name` corresponding to `solChannel` stim
+         %            object or objects (if array). All input arguments
+         %            should correspond to the number of stim channels (so
+         %            each input arg, aside from `obj` should have the same
+         %            number of elements).
+         %  AP    - Distance (anteroposterior from Bregma; mm)          %            per stim site)
+         %  ML    - Distance (mediolateral from Bregma; mm)
+         %  Depth - Distance (from dorsal surface of brain; microns)
+         %
+         % Output
+         %  -- none -- Updates the `solChannel.Stim_Distance_Table`
+         %             property, which has one row per stim site (or only
+         %             one row if no stimulation site)
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setStimChannelDistance(obj(i),Name,AP,ML,Depth);
+            end
+            return;
+         end
+         
+         AP = bsxfun(@minus,obj.AP,AP);
+         ML = bsxfun(@minus,obj.ML,ML);
+         % By convention, negative value for depth would indicate that the
+         % site is more superficial to the stim site.
+         DV = bsxfun(@minus,obj.Depth,Depth) .* 1e-3; % scale to mm 
+         Distance = sqrt((AP + ML + DV).^2);
+         obj.Stim_Distance_Table = table(Name,Distance,AP,ML,DV,...
+            'Description','Distance (mm) to site(s) delivering ICMS',...
+            'VariableUnits',{'Channel','mm','mm','mm','mm'},...
+            'VariableDescriptions',...
+           {'Name of ICMS channel',...
+            'Euclidean distance from stim site',...
+            'Anteroposterior distance relative to stim site (+ == rostral)',...
+            'Mediolateral distance relative to stim site (+ == lateral)',...
+            'Dorsoventral distance relative to stim site (+ == ventral)'});
+         obj.Stim_Distance_Table.Properties.UserData = struct('type',...
+            'StimDistance');
+      end
+   end
+   
    % Private "helper" methods
    methods (Access = private)
       % Parse Channel Index for object or each element in object array
@@ -1312,18 +1403,20 @@ classdef solChannel < handle
          Probe = parseNameInfo(obj);
          if nargin < 2 % If no `locData` use `cfg.default` values
             parseLayoutInfo(obj);
-            [areaKey,thetaKey,mlKey,apKey] = solChannel.getDefault(...
-               'areakey','thetakey','mlkey','apkey');
+            [areaKey,thetaKey,mlKey,apKey,oKey] = solChannel.getDefault(...
+               'areakey','thetakey','mlkey','apkey','orientationkey');
             obj.Area = areaKey.(Probe);
             obj.Hemisphere = cfg.Hem(obj.port_number);
             obj.Probe.Angle = thetaKey.(Probe);
             obj.Probe.ML = mlKey.(Probe);
             obj.Probe.AP = apKey.(Probe);
+            obj.Probe.Orientation = oKey.(Probe);
          else % Parse relevant properties from `locData` table
             locData = locData(ismember(locData.Probe,Probe),:);
             parseLayoutInfo(obj,locData.Depth(1));
-            obj.Area = locData.Area{1};
-            obj.Hemisphere = locData.Hemisphere{1};
+            obj.Area = string(locData.Area{1});
+            obj.Hemisphere = string(locData.Hemisphere{1});
+            obj.Probe.Orientation = string(locData.Orientation{1});
             obj.Probe.Angle = locData.Angle(1);
             obj.Probe.AP = locData.AP(1);
             obj.Probe.ML = locData.ML(1);
@@ -1341,9 +1434,27 @@ classdef solChannel < handle
          % is the shank index. 
          iShank = rem(obj.custom_order,nShank)+1; % Convert to 1-indexed
          r = (iShank - ((1 + nShank)/2)) * shankSpacing; % Radius
+         theta = obj.Probe.Angle;
          
          % For `theta = 0` it would be aligned perfectly to midline. In
-         % that case, `
+         % that case, we consider two different probe orientations:
+         % "rostral" (shank 1 would then be the furthest-possible rostral)
+         % or "caudal" (shank 1 would then be the furthest-possible caudal)
+         switch obj.Probe.Orientation
+            case "Rostral"
+               obj.AP = [];
+               obj.ML = [];
+            case "Caudal"
+               obj.AP = [];
+               obj.ML = [];
+            otherwise
+               error(['SOLENOID:' mfilename ':BadValue'],...
+                  ['\n\t->\t<strong>[PARSECHANNELLOCATION]:</strong> ' ...
+                   'Unexpected value for `Orientation`: ' ...
+                   '<strong>%s</strong>\n\t\t\t\t' ...
+                   '(Should be "Rostral" or "Caudal")\n'],...
+                   obj.Probe.Orientation);
+         end
       end
       
       % Parse default `locData` table based on other info
