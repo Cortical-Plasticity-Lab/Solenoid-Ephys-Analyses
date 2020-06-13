@@ -1,7 +1,8 @@
 classdef solBlock < handle
-%SOLBLOCK   obj = solBlock(); or obj = solBlock(ratObj,folder);
+%SOLBLOCK Class for organizing data from an individual recording
 %
-%  Class for organizing data from an individual recording (experiment).
+%  obj = solBlock(); 
+%  obj = solBlock(ratObj,folder);
 
 % PROPERTIES
    % Unchangeable properties set on object construction
@@ -12,47 +13,41 @@ classdef solBlock < handle
       Index       % From name convention: "R19-###_2019_MM_DD_[Index]"
    end
    
-   % Properties that can only be changed by class methods, but can be
-   % publically accessed and are not hidden.
+   % Properties with public `get` access, but must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = false)
       fs                       % Amplifier sample rate (Hz)
-      Depth                    % Overall Depth of electrodes
-      Trials                   % "Trial" timestamps (NEW / CYCLE setup)
-      Triggers                 % "Trigger" timestamps (OLD / original setup)
+      ICMS_Channel_Index       % Index of channel(s) delivering ICMS
+      ICMS_Channel_Name        % Name of ICMS stimulation channel
+      ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
+      Location_Table           % Table with location data for each probe (note that reference angle is 0 at horizontal to ref. GRID; positive with clockwise rotation)
       Solenoid_Onset_Latency   % Array of solenoid extend times (1 per pulse, within a trial)
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
-      ICMS_Onset_Latency       % Array of ICMS start times (1 per pulse, per stimulated channel)
-      ICMS_Channel_Name        % Name of ICMS stimulation channel
-      Location_Table           % Table with location data for each probe (note that reference angle is 0 at horizontal to ref. GRID; positive with clockwise rotation)
+      Trials                   % "Trial" timestamps (NEW / CYCLE setup)
+      Triggers                 % "Trigger" timestamps (OLD / original setup)
       TrialType                % Categorical array indicating trial type
    end
    
-   % Properties that can be publically accessed but only changed by class
-   % methods, and are also not populated in the standard object property
-   % list.
+   % Properties with public `get` access, but hidden and must be set by class method
    properties (GetAccess = public, SetAccess = private, Hidden = true)
       folder               % Recording block filepath folder
-      
       sol                  % Solenoid digital record file
       trig                 % "Trigger" digital record file
       iso                  % "Isoflurane" analog record file (pushbutton indicator)
       icms                 % ICMS digital record file
       trial                % "Trial" analog record file
       stim                 % "StimInfo" parsed file
-      
-      ICMS_Channel_Index   % Index of channel(s) delivering ICMS
       Layout               % Electrode layout (rows = depth, columns = M/L or A/P shanks)
 
    end
    
-   % Can only be set or accessed using class methods.
+   % Private properties that can only be set/accessed using class methods
    properties (Access = private)
       edges    % Time bin edges for binning histograms relative to alignment
    end
 
 % METHODS
-   % Class constructor and data-handling/parsing methods
-   methods (Access = public)
+   % Class constructor and overloaded methods
+   methods
       % SOLBLOCK class constructor
       function obj = solBlock(ratObj,folder)
          %SOLBLOCK  Class constructor for `solBlock` "recording" object
@@ -79,7 +74,6 @@ classdef solBlock < handle
          %              or an array of such objects representing multiple
          %              recordings from the same rat.
          
-         
          % Set the folder
          if nargin < 1
             clc;
@@ -101,272 +95,39 @@ classdef solBlock < handle
          end
          
          % Parse recording name based on BLOCK folder naming
-         [obj.Name,obj.Index] = obj.parseName;
+         [obj.Name,obj.Index] = parseName(obj);
          
          % Load configured defaults
-         subf = cfg.default('subf');
-         id = cfg.default('id');
-         L = cfg.default('L');
-         depth = cfg.default('depth');
+         [subf,id,L,fname] = solBlock.getDefault(...
+            'subf','id','L','site_location_table');
          
          % Set the electrode LAYOUT for this object
-         obj.setLayout(L,depth);
+         setLayout(obj,L,fname);
          
          % Set sample rate for this object
-         obj.setSampleRate(id);
+         setSampleRate(obj,id);
          
          % Construct child CHANNEL objects
-         obj.Children = obj.setChannels(subf,id);
+         obj.Children = setChannels(obj,subf,id);
          
          % Get other metadata         
-         obj.setMetaNames(subf,id);
+         setMetaNames(obj,subf,id);
          
          % Parse trial times
-         obj.setTrials;
+         setTrials(obj);
          
          % Set ICMS stimuli
-         obj.setStims;
+         setStims(obj);
          
          % Set the solenoid latencies
-         obj.setSolenoidLatencies;
-         fprintf(1,'\n -- \n');
-      end
-      
-   end
-   
-   % Helper methods that are called from other functions
-   methods (Access = private)
-      % Parse BLOCK name using recording folder path
-      function [Name,Index] = parseName(obj)
-         %PARSENAME Parse BLOCK name using recording folder path
-         %
-         % [Name,Index] = obj.parseName();
-         %
-         % Inputs
-         %  obj   - `solBlock` object or array of such objects
-         %
-         % Output
-         %  Name  - Name of recording block (char array). If `obj` is
-         %           nonscalar, then this is returned as cell array of same
-         %           dimension as `obj`
-         %  Index - Same as Name regarding size, except this is a numeric
-         %           array representing the block index corresponding to
-         %           each Block.
+         setSolenoidLatencies(obj);
          
-         if numel(obj) > 1
-            Name = cell(size(obj));
-            Index = nan(size(obj));
-            for ii = 1:numel(obj)
-               [Name{ii},Index(ii)] = obj(ii).parseName;
-            end
-            return;
-         end
-         name = strsplit(obj.folder,filesep);
-         Name = name{end};
-         tag = strsplit(Name,'_');
-         Index = str2double(tag{end});
-      end
-      
-      % Parse trile FILE
-      function successful_parse_flag = parseTrials(obj)
-         %PARSETRIALS Parse trial file
-         %
-         % Parse trial FILE (if not present, because Max is dumb and forgot
-         % to enable the analog inputs on a couple of recording blocks); it
-         % can be reconstructed from the combination of ICMS and SOLENOID 
-         % digital streams, so this is just there to "fix" a few "bad"
-         % recordings.
-         %
-         % successful_parse_flag = parseTrials(obj);
-         
-         if numel(obj) > 1
-            successful_parse_flag = false(numel(obj),1);
-            for i = 1:numel(obj)
-               successful_parse_flag(i) = parseTrials(obj(i));
-            end
-            return;
-         end
-         successful_parse_flag = false;
-         fprintf(1,'Parsing TRIAL stream for %s...',obj.Name);
-         
-         % Get a vector of HIGH indices, which will be used relative to
-         % each computed TRIAL index to set the stream HIGH.
-         trial_high_duration = cfg.default('trial_high_duration');
-         i_trial_vec = 0:round(trial_high_duration*1e-3 * obj.fs);
-         
-         % Parse solenoid and ICMS onset indices
-         iSol = round(obj.getSolOnset * obj.fs);
-         iICMS = round(obj.getICMS * obj.fs);
-         
-         if isempty(iICMS)
-            fprintf(1,'\n-->Could not parse trials for %s\n',obj.Name);
-            return;
-         end
-                 
-         % Initialize data struct (to save)
-         in = load(obj.icms);
-         out = struct;
-         out.data = zeros(size(in.data));
-         out.fs = in.fs;
-         
-         % Get the solenoid lag (should always be after ICMS)
-         solLag = min(min(abs(iICMS - iSol(1))),min(abs(iICMS - iSol(2))));  
-         
-         % Cycle through all ICMS, setting vector to HIGH
-         for k = 1:numel(iICMS)
-            vec = i_trial_vec + iICMS(k);
-            vec = vec((vec >= 1) & (vec <= numel(out.data)));
-            out.data(vec) = 1;
-         end
-         
-         % Cycle through all solenoid, setting vector to HIGH
-         for k = 1:numel(iSol)
-            vec = i_trial_vec + iSol(k) - solLag;
-            vec = vec((vec >= 1) & (vec <= numel(out.data)));
-            out.data(vec) = 1;
-         end
-         
-         % Save data struct using TRIAL file name
-         save(obj.trial,'-struct','out');
-         fprintf(1,'successful\n');
-         successful_parse_flag = true;
-      end
-      
-      % Parse the trial TYPE (for new CYCLE setup)
-      function parseTrialType(obj,tTrials,thresh)
-         %PARSETRIALTYPE Parses the enumerated TYPE for each trial
-         %
-         % parseTrialType(obj,tTrials,thresh);
-         %
-         % Inputs
-         %  obj     - Scalar or array of `solBlock` objects
-         %  tTrials - Time of each trial (seconds)
-         %  thresh  - Threshold (seconds) for distinguishing between trials
-         %
-         % Output
-         %  Associates the TYPE with each trial in `obj.TrialType` property
-         
-         if ~isscalar(obj)
-            error(['SOLENOID:' mfilename ':BadInputSize'],...
-               ['\n\t->\t<strong>[PARSETRIALTYPE]:</strong> ' ...
-                '`parseTrialType` is a method for SCALAR ' ...
-                '`solBlock` objects only']);
-         end
-         if nargin < 3
-            thresh = cfg.default('trial_duration');
-         end
-         
-         if nargin < 2
-            tTrials = obj.getTrials;
-         end
-         
-         tStim = getICMS(obj);
-         tSol = getSolOnset(obj);
-         
-         obj.TrialType = nan(numel(tTrials),1);
-         for ii = 1:numel(tTrials)
-            dStim = min(abs(tStim - tTrials(ii)));
-            dSol = min(abs(tSol - tTrials(ii)));
-            
-            if (dStim < thresh) && (dSol < thresh)
-               obj.TrialType(ii) = cfg.TrialType('SolICMS');
-            elseif dStim < thresh
-               obj.TrialType(ii) = cfg.TrialType('ICMS');
-            elseif dSol < thresh
-               obj.TrialType(ii) = cfg.TrialType('Solenoid');
-            else
-               obj.TrialType(ii) = cfg.TrialType('Catch');
-            end
-         end
+         % Parse distance of each child channel to stimulation site
+         parseStimDistance(obj);
       end
    end
    
-   % Static methods of SOLBLOCK class 
-   methods (Static = true)
-      % Return empty `solBlock` object
-      function obj = empty()
-         %EMPTY  Return empty `solBlock` object
-         %
-         % obj = solBlock.empty();
-         %
-         % Use this to initialize an empty array of `solBlock` for
-         % concatenation, for example.
-         
-         obj = solBlock(0);
-      end
-      
-      % Return indexing array with correct dimensions
-      function Y = pruneTruncatedSegments(X)
-      %PRUNETRUNCATEDSEGMENTS Return indexing array with correct dimensions
-      %
-      % Returns indexing matrix Y from binary vector X, where X switches
-      % from LOW to HIGH to indicate a contiguous segment related to some
-      % event of interest. Because if a recording is stopped early these
-      % segments can be truncated prematurely, this function checks to
-      % ensure there are the same number of HIGH samples in each detected
-      % "segment" and then returns the corresponding sample indices in the
-      % data matrix Y, where each row corresponds to a segment and each
-      % column is the sample index of a consecutive sample of interest.
-      %
-      %  Y = solBlock.pruneTruncatedSegments(X);
-      %
-      %  Inputs
-      %   X - Thresholding matrix indicating that a stimulus was present
-      %
-      %  Output
-      %   Y - Indexing matrix corresponding to rising/falling edges of X
-      
-         data = find(X > cfg.default('analog_thresh'));
-         iStart = data([true, diff(data) > 1]);
-         iDiff = iStart(2)-iStart(1);
-         iStart = iStart([true, diff(iStart) == iDiff]);
-         
-         Y = nan(numel(iStart),iDiff);
-         for i = 1:numel(iStart)
-            Y(i,:) = iStart(i):(iStart(i)+iDiff-1);
-         end
-         
-      end
-      
-      % Wrapper function to get variable number of default fields 
-      function varargout = getDefault(varargin)
-         %GETDEFAULT Return defaults parameters for `solBlock`
-         %
-         %  varargout = solBlock.getDefault(varargin);
-         %  e.g.
-         %     param = solBlock.getDefault('paramName');
-         %     [p1,...,pk] = solBlock.getDefault('p1Name',...,'pkName');
-         %
-         %  Inputs
-         %     varargin - Any of the parameter fields in the struct 
-         %                delineated in `cfg.default`
-         %
-         %  Wrapper function to get variable number of default fields
-         %
-         %  See Also: cfg.default
-         
-         % Parse input
-         if (nargin > nargout) && (nargout > 0)
-            error(['SOLENOID:' mfilename ':TooManyInputs'],...
-               ['\n\t->\t[GETDEFAULT]: ' ...
-                'More inputs specified than requested outputs']);
-         elseif (nargin < nargout)
-            error(['SOLENOID:' mfilename ':TooManyInputs'],...
-               ['\n\t->\t[GETDEFAULT]: ' ...
-                'More outputs requested than inputs specified']);
-         end
-         
-         % Collect fields into output cell array
-         if nargout > 0
-            varargout = cell(1,nargout);
-            [varargout{:}] = cfg.default(varargin{:});
-         else
-            cfg.default(varargin{:});
-         end
-      end
-   end
-   
-   % "Graphics" methods
+   % Public methods
    methods (Access = public)
       % Plot the aligned LFP for each channel
       function fig = avgLFPplot(obj,trialType,tPre,tPost,subset)
@@ -432,6 +193,402 @@ classdef solBlock < handle
          
       end
       
+      % Plot the peri-event time histogram for each channel, save the
+      % figure, and close the figure once it has been saved.
+      function batchPETH(obj,trialType,tPre,tPost,binWidth,subset)
+         if nargin < 5
+            binWidth = cfg.default('binwidth');
+         end
+         
+         if nargin < 4
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 3
+            tPre = cfg.default('tpre');
+         end
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               if nargin < 6
+                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth);
+               else
+                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth,subset);
+               end
+            end
+            return;
+         end
+         
+         if nargin < 6
+            subset = 1:numel(obj.Children);
+         end
+         
+         edgeVec = tPre:binWidth:tPost;
+
+         subf = cfg.default('subf');
+         id = cfg.default('id');
+         
+         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
+         if exist(outpath,'dir')==0
+            mkdir(outpath);
+         end
+         
+%          obj.parseStimuliTimes
+         
+         for ii = subset
+
+            f = PETH(obj.Children(ii),edgeVec,trialType,ii);
+            
+            savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
+               char(trialType) '_' id.peth '.fig']));
+            saveas(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
+               char(trialType) '_' id.peth '.png']));
+            
+            delete(f);
+            
+         end
+      end
+      
+      % Returns the closest timestamp of a trial ONSET (seconds)
+      function t = getClosestTrialOnset(obj,tVec)
+         %GETCLOSESTTRIALONSET Returns the closest timestamp of trial start
+         %
+         % t = getClosestTrialOnset(obj,tVec);
+         %
+         % Inputs
+         %  obj  - SCALAR `solBlock` object
+         %  tVec - Vector of candidate times
+         %
+         % Output
+         %  t    - Actual time of closest trial onset
+         
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[GETCLOSESTTRIALONSET]:</strong> ' ...
+                'This method only accepts a scalar `obj` input\n']);
+         end
+         ts = obj.getTrials;
+         [~,idx] = min(abs(ts - tVec(1)));
+         t = ts(idx);
+      end
+      
+      % Get the normalized position for current figure placement 
+      function pos = getFigPos(obj,ii,varargin)
+         %GETFIGPOS Return normalized position of current figure
+         %
+         % pos = getFigPos(obj);
+         % pos = getFigPos(obj,ii);
+         % pos = getFigPos(obj,ii,'Position',pos,'Scale',scl);
+         %
+         % Inputs
+         %  obj - Scalar `solBlock` object
+         %        -> If given as an array, throws warning and only uses
+         %           first element to return `pos`
+         %  ii  - Index (scalar integer) corresponding to this figure
+         %        -> Default: random integer based on number of
+         %                    `obj.Children`
+         %  varargin - Optional <'Name',value> pairs
+         %        + 'Position': the original position, to be scaled based
+         %                       on indexing relative to number of child
+         %                       objects
+         %        + 'Scale'   : the maximum (normalized) factor to add to
+         %                       both pos(1) and pos(2)
+         %
+         % Output
+         %  pos   - Updated figure `Position` (normalized coordinates)
+         %     --> Use this to make a cascaded tile of figures across the 
+         %         screen when multiple figures will be generated by a 
+         %         method, so that they don't just all stack one on top of
+         %         the other.
+         
+         if ~isscalar(obj)
+            warning(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[GETFIGPOS]:</strong> ' ...
+                'This method should only accept scalar inputs.\n' ...
+                '\t\t\t\t(Using first element only)\n']);
+             obj = obj(1);
+         end
+         
+         N = numel(obj.Children);
+         if nargin < 2
+            ii = randi(N,1,1);
+         end
+         
+         p = struct;
+         [p.Position,p.Scale] = solBlock.getDefault('figpos','figscl');
+         
+         fn = fieldnames(p);
+         for iV = 1:2:numel(varargin)
+            idx = strcmpi(fn,varargin{iV});
+            if sum(idx)==1
+               p.(fn{idx}) = varargin{iV+1};
+            end
+         end
+         
+         k = ii / N; % Scale factor
+         pos(1) = p.Position(1) + p.Scale * k;
+         pos(2) = p.Position(2) + p.Scale * k;
+      end
+      
+      % Get ICMS times (for new CYCLE setup)
+      function ts = getICMS(obj)
+         %GETICMS Return array of ICMS pulse onset times
+         %
+         % ts = getICMS(obj);
+         %
+         % Inputs
+         %  obj              - Scalar or array of `solBlock` objects
+         %
+         % Output
+         %  ts               - Vector of timestamps (seconds) of ICMS pulse
+         %                       onsets. If `obj` is an array, then this is
+         %                       a cell array, where each element contains
+         %                       such a vector that matches the
+         %                       corresponding element of `obj`
+         
+         % Handle object array input
+         if numel(obj) > 1
+            ts = cell(numel(obj),1);
+            for i = 1:numel(obj)
+               ts{i} = getICMS(obj(i));
+            end
+            return;
+         end
+         
+         if exist(obj.icms,'file')==0
+            fprintf(1,'No file: %s\n',obj.icms);
+            ts = [];
+            return;
+         end
+         
+         in = load(obj.icms,'data');
+         if sum(in.data > 0) == 0
+            ts = [];
+            return;
+         end
+         
+         % Find onset of "HIGH" times
+         data = find(in.data > 0);
+         
+         % Convert sample indices to times (SECONDS)
+         ts = data([true, diff(data) > 1]) ./ obj.fs;
+         
+         % Simplify parsing "incomplete" trials
+         if numel(ts) > 1
+            ts = ts(1:(end-1)); 
+         end
+         
+      end
+      
+      % Get TRIAL times (for new CYCLE setup)
+      function ts = getTrials(obj,updateTrialsProp)
+         %GETTRIALS Return array of trial onset times
+         %
+         % ts = getTrials(obj);
+         % ts = getTrials(obj,updateTrialsProp);
+         %
+         % Inputs
+         %  obj              - Scalar or array of `solBlock` objects
+         %  updateTrialsProp - Default is false; set true to force the
+         %                     `Trials` property to be updated with values
+         %                     returned in `ts`
+         %
+         % Output
+         %  ts               - Vector of timestamps (seconds) of trial
+         %                       onsets. If `obj` is an array, then this is
+         %                       a cell array, where each element contains
+         %                       such a vector that matches the
+         %                       corresponding element of `obj`
+         
+         if nargin < 2
+            updateTrialsProp = false;
+         end
+         
+         % Handle object array input
+         if numel(obj) > 1
+            ts = cell(numel(obj),1);
+            for i = 1:numel(obj)
+               ts{i} = getTrigs(obj(i),updateTrialsProp);
+            end
+            return;
+         end
+         
+         if exist(obj.trial,'file')==0
+            successful_parse = obj.parseTrials;
+            if ~successful_parse
+               ts = [];
+               return;
+            end
+         end
+         
+         in = load(obj.trial,'data');
+         thresh = cfg.default('analog_thresh');
+         if sum(in.data > thresh) == 0
+            ts = [];
+            return;
+         end
+         
+         % Find onset of "HIGH" times
+         data = find(in.data > thresh);
+         
+         % Convert sample indices to times (SECONDS)
+         ts = data([true, diff(data) > 1]) ./ obj.fs;
+         
+         % Simplify parsing "incomplete" trials
+         if numel(ts) > 1
+            ts = ts(1:(end-1)); 
+         end
+         
+         if updateTrialsProp
+            obj.Trials = ts;
+         end
+         
+      end
+      
+      % Get "trigger" times (for old digIO setup)
+      function ts = getTrigs(obj)
+         %GETTRIGS Returns "trigger" times (from old `digIO` setup)
+         %
+         % ts = getTrigs(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  
+         % Output
+         %  ts  - Array of timestamps of "trig" LOW to HIGH times. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getTrigs(obj(i));
+            end
+            return;
+         end
+         
+         in = load(obj.trig,'data');
+         if sum(in.data) == 0
+            ts = [];
+            return;
+         end
+         
+         data = find(in.data > 0);
+         ts = data([true, diff(data) > 1]) ./ obj.fs;
+         obj.Triggers = ts;
+      end
+      
+      % Return array of solenoid extension onset times
+      function ts = getSolOnset(obj,db)
+         %GETSOLONSET Returns times when solenoid goes from LOW to HIGH
+         %
+         % ts = getSolOnset(obj);
+         % ts = getSolOnset(obj,db);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  db  - Debounce threshold (samples; default: 1 [no debounce])
+         %  
+         % Output
+         %  ts  - Array of timestamps of times when solenoid extends. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if nargin < 2
+            db = 1; % Default of no debounce
+         end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getSolOnset(obj(i),db);
+            end
+            return;
+         end
+         
+         in = load(obj.sol,'data');
+         if sum(in.data) == 0
+            ts = [];
+            return;
+         end
+         
+         data = find(in.data > 0);
+         ts = data([true, diff(data) > db]) ./ obj.fs;
+      end
+      
+      % Return array of solenoid retraction onset times
+      function ts = getSolOffset(obj,db)
+         %GETSOLOFFSET Returns times when solenoid goes from HIGH to LOW
+         %
+         % ts = getSolOffset(obj);
+         % ts = getSolOffset(obj,db);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  db  - Debounce threshold (samples; default: 1 [no debounce])
+         %  
+         % Output
+         %  ts  - Array of timestamps of times when solenoid retracts. If
+         %        `obj` is an array, then returns a cell array the same
+         %        size as `obj`, where each cell element contains an array
+         %        of such timestamps (seconds)
+         
+         if nargin < 2
+            db = 1; % Default of no debounce
+         end
+         
+         if ~isscalar(obj)
+            ts = cell(size(obj));
+            for i = 1:numel(obj)
+               ts{i} = getSolOffset(obj(i),db);
+            end
+            return;
+         end
+         
+         in = load(obj.sol,'data');
+         if sum(in.data) == 0
+            ts = [];
+            return;
+         end
+         
+         data = find(in.data > 0);
+         ts = data([diff(data) > db, true]) ./ obj.fs;
+      end
+      
+      % Return the spike bin (histogram) edge times
+      function edges = getSpikeBinEdges(obj)
+         %GETSPIKEBINEDGES Return spike bin (histogram) edge times
+         %
+         % edges = getSpikeBinEdges(obj);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solBlock` objects
+         %  
+         % Output
+         %  edges - Vector of bin edge times for the spike histogram, which
+         %          contains (# bins + 1) elements. If `obj` is an array,
+         %          then returns a cell array of such vectors.
+         
+         if ~isscalar(obj)
+            edges = cell(numel(obj),1);
+            for ii = 1:numel(obj)
+               edges{ii} = getSpikeBinEdges(obj(ii));
+            end
+            return;
+         end
+         
+         if isempty(obj.edges)
+            setSpikeBinEdges(obj);
+         end
+         edges = obj.edges;
+      end
+      
       % Returns **block** data table for convenient export of dataset
       function blockTable = makeTables(obj)
          %MAKETABLES Returns data table elements specific to `solBlock`
@@ -455,14 +612,17 @@ classdef solBlock < handle
          %                          hemisphere
          %        * `Area`       - Indicates if probe is in RFA/CFA/S1
          %        * `Impedance`  - Individual channel measured impedance
-         %        * `XLoc`       - X-coordinate (mm) relative to bregma
+         %        * `AP`         - X-coordinate (mm) relative to bregma
          %                          (anteroposterior distance)
-         %        * `YLoc`       - Y-coordinate (mm) relative to bregma
+         %        * `ML`         - Y-coordinate (mm) relative to bregma
          %                          (mediolateral distance)
          %        * `Depth`      - Depth of recording channel (depends on
          %                          channels, which are at different depths
          %                          on individual recording shanks, as well
          %                          as the overall insertion depth)
+         %        * `StimDistance` - Distance from ICMS site
+         %        * `Solenoid_Location` - Location of Solenoid strike on
+         %                                   peripheral cutaneous region
          %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
          %        * `Spikes` - Binned spike counts relative to alignment
          %                       for a single channel.
@@ -526,244 +686,35 @@ classdef solBlock < handle
          %        `blockTable`
 
          % At this point, `obj` must be scalar
-         BlockID = obj.Name;  
+         BlockID = string(obj.Name);  
 
          % number of rows = number of channels * number of trials
          nChannels = numel(obj.Children);
 
-         % Get struct array that contains metadata such as stimulus type and
-         % onset, as well as which channel was stimulate, for each trial. This
-         % array can then be replicated so that there is an equivalent array
-         % for each "child" table (channel table) that is passed back:
+         % Get struct array that contains metadata such as stimulus type 
+         % and onset, as well as which channel was stimulate, for each 
+         % trial. This array can then be replicated so that there is an 
+         % equivalent array for each "child" table (channel table) that is 
+         % passed back:
          trialData = getTrialData(obj);
          trialData = repmat(trialData,nChannels,1);
 
-         % Note that at this point, we *must* make sure that trialData matches
-         % up with the corresponding elements of `channelTable`; the pattern
-         % for trialData will be [a; b; c; ... a; b; c] whereas pattern for
-         % `channelTable` elements will be [1; 1; 1; ... nCh; nCh; nCh], 
-         %  where [a,b,c] are trials and [1,2,...nCh] are channel indices.
+         % Note that at this point, we *must* make sure that trialData 
+         % matches up with the corresponding elements of `channelTable`; 
+         % the pattern for trialData will be [a; b; c; ... a; b; c] whereas
+         % pattern for `channelTable` elements will be 
+         % [1; 1; 1; ... nCh; nCh; nCh], where [a,b,c] are trials and 
+         % [1,2,...nCh] are channel indices.
 
          % % Return the `channelTable` for all child 'Channel' objects % %
          channelTable = makeTables(obj.Children); 
-
+         BlockID = repelem(BlockID,size(channelTable,1),1);
+         
          % make the table 
          trialTable = struct2table(trialData);
-         blockTable = [trialTable,channelTable];
-
-         % % Commented part below has to change % %
-         %   (Won't work when there are multiple Blocks for each Rat ) %
-
-         % get the Histogram (spikes; PETH) and LFP data timeseries
-         binCell = {nRows,1};
-         %for loop over the whole table
-         for iRow = 1:height(blockTable)
-             %first need to get which channel that row is
-             iChan = table2array(blockTable(iRow,'Channel'));
-             %get the binned spikes for that channel, allTrials is 118x500 double
-             % Ex 118 --> Number of trials
-             % Ex 500 --> Number of time bins (-500 : 500 ms; 2-ms bins)
-             allTrials = obj.Children(iChan,1).getBinnedSpikes();
-             %get the specific trial in question using the trialNumber as index
-             %each cell in binCell should return a 1x500 double
-             binCell{iRow} = allTrials(table2array(blockTable(iRow,'trialNumber')),:);
-         end
-
-         %have to some reason transpose it to get it to be nx1
-         binCellt = binCell';
-
-         %add it to the table
-         blockTable.Spikes = binCellt;
-
-         % ChannelID and ProbeID
-         % this variable/section will need to be changed
-         % unsure how these filenames correspond with each of the channels from
-         % solRat object
-         % is P1 Ch 0 always == channel 1?
-         wav_sneo_folder = strcat(obj.Name,'_wav-sneo_CAR_Spikes'); 
-
-         probeList = {};
-         chList = [];
-
-         %gets all mat files only
-         matFiles = dir(fullfile(wav_sneo_folder,'*.mat')); 
-         for i = 1:length(matFiles)
-           fileName = matFiles(i).name;
-           fileSplit = split(fileName, '_');
-           probeList(i) = fileSplit(end-2);
-           %have to get rid of the .mat on this
-           chSplit = split(fileSplit(end), '.');
-           chList(i) = str2double(chSplit(end-1));
-         end
-
-         % check to see if any channels were removed
-         % if they werent, then assume:
-         % probe 1 ch0 -> channel 1
-         % probe 2 ch0 -> channel 33
-         probeTable = strings(nRows,1);
-         chTable = zeros(nRows,1);
-         % +1 is needed because chList values start at 0
-         if length(unique(chList))*length(unique(probeList)) == nChannels
-             for iRow = 1:height(blockTable)
-                 %get the channel of that row
-                 iChan = table2array(blockTable(iRow,'Channel'));
-                 % if its greater than the max + 1 then subract 1
-                 if iChan <= max(chList) + 1
-                     chTable(iRow) = iChan - 1; 
-                 % otherwise subract (max + 2), 2 is the offset
-                 else
-                     chTable(iRow) = iChan - max(chList) - 2;            
-                 end
-                 probeTable(iRow) = probeList{iChan};
-             end
-
-         else
-             warning(['SOLENOID:' mfilename ':DataFormat'],...
-                ['\n\t->\t<strong>[MAKETABLES]:</strong> ' ...
-                 'Channel might have been removed. The indexing for ' ...
-                 'ChannelID & ProbeID may be incorrect']);
-         end
-
-         %add it to the table
-         blockTable.ChannelID = chTable;
-         blockTable.ProbeID = probeTable;
-
-         % move the variable around so its next to the other channel stuff
-         blockTable = movevars(blockTable,'ProbeID','After','Channel');
-         blockTable = movevars(blockTable,'ChannelID','After','ProbeID');
-
-         % Load in the _DS mat files and parse them using timestamps
-
-         % Default PETH parameters
-         tpre = -0.250;
-         tpost = 0.750;
-         % fs is 1000 for the _DS data
-         %fsDS = 1000;
-         timeStamps = obj.Trials;
-
-         % using fs and the timeStamps create a nTrials x 2 array of 
-         % indices first value is the start of that 1s window (in samples),
-         % second is end these indices can then be used to index into mat 
-         % files and grab data
-         DS_folder = strcat(obj.Name,'_DS');
-
-         %gets all mat files only
-         matFiles = dir(fullfile(DS_folder,'*.mat')); 
-
-         %load the first mat file to get the fs
-         firstMat = matFiles(1).name; 
-         fsDS = getfield(load(firstMat,'fs'),'fs');
-
-         windowInd = zeros(nTrials, 2);
-         for i = 1:nTrials
-             % should I round up or down? 
-             % the boundary is never on a whole number index
-             % right now round down on the beginning, and round up on the end
-             % tpre is a negative number, so add it 
-             windowInd(i,1) = floor(timeStamps(i)*fsDS+(tpre*fsDS));
-             windowInd(i,2) = ceil(timeStamps(i)*fsDS+(tpost*fsDS));
-         end
-
-         %now use windowInd to access the mat files and parse the data
-         %using cells because some windows may be off by 1 due to rounding
-         lfp = cell(nRows,1);
-         % loop through the .mat files in _DS
-         % iterate through all the files
-         for i = 1:length(matFiles)
-           fileName = matFiles(i).name;
-           data = getfield(load(firstMat,'data'),'data');%get data from .mat
-           fileSplit = split(fileName, '_');
-           probe = fileSplit(end-2);
-           %have to get rid of the .mat on this
-           chSplit = split(fileSplit(end), '.');
-           ch = str2double(chSplit(end-1));
-
-           % find the rows where you have that channel and probe
-           % there might be a faster way to do this? not sure
-           % iterate through all rows
-           for iRow = 1:height(blockTable)
-               % if the channel is correct
-               chI = table2array(blockTable(iRow,'ChannelID'));
-               if chI == ch
-                   % if the probe is correct
-                   if strcmp(table2array(blockTable(iRow,'ProbeID')), cell2mat(probe))
-
-                       % grab the indicies we parsed earlier and get that data
-                       ind = table2array(blockTable(iRow,'trialNumber'));
-                       t = windowInd(ind,:);
-                       %data array is loaded above from filename
-                       lfp{iRow} = data(t(1):t(2));
-                   end
-               end
-           end
-
-         end
-
-         % add it to the table
-         blockTable.LFP = lfp;
-         
+         blockTable = [table(BlockID), trialTable,channelTable];
       
       end %%%% End of makeTables%%%%
-      
-      % Plot the peri-event time histogram for each channel, save the
-      % figure, and close the figure once it has been saved.
-      function batchPETH(obj,trialType,tPre,tPost,binWidth,subset)
-         if nargin < 5
-            binWidth = cfg.default('binwidth');
-         end
-         
-         if nargin < 4
-            tPost = cfg.default('tpost');
-         end
-         
-         if nargin < 3
-            tPre = cfg.default('tpre');
-         end
-         
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
-         
-         if numel(obj) > 1
-            for ii = 1:numel(obj)
-               if nargin < 6
-                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth);
-               else
-                  batchPETH(obj(ii),trialType,tPre,tPost,binWidth,subset);
-               end
-            end
-            return;
-         end
-         
-         if nargin < 6
-            subset = 1:numel(obj.Children);
-         end
-         
-         edgeVec = tPre:binWidth:tPost;
-
-         subf = cfg.default('subf');
-         id = cfg.default('id');
-         
-         outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.peth);
-         if exist(outpath,'dir')==0
-            mkdir(outpath);
-         end
-         
-%          obj.parseStimuliTimes
-         
-         for ii = subset
-
-            f = PETH(obj.Children(ii),edgeVec,trialType,ii);
-            
-            savefig(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
-               char(trialType) '_' id.peth '.fig']));
-            saveas(f,fullfile(outpath,[obj.Name '_' obj.Children(ii).Name ...
-               char(trialType) '_' id.peth '.png']));
-            
-            delete(f);
-            
-         end
-      end
       
       % Return data related to each trial
       function trialData = getTrialData(obj)
@@ -869,49 +820,6 @@ classdef solBlock < handle
          off(solTrials,:) = obj.Solenoid_Offset_Latency;
          off = mat2cell(off,ones(1,nTrial),nSolPulse);
          [trialData.Solenoid_Offset] = deal(off{:});
-      end
-      
-      % Parse electrode site information based on spreadsheet table
-      function parseSiteInfo(obj,fname)
-         %PARSESITEINFO Parses the site location for each probe
-         %
-         % parseSiteInfo(obj,fname);
-         %
-         % Inputs
-         %  obj   - Scalar or array of `solBlock` objects
-         %  fname - (Optional) filename of table spreadsheet 
-         %           -> If not given, uses value in `cfg.default`
-         %
-         % Output
-         %  -- none -- Updates the site location for electrodes associated
-         %  with each recording block passed via `obj`
-         
-         if nargin < 2
-            fname = cfg.default('site_location_table');
-         end
-         
-         if ~isscalar(obj)
-            for i = 1:numel(obj)
-               parseSiteInfo(obj(i),fname);
-            end
-            return;
-         end
-         
-         locTable = readtable(fname);
-         obj.Location_Table = locTable(strcmpi(locTable.BlockID,obj.Name),:);
-         obj.Location_Table.Properties.UserData = struct(...
-            'type','Location');
-         obj.Location_Table.Properties.Description = ...
-            'Insertion site coordinates for recording probes';
-         obj.Location_Table.Properties.VariableUnits = {...
-            'Experiment','mm','mm','microns','Port','degrees'};
-         obj.Location_Table.Properties.VariableDescriptions = {...
-            'Experiment recording block name',...
-            'Anteroposterior distance from bregma (mm)',...
-            'Mediolateral distance from bregma (mm)', ...
-            'Insertion depth of highest channel (microns)',...
-            'Intan probe port indicating separate arrays',...
-            'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
       end
       
       % Plot organized subplots for PETH of each channel
@@ -1434,348 +1342,74 @@ classdef solBlock < handle
       
    end
    
-   % "Get" methods
-   methods (Access = public)
-      % Returns the closest timestamp of a trial ONSET (seconds)
-      function t = getClosestTrialOnset(obj,tVec)
-         %GETCLOSESTTRIALONSET Returns the closest timestamp of trial start
+   % Hidden methods that are usually just called from constructor
+   methods (Hidden,Access = public)
+      % Parse electrode site information based on spreadsheet table
+      function parseSiteInfo(obj,fname)
+         %PARSESITEINFO Parses the site location for each probe
          %
-         % t = getClosestTrialOnset(obj,tVec);
-         %
-         % Inputs
-         %  obj  - SCALAR `solBlock` object
-         %  tVec - Vector of candidate times
-         %
-         % Output
-         %  t    - Actual time of closest trial onset
-         
-         if ~isscalar(obj)
-            error(['SOLENOID:' mfilename ':BadInputSize'],...
-               ['\n\t->\t<strong>[GETCLOSESTTRIALONSET]:</strong> ' ...
-                'This method only accepts a scalar `obj` input\n']);
-         end
-         ts = obj.getTrials;
-         [~,idx] = min(abs(ts - tVec(1)));
-         t = ts(idx);
-      end
-      
-      % Get the normalized position for current figure placement 
-      function pos = getFigPos(obj,ii,varargin)
-         %GETFIGPOS Return normalized position of current figure
-         %
-         % pos = getFigPos(obj);
-         % pos = getFigPos(obj,ii);
-         % pos = getFigPos(obj,ii,'Position',pos,'Scale',scl);
-         %
-         % Inputs
-         %  obj - Scalar `solBlock` object
-         %        -> If given as an array, throws warning and only uses
-         %           first element to return `pos`
-         %  ii  - Index (scalar integer) corresponding to this figure
-         %        -> Default: random integer based on number of
-         %                    `obj.Children`
-         %  varargin - Optional <'Name',value> pairs
-         %        + 'Position': the original position, to be scaled based
-         %                       on indexing relative to number of child
-         %                       objects
-         %        + 'Scale'   : the maximum (normalized) factor to add to
-         %                       both pos(1) and pos(2)
-         %
-         % Output
-         %  pos   - Updated figure `Position` (normalized coordinates)
-         %     --> Use this to make a cascaded tile of figures across the 
-         %         screen when multiple figures will be generated by a 
-         %         method, so that they don't just all stack one on top of
-         %         the other.
-         
-         if ~isscalar(obj)
-            warning(['SOLENOID:' mfilename ':BadInputSize'],...
-               ['\n\t->\t<strong>[GETFIGPOS]:</strong> ' ...
-                'This method should only accept scalar inputs.\n' ...
-                '\t\t\t\t(Using first element only)\n']);
-             obj = obj(1);
-         end
-         
-         N = numel(obj.Children);
-         if nargin < 2
-            ii = randi(N,1,1);
-         end
-         
-         p = struct;
-         [p.Position,p.Scale] = solBlock.getDefault('figpos','figscl');
-         
-         fn = fieldnames(p);
-         for iV = 1:2:numel(varargin)
-            idx = strcmpi(fn,varargin{iV});
-            if sum(idx)==1
-               p.(fn{idx}) = varargin{iV+1};
-            end
-         end
-         
-         k = ii / N; % Scale factor
-         pos(1) = p.Position(1) + p.Scale * k;
-         pos(2) = p.Position(2) + p.Scale * k;
-      end
-      
-      % Get ICMS times (for new CYCLE setup)
-      function ts = getICMS(obj)
-         %GETICMS Return array of ICMS pulse onset times
-         %
-         % ts = getICMS(obj);
-         %
-         % Inputs
-         %  obj              - Scalar or array of `solBlock` objects
-         %
-         % Output
-         %  ts               - Vector of timestamps (seconds) of ICMS pulse
-         %                       onsets. If `obj` is an array, then this is
-         %                       a cell array, where each element contains
-         %                       such a vector that matches the
-         %                       corresponding element of `obj`
-         
-         % Handle object array input
-         if numel(obj) > 1
-            ts = cell(numel(obj),1);
-            for i = 1:numel(obj)
-               ts{i} = getICMS(obj(i));
-            end
-            return;
-         end
-         
-         if exist(obj.icms,'file')==0
-            fprintf(1,'No file: %s\n',obj.icms);
-            ts = [];
-            return;
-         end
-         
-         in = load(obj.icms,'data');
-         if sum(in.data > 0) == 0
-            ts = [];
-            return;
-         end
-         
-         % Find onset of "HIGH" times
-         data = find(in.data > 0);
-         
-         % Convert sample indices to times (SECONDS)
-         ts = data([true, diff(data) > 1]) ./ obj.fs;
-         
-         % Simplify parsing "incomplete" trials
-         if numel(ts) > 1
-            ts = ts(1:(end-1)); 
-         end
-         
-      end
-      
-      % Get TRIAL times (for new CYCLE setup)
-      function ts = getTrials(obj,updateTrialsProp)
-         %GETTRIALS Return array of trial onset times
-         %
-         % ts = getTrials(obj);
-         % ts = getTrials(obj,updateTrialsProp);
-         %
-         % Inputs
-         %  obj              - Scalar or array of `solBlock` objects
-         %  updateTrialsProp - Default is false; set true to force the
-         %                     `Trials` property to be updated with values
-         %                     returned in `ts`
-         %
-         % Output
-         %  ts               - Vector of timestamps (seconds) of trial
-         %                       onsets. If `obj` is an array, then this is
-         %                       a cell array, where each element contains
-         %                       such a vector that matches the
-         %                       corresponding element of `obj`
-         
-         if nargin < 2
-            updateTrialsProp = false;
-         end
-         
-         % Handle object array input
-         if numel(obj) > 1
-            ts = cell(numel(obj),1);
-            for i = 1:numel(obj)
-               ts{i} = getTrigs(obj(i),updateTrialsProp);
-            end
-            return;
-         end
-         
-         if exist(obj.trial,'file')==0
-            successful_parse = obj.parseTrials;
-            if ~successful_parse
-               ts = [];
-               return;
-            end
-         end
-         
-         in = load(obj.trial,'data');
-         thresh = cfg.default('analog_thresh');
-         if sum(in.data > thresh) == 0
-            ts = [];
-            return;
-         end
-         
-         % Find onset of "HIGH" times
-         data = find(in.data > thresh);
-         
-         % Convert sample indices to times (SECONDS)
-         ts = data([true, diff(data) > 1]) ./ obj.fs;
-         
-         % Simplify parsing "incomplete" trials
-         if numel(ts) > 1
-            ts = ts(1:(end-1)); 
-         end
-         
-         if updateTrialsProp
-            obj.Trials = ts;
-         end
-         
-      end
-      
-      % Get "trigger" times (for old digIO setup)
-      function ts = getTrigs(obj)
-         %GETTRIGS Returns "trigger" times (from old `digIO` setup)
-         %
-         % ts = getTrigs(obj);
-         %
-         % Inputs
-         %  obj - Scalar or array of `solBlock` objects
-         %  
-         % Output
-         %  ts  - Array of timestamps of "trig" LOW to HIGH times. If
-         %        `obj` is an array, then returns a cell array the same
-         %        size as `obj`, where each cell element contains an array
-         %        of such timestamps (seconds)
-         
-         if ~isscalar(obj)
-            ts = cell(size(obj));
-            for i = 1:numel(obj)
-               ts{i} = getTrigs(obj(i));
-            end
-            return;
-         end
-         
-         in = load(obj.trig,'data');
-         if sum(in.data) == 0
-            ts = [];
-            return;
-         end
-         
-         data = find(in.data > 0);
-         ts = data([true, diff(data) > 1]) ./ obj.fs;
-         obj.Triggers = ts;
-      end
-      
-      % Return array of solenoid extension onset times
-      function ts = getSolOnset(obj,db)
-         %GETSOLONSET Returns times when solenoid goes from LOW to HIGH
-         %
-         % ts = getSolOnset(obj);
-         % ts = getSolOnset(obj,db);
-         %
-         % Inputs
-         %  obj - Scalar or array of `solBlock` objects
-         %  db  - Debounce threshold (samples; default: 1 [no debounce])
-         %  
-         % Output
-         %  ts  - Array of timestamps of times when solenoid extends. If
-         %        `obj` is an array, then returns a cell array the same
-         %        size as `obj`, where each cell element contains an array
-         %        of such timestamps (seconds)
-         
-         if nargin < 2
-            db = 1; % Default of no debounce
-         end
-         
-         if ~isscalar(obj)
-            ts = cell(size(obj));
-            for i = 1:numel(obj)
-               ts{i} = getSolOnset(obj(i),db);
-            end
-            return;
-         end
-         
-         in = load(obj.sol,'data');
-         if sum(in.data) == 0
-            ts = [];
-            return;
-         end
-         
-         data = find(in.data > 0);
-         ts = data([true, diff(data) > db]) ./ obj.fs;
-      end
-      
-      % Return array of solenoid retraction onset times
-      function ts = getSolOffset(obj,db)
-         %GETSOLOFFSET Returns times when solenoid goes from HIGH to LOW
-         %
-         % ts = getSolOffset(obj);
-         % ts = getSolOffset(obj,db);
-         %
-         % Inputs
-         %  obj - Scalar or array of `solBlock` objects
-         %  db  - Debounce threshold (samples; default: 1 [no debounce])
-         %  
-         % Output
-         %  ts  - Array of timestamps of times when solenoid retracts. If
-         %        `obj` is an array, then returns a cell array the same
-         %        size as `obj`, where each cell element contains an array
-         %        of such timestamps (seconds)
-         
-         if nargin < 2
-            db = 1; % Default of no debounce
-         end
-         
-         if ~isscalar(obj)
-            ts = cell(size(obj));
-            for i = 1:numel(obj)
-               ts{i} = getSolOffset(obj(i),db);
-            end
-            return;
-         end
-         
-         in = load(obj.sol,'data');
-         if sum(in.data) == 0
-            ts = [];
-            return;
-         end
-         
-         data = find(in.data > 0);
-         ts = data([diff(data) > db, true]) ./ obj.fs;
-      end
-      
-      % Return the spike bin (histogram) edge times
-      function edges = getSpikeBinEdges(obj)
-         %GETSPIKEBINEDGES Return spike bin (histogram) edge times
-         %
-         % edges = getSpikeBinEdges(obj);
+         % parseSiteInfo(obj,fname);
          %
          % Inputs
          %  obj   - Scalar or array of `solBlock` objects
-         %  
+         %  fname - (Optional) filename of table spreadsheet 
+         %           -> If not given, uses value in `cfg.default`
+         %
          % Output
-         %  edges - Vector of bin edge times for the spike histogram, which
-         %          contains (# bins + 1) elements. If `obj` is an array,
-         %          then returns a cell array of such vectors.
+         %  -- none -- Updates the site location for electrodes associated
+         %  with each recording block passed via `obj`
+         
+         if nargin < 2
+            fname = solBlock.getDefault('site_location_table');
+         end
          
          if ~isscalar(obj)
-            edges = cell(numel(obj),1);
-            for ii = 1:numel(obj)
-               edges{ii} = getSpikeBinEdges(obj(ii));
+            for i = 1:numel(obj)
+               parseSiteInfo(obj(i),fname);
             end
             return;
          end
          
-         if isempty(obj.edges)
-            setSpikeBinEdges(obj);
-         end
-         edges = obj.edges;
+         locTable = readtable(fname);
+         obj.Location_Table = locTable(strcmpi(locTable.BlockID,obj.Name),:);
+         obj.Location_Table.Properties.UserData = struct(...
+            'type','Location');
+         obj.Location_Table.Properties.Description = ...
+            'Insertion site coordinates for recording probes';
+         obj.Location_Table.Properties.VariableUnits = {...
+            'Experiment','Port','Cortical Area','mm','mm','microns','degrees'};
+         obj.Location_Table.Properties.VariableDescriptions = {...
+            'Experiment recording block name',...
+            'Intan probe port indicating separate arrays',...
+            'Area targeted by each probe (Rostral Forelimb Area; RFA; premotor) or Forelimb Sensory Cortex (S1)',...
+            'Anteroposterior distance from bregma (mm)',...
+            'Mediolateral distance from bregma (mm)', ...
+            'Insertion depth of highest channel (microns)',...
+            'Angle of probe (degrees) with respect to horizontal from bregma, positive is clockwise direction'};
       end
       
-   end
-   
-   % "Set" methods
-   methods (Access = public)
+      % Parse distance to stimulation electrode
+      function parseStimDistance(obj)
+         %PARSESTIMDISTANCE Parse distance to stimulation electrode
+         %
+         % parseStimDistance(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array `solBlock` object
+         %
+         % Output
+         %  -- none -- Updates `solChannel.Stim_Distance_Table` property of
+         %              each element of `obj.Children`
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseStimDistance(obj(i));
+            end
+            return;
+         end
+         
+      end
+      
       % Set (construct) the child CHANNEL objects
       function Children = setChannels(obj,subf,id)
          %SETCHANNELS Creates child `solChannel` objects
@@ -1798,10 +1432,10 @@ classdef solBlock < handle
          
          % Parse input arguments
          if nargin < 3
-            id = cfg.defaults('id');
+            id = solBlock.getDefault('id');
          end
          if nargin < 2
-            subf = cfg.defaults('subf');
+            subf = solBlock.getDefault('subf');
          end
          % Handle object array input
          if numel(obj) > 1
@@ -1818,7 +1452,9 @@ classdef solBlock < handle
             [obj.Name subf.raw],...
             [obj.Name id.info]));
          % Construct child CHANNEL array
-         fprintf(1,'Adding CHANNEL child objects to %s...000%%\n',obj.Name);
+         fprintf(1,...
+            'Adding CHANNEL child objects to %s...000%%\n',...
+            obj.Name);
          nCh = numel(in.RW_info);
          Children = solChannel(nCh);
          for iCh = 1:nCh
@@ -1827,56 +1463,45 @@ classdef solBlock < handle
          end
       end
       
-      % Set the depth manually (after object creation)
-      function setDepth(obj,newDepth)
-         %SETDEPTH Update depth (manually); done after object creation
-         %
-         % setDepth(obj,newDepth);
-         %
-         % Inputs
-         %  obj      - scalar or array of `solBlock` objects
-         %  newDepth - scalar or array of depths (microns) to update.
-         %                 Should have one element for each element of
-         %                 `obj`
-         
-         if isscalar(newDepth) && ~isscalar(obj)
-            newDepth = repelem(newDepth,size(obj));
-         end
-         
-         for i = 1:numel(obj)
-            obj(i).Depth = newDepth(i);
-         end
-      end
-      
       % Set the site layout pattern and site depth
-      function setLayout(obj,L,depth)
+      function setLayout(obj,L,fname)
          %SETLAYOUT Set the site layout pattern and site depth
          %
-         % setLayout(obj,L,depth);
+         % setLayout(obj);
+         % setLayout(obj,L);
+         % setLayout(obj,L,fname);
          %
          % Inputs
          %  obj   - `solBlock` or array of `solBlock` objects
-         %  L     - Layout of channels (names)
-         %  depth - Depth of *highest* (dorsal-most) channel (microns)
+         %  L     - (Optional) Layout of channels (names)
+         %              -> Matrix is cell array of char vectors arranged as
+         %                 m x k, where m is # channels per shank and k is
+         %                 # shanks, and element (m,k) is the m-th deepest
+         %                 (e.g. 1,k is the most-dorsal on shank k) channel
+         %                 on shank k.
+         %  fname - (Optional) Excel spreadsheet filename with locations of
+         %                       probes for this experiment. If not
+         %                       provided, uses value in 
+         %                       `cfg.default('site_location_table');`
          %
          % Output
          %  -- none -- (Sets `Layout` and `Depth` properties of solBlock)
          
-         if nargin < 2
-            L = cfg.default('L');
-         end
          if nargin < 3
-            depth = cfg.default('depth');
+            fname = solBlock.getDefault('site_location_table');
+         end
+         if nargin < 2
+            L = solBlock.getDefault('L');
          end
          if numel(obj) > 1
             for ii = 1:numel(obj)
-               setLayout(obj(ii),L,depth);
+               setLayout(obj(ii),L,fname);
             end
             return;
          end
          
-         obj.Depth = depth; % depth in microns of highest channel
-         obj.Layout = L;    % relative offset of each channel (microns)     
+         obj.Layout = L;    % relative offset of each channel (microns) 
+         parseSiteInfo(obj,fname);
       end
       
       % Set Metadata file names
@@ -1923,13 +1548,29 @@ classdef solBlock < handle
          obj.stim = fullfile(sync_path,[obj.Name id.stim_info]);
       end
       
-      % Set sample rate (fs) for this object, or if not specified as an
-      % input argument, parse the sample rate using default parameters. 
-      % 'fs' input can also be 'id' struct from cfg.default.
+      % Set sample rate (fs) for this object
       function setSampleRate(obj,fs)
+         %SETSAMPLERATE Set sample rate (fs) for this object
+         %
+         % setSampleRate(obj);     -> Parses from files
+         % setSampleRate(obj,fs);  -> Specify sample rate explicitly
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %  fs  - (Optional) Can either be:
+         %           * Scalar numeric - sample rate of recording amps
+         %           * Struct - struct with field `gen` from
+         %                       cfg.default('id') struct, which is then
+         %                       used to load the file that contains the
+         %                       `fs` data for amplifier that was extracted
+         %                       from recording binaries.
+         %
+         % Output
+         %  -- none -- Sets the `solBlock.fs` property
+         
          % Parse input arguments
          if nargin < 2
-            fs = cfg.default('id');
+            fs = solBlock.getDefault('id');
          end
          
          % Handle object input array
@@ -2072,7 +1713,16 @@ classdef solBlock < handle
          % setStims(obj,tStim,icms_channel_index);
          %
          % Inputs
-         %  obj 
+         %  obj                  - SCALAR `solBlock` array
+         %  tStim                - Stim times array
+         %  icms_channel_index   - Index of channel used to deliver ICMS
+         %
+         % Output
+         %  -- none -- Sets the `solBlock.ICMS_Channel_Index`,
+         %             `solBlock.ICMS_Onset_Latency`, and
+         %             `solBlock.ICMS_Channel_Name` properties.
+         %  
+         % See also: solBlock.parseStimDistance
          
          if ~isscalar(obj)
             error(['SOLENOID:' mfilename ':BadInputSize'],...
@@ -2113,14 +1763,39 @@ classdef solBlock < handle
       
       % Set Trial times
       function setTrials(obj,tTrials)
+         %SETTRIALS Set trial times for scalar or array of objects
+         %
+         % setTrials(obj); -> Parse times using `t = getTrials(obj,true);`
+         % setTrials(obj,tTrials); -> Specify times manually
+         %
+         % Inputs
+         %  obj     - Scalar or array of `solBlock` objects
+         %  tTrials - (Optional): vector of trial times (sec) for `obj`; if
+         %                        `obj` is array, should be given as cell
+         %                        array of trial times for each element of
+         %                        `obj`
+         %
+         % Output
+         %  -- none -- Sets the `solBlock.Trials` property and invokes the
+         %              `parseTrialType` method on each element of `obj`
+         %
+         % See Also: solBlock.parseTrialType
+         
          if nargin < 2
             tTrials = [];
          end
          
          % Parse array input
          if numel(obj) > 1
+            if ~iscell(tTrials)
+               error(['SOLENOID:' mfilename ':BadSyntax'],...
+                  ['\n\t->\t<strong>[SETTRIALS]:</strong> ' ...
+                   'If `obj` is passed as array to `setTrials`, then ' ...
+                   'if `tTrials` is specified, must be as a cell array ' ...
+                   'with each cell corresponding to element of `obj`\n']);
+            end
             for ii = 1:numel(obj)
-               obj(ii).setTrials(tTrials);
+               obj(ii).setTrials(tTrials{ii});
             end
             return;
          end
@@ -2137,9 +1812,241 @@ classdef solBlock < handle
          end
          
          % Parse the type for each trial
-         obj.parseTrialType;
+         parseTrialType(obj);
          
       end
       
+   end
+   
+   % Helper methods that are called from other functions
+   methods (Access = private)
+      % Parse BLOCK name using recording folder path
+      function [Name,Index] = parseName(obj)
+         %PARSENAME Parse BLOCK name using recording folder path
+         %
+         % [Name,Index] = obj.parseName();
+         %
+         % Inputs
+         %  obj   - `solBlock` object or array of such objects
+         %
+         % Output
+         %  Name  - Name of recording block (char array). If `obj` is
+         %           nonscalar, then this is returned as cell array of same
+         %           dimension as `obj`
+         %  Index - Same as Name regarding size, except this is a numeric
+         %           array representing the block index corresponding to
+         %           each Block.
+         
+         if numel(obj) > 1
+            Name = cell(size(obj));
+            Index = nan(size(obj));
+            for ii = 1:numel(obj)
+               [Name{ii},Index(ii)] = obj(ii).parseName;
+            end
+            return;
+         end
+         name = strsplit(obj.folder,filesep);
+         Name = name{end};
+         tag = strsplit(Name,'_');
+         Index = str2double(tag{end});
+      end
+      
+      % Parse trile FILE
+      function successful_parse_flag = parseTrials(obj)
+         %PARSETRIALS Parse trial file
+         %
+         % Parse trial FILE (if not present, because Max is dumb and forgot
+         % to enable the analog inputs on a couple of recording blocks); it
+         % can be reconstructed from the combination of ICMS and SOLENOID 
+         % digital streams, so this is just there to "fix" a few "bad"
+         % recordings.
+         %
+         % successful_parse_flag = parseTrials(obj);
+         
+         if numel(obj) > 1
+            successful_parse_flag = false(numel(obj),1);
+            for i = 1:numel(obj)
+               successful_parse_flag(i) = parseTrials(obj(i));
+            end
+            return;
+         end
+         successful_parse_flag = false;
+         fprintf(1,'Parsing TRIAL stream for %s...',obj.Name);
+         
+         % Get a vector of HIGH indices, which will be used relative to
+         % each computed TRIAL index to set the stream HIGH.
+         trial_high_duration = cfg.default('trial_high_duration');
+         i_trial_vec = 0:round(trial_high_duration*1e-3 * obj.fs);
+         
+         % Parse solenoid and ICMS onset indices
+         iSol = round(obj.getSolOnset * obj.fs);
+         iICMS = round(obj.getICMS * obj.fs);
+         
+         if isempty(iICMS)
+            fprintf(1,'\n-->Could not parse trials for %s\n',obj.Name);
+            return;
+         end
+                 
+         % Initialize data struct (to save)
+         in = load(obj.icms);
+         out = struct;
+         out.data = zeros(size(in.data));
+         out.fs = in.fs;
+         
+         % Get the solenoid lag (should always be after ICMS)
+         solLag = min(min(abs(iICMS - iSol(1))),min(abs(iICMS - iSol(2))));  
+         
+         % Cycle through all ICMS, setting vector to HIGH
+         for k = 1:numel(iICMS)
+            vec = i_trial_vec + iICMS(k);
+            vec = vec((vec >= 1) & (vec <= numel(out.data)));
+            out.data(vec) = 1;
+         end
+         
+         % Cycle through all solenoid, setting vector to HIGH
+         for k = 1:numel(iSol)
+            vec = i_trial_vec + iSol(k) - solLag;
+            vec = vec((vec >= 1) & (vec <= numel(out.data)));
+            out.data(vec) = 1;
+         end
+         
+         % Save data struct using TRIAL file name
+         save(obj.trial,'-struct','out');
+         fprintf(1,'successful\n');
+         successful_parse_flag = true;
+      end
+      
+      % Parse the trial TYPE (for new CYCLE setup)
+      function parseTrialType(obj,tTrials,thresh)
+         %PARSETRIALTYPE Parses the enumerated TYPE for each trial
+         %
+         % parseTrialType(obj,tTrials,thresh);
+         %
+         % Inputs
+         %  obj     - Scalar or array of `solBlock` objects
+         %  tTrials - Time of each trial (seconds)
+         %  thresh  - Threshold (seconds) for distinguishing between trials
+         %
+         % Output
+         %  Associates the TYPE with each trial in `obj.TrialType` property
+         
+         if ~isscalar(obj)
+            error(['SOLENOID:' mfilename ':BadInputSize'],...
+               ['\n\t->\t<strong>[PARSETRIALTYPE]:</strong> ' ...
+                '`parseTrialType` is a method for SCALAR ' ...
+                '`solBlock` objects only']);
+         end
+         if nargin < 3
+            thresh = cfg.default('trial_duration');
+         end
+         
+         if nargin < 2
+            tTrials = obj.getTrials;
+         end
+         
+         tStim = getICMS(obj);
+         tSol = getSolOnset(obj);
+         
+         obj.TrialType = nan(numel(tTrials),1);
+         for ii = 1:numel(tTrials)
+            dStim = min(abs(tStim - tTrials(ii)));
+            dSol = min(abs(tSol - tTrials(ii)));
+            
+            if (dStim < thresh) && (dSol < thresh)
+               obj.TrialType(ii) = cfg.TrialType('SolICMS');
+            elseif dStim < thresh
+               obj.TrialType(ii) = cfg.TrialType('ICMS');
+            elseif dSol < thresh
+               obj.TrialType(ii) = cfg.TrialType('Solenoid');
+            else
+               obj.TrialType(ii) = cfg.TrialType('Catch');
+            end
+         end
+      end
+   end
+   
+   % Static methods of SOLBLOCK class 
+   methods (Static = true)
+      % Return empty `solBlock` object
+      function obj = empty()
+         %EMPTY  Return empty `solBlock` object
+         %
+         % obj = solBlock.empty();
+         %
+         % Use this to initialize an empty array of `solBlock` for
+         % concatenation, for example.
+         
+         obj = solBlock(0);
+      end
+      
+      % Return indexing array with correct dimensions
+      function Y = pruneTruncatedSegments(X)
+      %PRUNETRUNCATEDSEGMENTS Return indexing array with correct dimensions
+      %
+      % Returns indexing matrix Y from binary vector X, where X switches
+      % from LOW to HIGH to indicate a contiguous segment related to some
+      % event of interest. Because if a recording is stopped early these
+      % segments can be truncated prematurely, this function checks to
+      % ensure there are the same number of HIGH samples in each detected
+      % "segment" and then returns the corresponding sample indices in the
+      % data matrix Y, where each row corresponds to a segment and each
+      % column is the sample index of a consecutive sample of interest.
+      %
+      %  Y = solBlock.pruneTruncatedSegments(X);
+      %
+      %  Inputs
+      %   X - Thresholding matrix indicating that a stimulus was present
+      %
+      %  Output
+      %   Y - Indexing matrix corresponding to rising/falling edges of X
+      
+         data = find(X > cfg.default('analog_thresh'));
+         iStart = data([true, diff(data) > 1]);
+         iDiff = iStart(2)-iStart(1);
+         iStart = iStart([true, diff(iStart) == iDiff]);
+         
+         Y = nan(numel(iStart),iDiff);
+         for i = 1:numel(iStart)
+            Y(i,:) = iStart(i):(iStart(i)+iDiff-1);
+         end
+         
+      end
+      
+      % Wrapper function to get variable number of default fields 
+      function varargout = getDefault(varargin)
+         %GETDEFAULT Return defaults parameters for `solBlock`
+         %
+         %  varargout = solBlock.getDefault(varargin);
+         %  e.g.
+         %     param = solBlock.getDefault('paramName');
+         %     [p1,...,pk] = solBlock.getDefault('p1Name',...,'pkName');
+         %
+         %  Inputs
+         %     varargin - Any of the parameter fields in the struct 
+         %                delineated in `cfg.default`
+         %
+         %  Wrapper function to get variable number of default fields
+         %
+         %  See Also: cfg.default
+         
+         % Parse input
+         if (nargin > nargout) && (nargout > 0)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More inputs specified than requested outputs']);
+         elseif (nargin < nargout)
+            error(['SOLENOID:' mfilename ':TooManyInputs'],...
+               ['\n\t->\t[GETDEFAULT]: ' ...
+                'More outputs requested than inputs specified']);
+         end
+         
+         % Collect fields into output cell array
+         if nargout > 0
+            varargout = cell(1,nargout);
+            [varargout{:}] = cfg.default(varargin{:});
+         else
+            cfg.default(varargin{:});
+         end
+      end
    end
 end

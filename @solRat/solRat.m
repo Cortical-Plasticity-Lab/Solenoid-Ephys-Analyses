@@ -419,16 +419,22 @@ classdef solRat < handle
       function [deficitTable,behaviorTable] = parseDeficitSeverity(obj)
          %PARSEDEFICITSEVERITY Return some indicator of deficit (behavior)
          %
-         % deficitSeverity = parseDeficitSeverity(obj);
+         % [deficitTable,behaviorTable] = parseDeficitSeverity(obj);
          %
          % Inputs
          %  obj - Scalar or array `solRat` object
          %
          % Output
-         %  deficitSeverity - Quantitative indicator of behavioral deficit
-         %     * TBD (see: Reach-Scoring.xlsx for data source)
-         %      returns a row per each animal, containing percent sucess
-         %      over each of the days, pre and post
+         %  deficitTable  - Table with 1 row per element of `obj`,
+         %                  containing information related to the strength
+         %                  of the behavioral deficit.
+         %
+         %  behaviorTable - Table with 1 row per reach day, with
+         %                    information about each day's reach
+         %                    performance for a given element of `obj`
+         %                    -> If `obj` is array, then all such tables
+         %                       corresponding to elements of `obj` are
+         %                       concatenated together.
          
          if ~isscalar(obj)
             deficitTable = table.empty;
@@ -441,37 +447,12 @@ classdef solRat < handle
             return;
          end
          
-         [SurgID,AnimalID] = solRat.getDefault('namingValue','namingKey');
+         [SurgID,AnimalID,transform] = solRat.getDefault(...
+            'namingValue','namingKey','transform');
          keyTable = table(SurgID,AnimalID);
          keyTable = keyTable(strcmpi(keyTable.SurgID,obj.Name),:);
-         %          %solRat.getDefault()
-         %          nameDict = containers.Map(...
-         %             solRat.getDefault('namingValue'), ... % Names
-         %             solRat.getDefault('namingKey'));      % Keys
          %load excel file
          excelTable = readtable(solRat.getDefault('excel'));
-         % Parse experimenter-specific key (MM-[alphabet]#),
-         %  using "unified" lab surgical number (RYY-###)
-         %          ratID = obj.Name;
-         %          ratName = nameDict(ratID);
-         %
-         %          ratDay = [];
-         %          ratSuccess = [];
-         %
-         %          for iRow = 1:height(excelTable)
-         %
-         %              iName = table2array(excelTable(iRow,'Rat'));
-         %              if cell2mat(iName) == ratName
-         %                  ratDay = [ratDay; table2array(excelTable(iRow,'Day'))]; %#ok<AGROW>
-         %                  ratSuccess = [ratSuccess; table2array(excelTable(iRow,'Percent_Success'))]; %#ok<AGROW>
-         %              end
-         %
-         %          end
-         %          ratProgress = [ratDay, ratSuccess];
-         %          ratProgress = sortrows(ratProgress);
-         %          deficitSeverity = table(convertCharsToStrings(ratID),{ratProgress});
-         %          deficitSeverity.Properties.VariableNames = {'RatID' 'Success Progress'};
-         
          % With tables, easiest to use `innerjoin` and `outerjoin` (and
          % faster usually)
          behaviorTable = outerjoin(keyTable,excelTable,...
@@ -500,11 +481,15 @@ classdef solRat < handle
          iBaseline  = behaviorTable.Day <= 0;
          iMeasure   = ~iBaseline;
          deficitTable.Pre_Success_Rate = mean(behaviorTable.Percent_Success(iBaseline));
-         pct = behaviorTable.Percent_Success(iMeasure);
+         pct = transform(behaviorTable.Percent_Success(iMeasure));
          day = behaviorTable.Day(iMeasure);
-         pre = repelem(deficitTable.Pre_Success_Rate,numel(day),1);
+         pre = transform(repelem(deficitTable.Pre_Success_Rate,numel(day),1));
          tbl = table(pct,day,pre);
-         modelspec = 'pct ~ day + (1|pre)';
+         % `'pct ~ day + (day|pre)'` : Linear mixed-effect model
+         %                             specification. This means that we
+         %                             are looking to predict
+         %                             percent-success
+         modelspec = 'pct ~ day + (day|pre)';
          lme = fitlme(tbl,modelspec);
          
          % Parse relevant parameters from the model

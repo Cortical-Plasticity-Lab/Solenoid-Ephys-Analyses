@@ -16,6 +16,14 @@ classdef solChannel < handle
       Hemisphere     % Left or Right hemisphere
       Depth          % relative electrode site depth (microns)
       Impedance      % electrode impedance (kOhms)
+      Stim_Distance_table % Table with distances from stim channel
+                          % -> If multiple stimulation sites, then there is
+                          %    a new row for each channel. Variables are:
+                          %      * Stim_Channel
+                          %      * AP (anteroposterior offset)
+                          %      * ML (mediolateral offset)
+                          %      * DV (dorsoventral offset)
+                          %      * Distance (Euclidean distance)
    end
    
    % Hidden properties that can be accessed outside of the class
@@ -68,7 +76,9 @@ classdef solChannel < handle
                obj = repmat(obj,block,1); % Initialize empty array
                return;
             else
-               error('Check ''block'' input argument (current class: %s)',...
+               error(['SOLENOID:' mfilename ':BadInput'],...
+                  ['\n\t->\t<strong>[SOLCHANNEL]:</strong> ' ...
+                   'Check ''block'' input argument (current class: %s)'],...
                   class(block));
             end
          end
@@ -86,14 +96,14 @@ classdef solChannel < handle
          obj.fs = block.fs;
          
          % Parse channel's INDEX and LOCATION (Depth, Hemisphere)
-         obj.parseChannelIndex;
-         obj.parseChannelLocation;
+         parseChannelIndex(obj);
+         parseChannelLocation(obj);
          
          % Get configured defaults
          [subf,id] = solChannel.getDefault('subf','id');
          
          % Set file associations
-         obj.setFileAssociations(subf,id);
+         setFileAssociations(obj,subf,id);
          
       end
       
@@ -153,7 +163,7 @@ classdef solChannel < handle
       end
       
       % Returns **channel** data table for convenient export of dataset
-      function channelTable = makeTables(obj,probeDepth)
+      function channelTable = makeTables(obj,probeDepth,tPre,tPost)
          %MAKETABLES Returns data table elements specific to `solChannel`
          %
          %  channelTable = makeTables(obj,trialData);
@@ -171,15 +181,15 @@ classdef solChannel < handle
          %                          hemisphere
          %        * `Area`       - Indicates if probe is in RFA/CFA/S1
          %        * `Impedance`  - Individual channel measured impedance
-         %        * `XLoc`       - X-coordinate (mm) relative to bregma
+         %        * `AP`         - X-coordinate (mm) relative to bregma
          %                          (anteroposterior distance)
-         %        * `YLoc`       - Y-coordinate (mm) relative to bregma
+         %        * `ML`         - Y-coordinate (mm) relative to bregma
          %                          (mediolateral distance)
          %        * `Depth`      - Depth of recording channel (depends on
          %                          channels, which are at different depths
          %                          on individual recording shanks, as well
          %                          as the overall insertion depth)
-         %        * `TrialType`- {'Solenoid','ICMS', or 'Solenoid+ICMS'}
+         %        * `StimDistance` - Distance from ICMS site
          %        * `Spikes` - Binned spike counts relative to alignment 
          %                       for a single channel.
          %        * `LFP`    - LFP time-series relative to alignment for a
@@ -188,6 +198,14 @@ classdef solChannel < handle
          %                    notes or maybe a notes struct? Basically
          %                    something that lets you manually add "tags" 
          %                    to the data rows.
+         
+         if nargin < 3
+            tPre = solChannel.getDefault('tpre');
+         end
+         
+         if nargin < 4
+            tPost = solChannel.getDefault('tpost');
+         end
          
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
@@ -204,29 +222,167 @@ classdef solChannel < handle
          
          % SolChannel stuff
          
-         ChannelID = obj.Name;
+         ChannelID = string(obj.Name);
+         pInfo = strsplit(ChannelID,'-');
+         Probe     = pInfo(1);
+         Channel   = str2double(pInfo(2)) + 1; % Account for zero-index
+         Hemisphere = obj.Hemisphere;
+         Depth = obj.Depth;
+         Impedance = obj.Impedance;
          
-         table(Channel, trialNumber, ...
-             Names, Hemisphere, ProbeDepth, Impedance);
-         
-         depthArr = zeros(nChannels,1);
-         hemisphereArr = zeros(nChannels,1);
-         impedenceArr = zeros(nChannels,1);
-         nameArr = strings([nChannels 1]);
-         
-         
-         depthArr(i) = obj.Children(i,1).Depth;
-         hemisphereArr(i) = obj.Children(i,1).Hemisphere;
-         impedenceArr(i) = obj.Children(i,1).Impedance;
-         nameArr(i) = obj.Children(i,1).Name;
+         channelTable = table(ChannelID,Channel,Probe,...
+            Hemisphere,Depth,Impedance);
          
          
-         ProbeDepth = repmat(depthArr,nTrials,1);
-         Hemisphere = repmat(hemisphereArr,nTrials,1);
-         Impedance = repmat(impedenceArr,nTrials,1);
-         Names = string(repmat(nameArr,nTrials,1));
+         getBinnedSpikes(obj,cfg.TrialType('All'));
          
-         trialNumber = repelem(1:nTrials,nChannels)';
+         % get the Histogram (spikes; PETH) and LFP data timeseries
+         binCell = {nRows,1};
+         %for loop over the whole table
+         for iRow = 1:height(blockTable)
+             %first need to get which channel that row is
+             iChan = table2array(blockTable(iRow,'Channel'));
+             %get the binned spikes for that channel, allTrials is 118x500 double
+             % Ex 118 --> Number of trials
+             % Ex 500 --> Number of time bins (-500 : 500 ms; 2-ms bins)
+             allTrials = 
+             %get the specific trial in question using the trialNumber as index
+             %each cell in binCell should return a 1x500 double
+             binCell{iRow} = allTrials(table2array(blockTable(iRow,'trialNumber')),:);
+         end
+
+         %have to some reason transpose it to get it to be nx1
+         binCellt = binCell';
+
+         %add it to the table
+         blockTable.Spikes = binCellt;
+
+         % ChannelID and ProbeID
+         % this variable/section will need to be changed
+         % unsure how these filenames correspond with each of the channels from
+         % solRat object
+         % is P1 Ch 0 always == channel 1?
+         wav_sneo_folder = strcat(obj.Name,'_wav-sneo_CAR_Spikes'); 
+
+         probeList = {};
+         chList = [];
+
+         %gets all mat files only
+         matFiles = dir(fullfile(wav_sneo_folder,'*.mat')); 
+         for i = 1:length(matFiles)
+           fileName = matFiles(i).name;
+           fileSplit = split(fileName, '_');
+           probeList(i) = fileSplit(end-2);
+           %have to get rid of the .mat on this
+           chSplit = split(fileSplit(end), '.');
+           chList(i) = str2double(chSplit(end-1));
+         end
+
+         % check to see if any channels were removed
+         % if they werent, then assume:
+         % probe 1 ch0 -> channel 1
+         % probe 2 ch0 -> channel 33
+         probeTable = strings(nRows,1);
+         chTable = zeros(nRows,1);
+         % +1 is needed because chList values start at 0
+         if length(unique(chList))*length(unique(probeList)) == nChannels
+             for iRow = 1:height(blockTable)
+                 %get the channel of that row
+                 iChan = table2array(blockTable(iRow,'Channel'));
+                 % if its greater than the max + 1 then subract 1
+                 if iChan <= max(chList) + 1
+                     chTable(iRow) = iChan - 1; 
+                 % otherwise subract (max + 2), 2 is the offset
+                 else
+                     chTable(iRow) = iChan - max(chList) - 2;            
+                 end
+                 probeTable(iRow) = probeList{iChan};
+             end
+
+         else
+             warning(['SOLENOID:' mfilename ':DataFormat'],...
+                ['\n\t->\t<strong>[MAKETABLES]:</strong> ' ...
+                 'Channel might have been removed. The indexing for ' ...
+                 'ChannelID & ProbeID may be incorrect']);
+         end
+
+         %add it to the table
+         blockTable.ChannelID = chTable;
+         blockTable.ProbeID = probeTable;
+
+         % move the variable around so its next to the other channel stuff
+         blockTable = movevars(blockTable,'ProbeID','After','Channel');
+         blockTable = movevars(blockTable,'ChannelID','After','ProbeID');
+
+         % Load in the _DS mat files and parse them using timestamps
+
+         % Default PETH parameters
+         tpre = -0.250;
+         tpost = 0.750;
+         % fs is 1000 for the _DS data
+         %fsDS = 1000;
+         timeStamps = obj.Trials;
+
+         % using fs and the timeStamps create a nTrials x 2 array of 
+         % indices first value is the start of that 1s window (in samples),
+         % second is end these indices can then be used to index into mat 
+         % files and grab data
+         DS_folder = strcat(obj.Name,'_DS');
+
+         %gets all mat files only
+         matFiles = dir(fullfile(DS_folder,'*.mat')); 
+
+         %load the first mat file to get the fs
+         firstMat = matFiles(1).name; 
+         fsDS = getfield(load(firstMat,'fs'),'fs');
+
+         windowInd = zeros(nTrials, 2);
+         for i = 1:nTrials
+             % should I round up or down? 
+             % the boundary is never on a whole number index
+             % right now round down on the beginning, and round up on the end
+             % tpre is a negative number, so add it 
+             windowInd(i,1) = floor(timeStamps(i)*fsDS+(tpre*fsDS));
+             windowInd(i,2) = ceil(timeStamps(i)*fsDS+(tpost*fsDS));
+         end
+
+         %now use windowInd to access the mat files and parse the data
+         %using cells because some windows may be off by 1 due to rounding
+         lfp = cell(nRows,1);
+         % loop through the .mat files in _DS
+         % iterate through all the files
+         for i = 1:length(matFiles)
+           fileName = matFiles(i).name;
+           data = getfield(load(firstMat,'data'),'data');%get data from .mat
+           fileSplit = split(fileName, '_');
+           probe = fileSplit(end-2);
+           %have to get rid of the .mat on this
+           chSplit = split(fileSplit(end), '.');
+           ch = str2double(chSplit(end-1));
+
+           % find the rows where you have that channel and probe
+           % there might be a faster way to do this? not sure
+           % iterate through all rows
+           for iRow = 1:height(blockTable)
+               % if the channel is correct
+               chI = table2array(blockTable(iRow,'ChannelID'));
+               if chI == ch
+                   % if the probe is correct
+                   if strcmp(table2array(blockTable(iRow,'ProbeID')), cell2mat(probe))
+
+                       % grab the indicies we parsed earlier and get that data
+                       ind = table2array(blockTable(iRow,'trialNumber'));
+                       t = windowInd(ind,:);
+                       %data array is loaded above from filename
+                       lfp{iRow} = data(t(1):t(2));
+                   end
+               end
+           end
+
+         end
+
+         % add it to the table
+         blockTable.LFP = lfp;
          
       end %%%% End of makeTables%%%%
    end
@@ -260,8 +416,7 @@ classdef solChannel < handle
          
       end
       
-      % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to
-      % TRIALS for this channel
+      % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to TRIAL
       function [data,t,t_trial] = getAlignedIFR(obj,trialType)
          if nargin < 2
             trialType = cfg.TrialType('All');
@@ -461,17 +616,34 @@ classdef solChannel < handle
       end
       
       % Returns SPIKE point process data for this channel
-      % Depending on 'type' arg, either returns a vector of peak times
-      % (point process), or a data matrix of snippet waveforms
-      % with rows corresponding one-to-one with elements of peak times.
       function data = getSpikes(obj,ch,type)
+         %GETSPIKES Returns spike point-process data for this channel
+         %
+         % data = getSpikes(obj);
+         % data = getSpikes(obj,ch,type);
+         %
+         % Inputs
+         %  obj  - Scalar or array of `solChannel` objects
+         %  ch   - Indexing array for `obj` input (default is all `obj`)
+         %  type - Can be: 'ts' (default; times) or 'wave' (spike snippets)
+         %
+         % Output
+         %  data - Depends on `type` argument. If `type` is `ts` (default)
+         %         then this returns a cell array of timestamps of spike
+         %         peak times for each element of `obj` (unless a scalar
+         %         `obj` is given in which case data is just the vector
+         %         array of timestamps).
+         %         If `type` is `wave` then this is a cell array of spike
+         %         waveform snippets, where each row corresponds to a
+         %         sequential corresponding timestamp of spike peak time.
+         
          if nargin < 2
             ch = 1:numel(obj);
          end
          if nargin < 3
             type = 'ts';
          end
-         if numel(obj) > 1
+         if ~isscalar(obj)
             
             data = cell(numel(ch),1);
             for ii = 1:numel(ch)
@@ -1004,7 +1176,9 @@ classdef solChannel < handle
          
          if isempty(obj.Parent.Trials)
             fig = [];
-            fprintf(1,'Trial times not yet parsed for %s (%s).\n',obj.Parent.Name,obj.Name);
+            fprintf(1,...
+               'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
             return;
          end
          
