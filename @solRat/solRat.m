@@ -4,8 +4,21 @@ classdef solRat < handle
    %  obj = solRat;
    %  obj = solRat('P:\Path\To\Data\R19-###');
    %
-   %  Handle class to organize data collected for a specific experimental
-   %  animal (typically, all from the same acute surgical preparation)
+   % Handle class to organize data collected for a specific experimental
+   % animal (typically, all from the same acute surgical preparation)
+   %
+   % solRat Properties
+   %  Name     - Name of this solRat object ('R19-###')
+   %  Children - Scalar or array of solBlock child objects
+   %  folder   - Full path to folder containing solRat data sources
+   %  Layout   - Organization of probes for this solRat object
+   %     
+   % solRat Methods
+   %  solRat     - Class constructor for solRat object
+   %  makeTables - Returns aggregated data table for all child solBlock objects
+   %  save       - Saves solRat object to file using `obj.Name`; solRat object is saved in variable 'r'
+   %
+   % See also: solBlock, solChannel
    
    % PROPERTIES
    % Immutable properties defined during class construction
@@ -87,19 +100,23 @@ classdef solRat < handle
       end
       
       % Returns **master** data table for convenient export of dataset
-      function masterTable = makeTables(obj,tPre,tPost)
+      function masterTable = makeTables(obj,tPre,tPost,firstRowID)
          %MAKETABLES Returns master data table for convenient data export
          %
          %  masterTable = obj.makeTables;
          %  masterTable = makeTables(objArray);
          %  masterTable = makeTables(obj,tPre,tPost);
+         %  masterTable = makeTables(obj,tPre,tPost,firstRowID);
          %
          %  Inputs
          %     obj   - Scalar or Array of `solRat` objects
          %     tPre  - (Optional) Specify "pre-alignment" (seconds);
          %              otherwise, uses default value in `cfg.default`
          %     tPost - (Optional) Specify "post-alignment" (seconds);
-         %              otherwise, uses default value in `cfg.default`  
+         %              otherwise, uses default value in `cfg.default`
+         %     firstRowID - (Optional) Index of first row. Typically not
+         %                    provided (default is 1). Used in assigning
+         %                    the unique RowID of each table row.
          %
          %  Output
          %     masterTable - Table with the following variables:
@@ -142,6 +159,10 @@ classdef solRat < handle
             [tPost] = solRat.getDefault('tpost');
          end
          
+         if nargin < 4
+            firstRowID = 1;
+         end
+         
          % Check if its scalar or array and iterate on array if so:
          if ~isscalar(obj)
             masterTable = table.empty; % Create empty data table to append
@@ -149,8 +170,10 @@ classdef solRat < handle
                % Note: we could pre-allocate `masterTable` but this isn't
                % really that much slower here and is a lot more convenient to
                % write for the time-being.
-               masterTable = [masterTable; ...
-                  makeTables(obj(iRat),tPre,tPost)]; %#ok<AGROW>
+               tab = makeTables(obj(iRat),tPre,tPost,firstRowID);
+               nRow = size(tab,1);
+               firstRowID = firstRowID + nRow;
+               masterTable = [masterTable; tab]; %#ok<AGROW>
             end
             return; % End "recursion"
          end
@@ -188,8 +211,9 @@ classdef solRat < handle
          masterTable = [ratTable, blockTable];
          
          % Add unique "ID" to each row
-         masterTable.RowID = utils.makeKey(...
-            nBlockRows,'unique',[strrep(obj.Name,'-','') '_']);
+%          masterTable.RowID = utils.makeKey(...
+%             nBlockRows,'unique',[strrep(char(obj.Name),'-','') '_']);
+         masterTable.RowID = (firstRowID:(firstRowID+nBlockRows-1)).';
          
          % Move appended `RowID` to first variable:
          masterTable = masterTable(:,[end, 1:(end-1)]);
@@ -229,7 +253,7 @@ classdef solRat < handle
          savetic = tic; % Start timing save
          
          % Notify command window of which SOLRAT is being saved
-         fname = fullfile(pwd,[obj.Name '.mat']);
+         fname = fullfile(pwd,[char(obj.Name) '.mat']);
          fprintf(1,...
             'Saving %s (as %s.mat): in progress...\n',...
             obj.Name,obj.Name);
@@ -627,6 +651,68 @@ classdef solRat < handle
          end
          obj.fbrowser = figBrowserObj;
          
+      end
+   end
+   
+   % Public methods that are access points to update existing objects
+   methods (Access = public, Hidden = true)
+      % Update site info based on data in `Probe-Info.xlsx`
+      function parseSiteInfo(obj,fname)
+         %PARSESITEINFO Parses the site location for each probe
+         %
+         % parseSiteInfo(obj,fname);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solRat` objects
+         %  fname - (Optional) filename of table spreadsheet 
+         %           -> If not given, uses value in `cfg.default`
+         %
+         % Output
+         %  -- none -- Updates the site location for electrodes associated
+         %             with each child of all `solRat` objects in `obj`
+         
+         if nargin < 2
+            fname = solRat.getDefault('site_location_table');
+         end
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseSiteInfo(obj(i),fname);
+            end
+            return;
+         end
+         
+         parseSiteInfo(obj.Children,fname);
+      end
+      
+      % Update solenoid info based on data in `Solenoid-Info.xlsx`
+      function parseSolenoidInfo(obj,fname)
+         %PARSESOLENOIDINFO Update solenoid info based on data in info file
+         %
+         %  parseSolenoidInfo(obj);
+         %
+         % Inputs
+         %  obj   - Scalar or array `solRat` objects
+         %  fname - (Optional): Default is `Solenoid-Info.xlsx`; can
+         %                       specify explicitly to use a different file
+         %                       (or change it in `cfg.default()`
+         %
+         % Output
+         %  -- none -- Sets new solenoid location associations on
+         %              corresponding properties of all child objects.
+         
+         if nargin < 2
+            fname = solRat.getDefault('solenoid_location_table');
+         end
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseSolenoidInfo(obj(i),fname);
+            end
+            return;
+         end
+         
+         parseSolenoidInfo(obj.Children,fname);
       end
    end
    

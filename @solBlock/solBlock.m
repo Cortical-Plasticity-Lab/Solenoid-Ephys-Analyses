@@ -1,8 +1,12 @@
 classdef solBlock < handle
 %SOLBLOCK  Class for organizing data from an individual recording
 %
-%   obj = solBlock(); 
-%   obj = solBlock(ratObj,folder);
+%   obj = solBlock(); Create a single solBlock object by selecting folder
+%   obj = solBlock(ratObj,folder); Create a child solBlock of solRat
+%
+%  solBlock contains information from a single recording session. It is
+%  constructed during solRat object creation or can also be constructed
+%  independently as a scalar or array block object.
 %
 % solBlock Properties
 %  Name - Recording BLOCK name
@@ -24,6 +28,8 @@ classdef solBlock < handle
 % solBlock Methods
 %  solBlock   - Class constructor
 %  makeTables - Return BLOCK table for metadata and data table export
+%
+% See also: solRat, solChannel
 
 % PROPERTIES
    % Unchangeable properties set on object construction
@@ -211,17 +217,17 @@ classdef solBlock < handle
                 case 1
                    for iBlock = 1:numel(obj)
                      blockTable = [blockTable; ...
-                        solBlock.makeTable(obj(iBlock))]; %#ok<AGROW>
+                        makeTables(obj(iBlock))]; %#ok<AGROW>
                    end
                 case 2
                    for iBlock = 1:numel(obj)
                      blockTable = [blockTable; ...
-                        solBlock.makeTable(obj(iBlock),tPre)]; %#ok<AGROW>
+                        makeTables(obj(iBlock),tPre)]; %#ok<AGROW>
                    end
                 otherwise
                    for iBlock = 1:numel(obj)
                      blockTable = [blockTable; ...
-                        solBlock.makeTable(obj(iBlock),tPre,tPost)]; %#ok<AGROW>
+                        makeTables(obj(iBlock),tPre,tPost)]; %#ok<AGROW>
                    end
              end
              return;
@@ -233,6 +239,9 @@ classdef solBlock < handle
          elseif nargin < 3
             [~,~,tPost] = getSpikeBinEdges(obj);
          end
+         
+         fprintf(1,['\t->\t<strong>[MAKETABLES]:</strong> ' ...
+            'Adding table for %s...'],obj.Name);
       
          % Need to parse the following variables from Block:
          %  * `TrialID`  - Since "Block" contains list of all trial instances,
@@ -296,13 +305,17 @@ classdef solBlock < handle
          
          channelTable = makeTables(obj.Children,trialData,tPre,tPost); 
          nRows = size(channelTable,1);
-
-         % Note that `solTable` contains `BlockID` column already
-         solTable = obj.Solenoid_Location;
-         solTable = repmat(solTable,nRows,1);
+         BlockID = cellfun(@(C)string(C),repmat({obj.Name},nRows,1),...
+                        'UniformOutput',true);
+         BlockID = categorical(BlockID,solBlock.getDefault('all_blocks'));
+         thisTable = table(BlockID);
+         thisTable.Properties.VariableDescriptions = {'Recording identifier'};
+         thisTable.Properties.Description = 'Block information';
+         thisTable.Properties.UserData = struct(...
+            'type','BlockTable');
          
          % Concatenate Block-level info with Channel-level info for output
-         blockTable = [solTable, channelTable];
+         blockTable = [thisTable, channelTable];
       
       end %%%% End of makeTables%%%%
       
@@ -909,10 +922,9 @@ classdef solBlock < handle
          
          % % General Block-related Solenoid info % %
          solTable = obj.Solenoid_Location;
-         [trialData.Solenoid_Target] = deal(string(solTable.Location{1}));
+         [trialData.Solenoid_Target] = deal(string(solTable.Target{1}));
          [trialData.Solenoid_Paw] = deal(string(solTable.Paw{1}));
          [trialData.Solenoid_Abbrev] = deal(string(solTable.TAG{1}));
-         [trialData.Notes] = deal(string(solTable.Notes{1}));
       end
       
       % Plot organized subplots for PETH of each channel

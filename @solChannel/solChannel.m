@@ -2,6 +2,27 @@ classdef solChannel < handle
    %SOLCHANNEL  Organization object for data at the individual-channel level
    %
    %  obj = solChannel(solBlockObj,info);
+   %
+   %  Note that this object can only be constructed via call from
+   %  solBlock object.
+   %
+   % solChannel Properties
+   %  Name       - String name of electrode recording channel ("A-###" or "B-###")
+   %  Parent     - Parent solBlock object handle (experiment)
+   %  Area       - Recording area ("RFA", "CFA", "S1", etc.)
+   %  AP         - Electrode anteroposterior distance from Bregma (mm)
+   %  Depth      - Electrode depth, relative to dorsal surface (microns)
+   %  Hemisphere - "Left" or "Right" hemisphere
+   %  Impedance  - Electrode impedance (kOhms)
+   %  Probe      - Struct containing information about probe center location, depth, and angle/orientation
+   %  ML         - Electrode mediolateral distance from Bregma (mm)
+   %  StimData   - Table with distances from ICMS stimulation electrode
+   %
+   % solChannel Methods
+   %  solChannel - Class constructor for solChannel object
+   %  makeTables - Method to return channel-level table information
+   %
+   % See also: solRat, solBlock
    
    % PROPERTIES
    % Immutable properties set on object construction
@@ -54,8 +75,8 @@ classdef solChannel < handle
    end
    
    % METHODS
-   % Class constructor, overloaded, and most-used methods
-   methods
+   % Restricted access: class constructor, set stim distance
+   methods (Access = {?solChannel, ?solBlock})
       % Class constructor for SOLCHANNEL object
       function obj = solChannel(block,info,locData)
          %SOLCHANNEL Constructor for `solChannel` object
@@ -118,6 +139,61 @@ classdef solChannel < handle
          
       end  
       
+      % Assign distance to ICMS site(s)
+      function setStimChannelDistance(obj,Name,AP,ML,Depth)
+         %SETSTIMCHANNELDISTANCE  Sets distance from stimulation site(s)
+         %
+         % setStimChannelDistance(obj,Name,AP,ML,Depth);
+         % setStimChannelDistance(obj,"None",nan,nan,nan); 
+         %  -> If no stim channel
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solChannel` objects
+         %  Name  - `solChannel.Name` corresponding to `solChannel` stim
+         %            object or objects (if array). All input arguments
+         %            should correspond to the number of stim channels (so
+         %            each input arg, aside from `obj` should have the same
+         %            number of elements).
+         %  AP    - Distance (anteroposterior from Bregma; mm)          %            per stim site)
+         %  ML    - Distance (mediolateral from Bregma; mm)
+         %  Depth - Distance (from dorsal surface of brain; microns)
+         %
+         % Output
+         %  -- none -- Updates the `solChannel.StimData`
+         %             property, which has one row per stim site (or only
+         %             one row if no stimulation site)
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setStimChannelDistance(obj(i),Name,AP,ML,Depth);
+            end
+            return;
+         end
+         
+         AP = bsxfun(@minus,obj.AP,AP);
+         ML = bsxfun(@minus,obj.ML,ML);
+         % By convention, negative value for depth would indicate that the
+         % site is more superficial to the stim site.
+         DV = bsxfun(@minus,obj.Depth,Depth) .* 1e-3; % scale to mm 
+         Distance = sqrt((AP + ML + DV).^2);
+         stimTable = table(Name,Distance,AP,ML,DV);
+         stimTable.Properties.Description = ...
+            'Distance (mm) to site(s) delivering ICMS';
+         stimTable.Properties.VariableUnits = ...
+           {'Channel','mm','mm','mm','mm'};
+         stimTable.Properties.VariableDescriptions = ...
+           {'Name of ICMS channel',...
+            'Euclidean distance from stim site',...
+            'Anteroposterior distance relative to stim site (+ == rostral)',...
+            'Mediolateral distance relative to stim site (+ == lateral)',...
+            'Dorsoventral distance relative to stim site (+ == ventral)'};
+         stimTable.Properties.UserData = struct('type','StimDistance');
+         obj.StimData = stimTable;
+      end
+   end
+   
+   % Overloaded and most-used methods
+   methods      
       % Return LFP aligned to TRIALS for this channel
       function [data,t] = getAlignedLFP(obj,trialType)
          %GETALIGNEDLFP Return LFP aligned to trials for this channel
@@ -332,23 +408,19 @@ classdef solChannel < handle
          
          % Since it can be an array, iterate/recurse over all the blocks
          if ~isscalar(obj)
-            channelTable = table.empty; % Create empty data table to append
             switch nargin
                case 2
-                  for iChannel = 1:numel(obj)
-                     channelTable = [channelTable; ...
-                        makeTable(obj(iChannel),trialData)];
-                  end
+                  channelTable = appendTables(obj,...
+                     @(o,td)makeTables(o,td),...
+                     trialData);
                case 3
-                  for iChannel = 1:numel(obj)
-                     channelTable = [channelTable; ...
-                        makeTable(obj(iChannel),trialData,tPre)];
-                  end
+                  channelTable = appendTables(obj,...
+                     @(o,td,tpre)makeTables(o,td,tpre),...
+                     trialData,tPre);
                otherwise
-                  for iChannel = 1:numel(obj)
-                     channelTable = [channelTable; ...
-                        makeTable(obj(iChannel),trialData,tPre,tPost)];
-                  end
+                  channelTable = appendTables(obj,...
+                     @(o,td,pr,po)makeTables(o,td,pr,po),...
+                     trialData,tPre,tPost);
             end
             return;
          end
@@ -388,18 +460,17 @@ classdef solChannel < handle
          % % Create "trialTable" for trial data to match channelTable % %
          trialTable = solChannel.trialData2Table(trialData);
          
-         % Return all binned spikes (for all trials) on this channel
-         allTrials = cfg.TrialType('All');
-         Spikes = getBinnedSpikes(obj,allTrials,tPre,tPost);
-         
-         % Return all aligned LFP data
-         LFP = getAlignedLFP(obj,allTrials);
+         % % Return "dataTable" with Spikes & LFP data % %
+         dataTable = getDataTable(obj,tPre,tPost);
          
          % Concatenate trialTable with channels tables
-         channelTable = [trialTable, channelTable, table(Spikes, LFP,...
-            'VariableDescriptions',...
-            {'Histogram bin counts of spikes by trial',...
-             'Decimated LFP voltage signal (microvolts) during trial'})];
+         channelTable = [trialTable, channelTable, dataTable];
+         
+         % Convert some variables to categorical %
+         channelTable.Hemisphere = categorical(...
+            channelTable.Hemisphere,["Right","Left"]);
+         channelTable.Probe = categorical(...
+            channelTable.Probe,["A","B"]);
          
       end %%%% End of makeTables%%%%
    end
@@ -661,6 +732,57 @@ classdef solChannel < handle
             'EdgeColor','none',...
             'FaceColor',pars.col{obj.Hemisphere});
          
+      end
+      
+      % Return "dataTable" with Spikes & LFP data for this channel
+      function dataTable = getDataTable(obj,tPre,tPost)
+         %GETDATATABLE Return table with trial Spike & LFP data
+         %
+         %  dataTable = getDataTable(obj);
+         %  dataTable = getDataTable(obj,tPre,tPost);
+         %
+         % Inputs
+         %  obj   - Scalar or array of `solChannel` objects
+         %  tPre  - (Optional) Time (sec) prior to alignment event
+         %  tPost - (Optional) Time (sec) after alignment event
+         %
+         % Output
+         %  dataTable - Table with 2 variables: Spikes & LFP, where columns
+         %                 are time samples and rows are trials.
+         
+         if nargin < 2
+            [tPre,tPost] = solChannel.getDefault('tpre','tpost');
+         elseif nargin < 3
+            tPost = solChannel.getDefault('tpost');
+         end
+         
+         if ~isscalar(obj)
+            dataTable = table.empty;
+            for i = 1:numel(obj)
+               dataTable = [dataTable; ...
+                  getDataTable(obj(i),tPre,tPost)];
+            end
+            return;
+         end
+         
+         % Return all binned spikes (for all trials) on this channel
+         allTrials = cfg.TrialType('All');
+         Spikes = getBinnedSpikes(obj,allTrials,tPre,tPost);
+         
+         % Return all aligned LFP data
+         LFP = getAlignedLFP(obj,allTrials);
+         
+         % Make table for Spikes & LFP data
+         dataTable = table(Spikes, LFP);
+         dataTable.Properties.Description = ...
+            'Table with Spike & LFP data in alignment to stimuli';
+         dataTable.Properties.VariableDescriptions = ...
+            {'Histogram bin counts of spikes by trial',...
+             'Decimated LFP voltage signal (microvolts) during trial'};
+          dataTable.Properties.UserData = struct(...
+             'type','Data',...
+             'tSpike',linspace(tPre,tPost,size(Spikes,2)),...
+             'tLFP',linspace(tPre,tPost,size(LFP,2)));
       end
       
       % Returns BANDPASS FILTERED (UNIT) data for this channel
@@ -1417,6 +1539,30 @@ classdef solChannel < handle
    
    % Public but hidden `set` methods that probably only in constructor
    methods (Access = public, Hidden = true)
+      % Wrapper to iterate and append table array
+      function T = appendTables(obj,fcn,varargin)
+         %APPENDTABLES Wrapper to iterate and append table array
+         %
+         %  T = appendTables(obj,fcn,arg1,arg2,...);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solChannel` objects
+         %  fcn - Function handle to use for appending table
+         %  varargin - Any input arguments required by `fcn`
+         %
+         % Output
+         %  T   - Accumulated table
+         
+         nCh = numel(obj);
+         T = table.empty;
+         fprintf(1,'%03d%%\n',0);
+         for iCh = 1:nCh
+            T = [T; ...
+               fcn(obj(iCh),varargin{:})];
+            fprintf(1,'\b\b\b\b\b%03d%%\n',round(iCh/nCh*100));
+         end
+      end
+      
       % Set the RAW data file for this channel
       function setRaw(obj,f,id)
          %SETRAW  Set RAW data file for this channel
@@ -1718,61 +1864,6 @@ classdef solChannel < handle
             obj.port_number,...
             obj.native_order));
       end   
-   end
-   
-   % Restricted methods (only called by `solChannel` or `solBlock`)
-   methods (Access = {?solChannel, ?solBlock})
-      % Assign distance to ICMS site(s)
-      function setStimChannelDistance(obj,Name,AP,ML,Depth)
-         %SETSTIMCHANNELDISTANCE  Sets distance from stimulation site(s)
-         %
-         % setStimChannelDistance(obj,Name,AP,ML,Depth);
-         % setStimChannelDistance(obj,"None",nan,nan,nan); 
-         %  -> If no stim channel
-         %
-         % Inputs
-         %  obj   - Scalar or array of `solChannel` objects
-         %  Name  - `solChannel.Name` corresponding to `solChannel` stim
-         %            object or objects (if array). All input arguments
-         %            should correspond to the number of stim channels (so
-         %            each input arg, aside from `obj` should have the same
-         %            number of elements).
-         %  AP    - Distance (anteroposterior from Bregma; mm)          %            per stim site)
-         %  ML    - Distance (mediolateral from Bregma; mm)
-         %  Depth - Distance (from dorsal surface of brain; microns)
-         %
-         % Output
-         %  -- none -- Updates the `solChannel.StimData`
-         %             property, which has one row per stim site (or only
-         %             one row if no stimulation site)
-         
-         if ~isscalar(obj)
-            for i = 1:numel(obj)
-               setStimChannelDistance(obj(i),Name,AP,ML,Depth);
-            end
-            return;
-         end
-         
-         AP = bsxfun(@minus,obj.AP,AP);
-         ML = bsxfun(@minus,obj.ML,ML);
-         % By convention, negative value for depth would indicate that the
-         % site is more superficial to the stim site.
-         DV = bsxfun(@minus,obj.Depth,Depth) .* 1e-3; % scale to mm 
-         Distance = sqrt((AP + ML + DV).^2);
-         stimTable = table(Name,Distance,AP,ML,DV);
-         stimTable.Properties.Description = ...
-            'Distance (mm) to site(s) delivering ICMS';
-         stimTable.Properties.VariableUnits = ...
-           {'Channel','mm','mm','mm','mm'};
-         stimTable.Properties.VariableDescriptions = ...
-           {'Name of ICMS channel',...
-            'Euclidean distance from stim site',...
-            'Anteroposterior distance relative to stim site (+ == rostral)',...
-            'Mediolateral distance relative to stim site (+ == lateral)',...
-            'Dorsoventral distance relative to stim site (+ == ventral)'};
-         stimTable.Properties.UserData = struct('type','StimDistance');
-         obj.StimData = stimTable;
-      end
    end
    
    % Private "helper" methods
@@ -2161,23 +2252,16 @@ classdef solChannel < handle
          % Output
          %  trialTable - Table with one row per trial
          
-%          TrialID = vertcat(trialData.ID);
-%          Number = vertcat(trialData.Number);
-%          Time = vertcat(trialData.Time);
-%          Type = vertcat(trialData.Type);
-%          ICMS_Onset = vertcat(trialData.ICMS_Onset);
-%          ICMS_Channel = vertcat(trialData.ICMS_Channel);
-%          Solenoid_Onset = vertcat(trialData.Solenoid_Onset);
-%          Solenoid_Offset = vertcat(trialData.Solenoid_Offset);
-%          Solenoid_Target = vertcat(trialData.Solenoid_Target);
-%          Solenoid_Paw = vertcat(trialData.Solenoid_Paw);
-%          Solenoid_Abbrev = vertcat(trialData.Solenoid_Abbrev);
-%          Notes = vertcat(trialData.Notes);
-%          trialTable = table(TrialID,Number,Time,Type,...
-%             ICMS_Onset,ICMS_Channel,...
-%             Solenoid_Onset,Solenoid_Offset,Solenoid_Target,...
-%             Solenoid_Paw,Solenoid_Abbrev,Notes);
+         [abbrevs,targs] = solChannel.getDefault('all_abbr','all_tgt');
+         
          trialTable = struct2table(trialData);
+         trialTable.TrialID = cellfun(@(C)string(C),trialTable.TrialID,'UniformOutput',true);
+         trialTable.Type = categorical(trialTable.Type,[1,2,3],["Solenoid", "ICMS", "Solenoid + ICMS"]);
+         Targ = cellfun(@(C)string(C),trialTable.Solenoid_Target,'UniformOutput',true);
+         trialTable.Solenoid_Target = categorical(Targ,targs);
+         Abbrev = cellfun(@(C)string(C),trialTable.Solenoid_Abbrev,'UniformOutput',true);
+         trialTable.Solenoid_Abbrev = categorical(Abbrev,abbrevs);
+         trialTable.Solenoid_Paw = categorical(trialTable.Solenoid_Paw,["Right"; "Left"]);
          trialTable.Properties.Description = 'Trial metadata table';
          trialTable.Properties.UserData = struct('type','TrialData');
          trialTable.Properties.VariableDescriptions = {...
@@ -2190,8 +2274,8 @@ classdef solChannel < handle
             'Relative delay (sec) to extension onset for solenoid',...
             'Relative delay (sec) to retraction onset for solenoid',...
             'Peripheral cutaneous target for solenoid',...
-            'Abbreviation from Tutunculer 2006 convention for target',...
-            'Misc recording block notes'};
+            'Side ("Left" or "Right") targeted by solenoid',...
+            'Abbreviation from Tutunculer 2006 convention for target'};
       end
    end
 end

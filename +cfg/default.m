@@ -24,9 +24,9 @@ out.site_location_table = 'Probe-Info.xlsx';
 out.solenoid_location_table = 'Solenoid-Info.xlsx';
 out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
 %put the list of rat names ex: MM-T1, order matches namingValue
-out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2'}; 
+out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2';'MM-V1'}; 
 %put the list of their animal ID ex R19-226, order matches namingKey
-out.namingValue = {'R19-224';'R19-225';'R19-226';'R19-227';'R19-230';'R19-231';'R19-232';'R19-233'}; 
+out.namingValue = {'R19-224';'R19-225';'R19-226';'R19-227';'R19-230';'R19-231';'R19-232';'R19-233';'R19-234'}; 
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...
@@ -122,8 +122,7 @@ out.init_trial_data = struct(...
                'Solenoid_Offset',[],...
                'Solenoid_Target',"",...
                'Solenoid_Paw',"",...
-               'Solenoid_Abbrev',"",...
-               'Notes',"");
+               'Solenoid_Abbrev',"");
 
 % Default figure position
 out.figpos = [0.15 0.15 0.3 0.3];
@@ -165,6 +164,80 @@ out.probe_a_loc = 'RFA'; % depends on recording block
 out.probe_b_loc = 'S1';  % depends on recording block
 out.trial_high_duration = 500; % ms (same for all recordings in CYCLE setup)
 out.fig_type_for_browser = 'Probe-Plots';
+
+% (main experiment) Lists for making categorical variables (reduce size)
+out.all_blocks = ...
+["R19-224_2019_11_04_0";
+"R19-224_2019_11_04_1";
+"R19-224_2019_11_04_2";
+"R19-224_2019_11_04_3";
+"R19-226_2019_11_05_0";
+"R19-226_2019_11_05_1";
+"R19-226_2019_11_05_2";
+"R19-226_2019_11_05_3";
+"R19-227_2019_11_05_0";
+"R19-227_2019_11_05_1";
+"R19-227_2019_11_05_2";
+"R19-227_2019_11_05_3";
+"R19-227_2019_11_05_4";
+"R19-227_2019_11_05_5";
+"R19-227_2019_11_05_6";
+"R19-230_2019_11_06_0";
+"R19-230_2019_11_06_1";
+"R19-230_2019_11_06_2";
+"R19-230_2019_11_06_3";
+"R19-230_2019_11_06_4";
+"R19-230_2019_11_06_5";
+"R19-231_2019_11_06_0";
+"R19-231_2019_11_06_1";
+"R19-231_2019_11_06_2";
+"R19-231_2019_11_06_3";
+"R19-231_2019_11_06_4";
+"R19-231_2019_11_06_5";
+"R19-231_2019_11_06_6";
+"R19-232_2019_11_07_0";
+"R19-232_2019_11_07_1";
+"R19-232_2019_11_07_2";
+"R19-232_2019_11_07_3";
+"R19-232_2019_11_07_4";
+"R19-232_2019_11_07_5";
+"R19-234_2019_11_07_0";
+"R19-234_2019_11_07_1";
+"R19-234_2019_11_07_2";
+"R19-234_2019_11_07_3";
+"R19-234_2019_11_07_4";
+"R19-234_2019_11_07_5";
+"R19-234_2019_11_07_6";
+"R19-234_2019_11_07_7"];
+out.all_abbr = ... % All possible abbreviations for TAG (see Solenoid-Info.xlsx)
+   ["U";
+    "WR";
+    "PAW";
+    "D1";
+    "D1P";
+    "D1K";
+    "D2";
+    "D2P";
+    "D2K";
+    "D3";
+    "D3P";
+    "D3K";
+    "D4";
+    "D4P";
+    "D4K";
+    "D5";
+    "D5P";
+    "D5K";
+    "PLM";
+    "DFL";
+    "PFL"];
+out.all_tgt= ... % All possible "generic" target options (see Solenoid-Info.xlsx, Target column)
+   ["Forelimb";
+    "Digit"; 
+    "Knuckle";
+    "Wrist";
+    "Paw";
+    "Palm"];
 
 % Parse output (don't change this part)
 if nargin < 1
