@@ -496,7 +496,8 @@ classdef solChannel < handle
          channelTable = repmat(channelTable,nTrial,1);
          
          % % Create "trialTable" for trial data to match channelTable % %
-         trialTable = solChannel.trialData2Table(trialData);
+         trialTable = solChannel.trialData2Table(trialData,tPre,tPost,...
+            obj.Parent.TotalDuration);
          
          % % Return "dataTable" with Spikes & LFP data % %
          dataTable = getDataTable(obj,tPre,tPost);
@@ -2293,13 +2294,16 @@ classdef solChannel < handle
    % Private static methods
    methods (Static = true, Access = private)
       % Convert `trialData` array struct to table format
-      function trialTable = trialData2Table(trialData)
+      function trialTable = trialData2Table(trialData,tPre,tPost,tTotal)
          %TRIALDATA2TABLE Convert `trialData` array struct to table format
          %
-         %  trialTable = solChannel.trialData2Table(trialData);
+         %  trialTable = solChannel.trialData2Table(trialData,tPre,tPost,tTotal);
          %
          % Inputs
          %  trialData  - Struct array with one element per trial
+         %  tPre       - Time prior to alignment (sec)
+         %  tPost      - Time after alignment (sec)
+         %  tTotal     - Total duration of recording
          %
          % Output
          %  trialTable - Table with one row per trial
@@ -2307,6 +2311,9 @@ classdef solChannel < handle
          [abbrevs,targs] = solChannel.getDefault('all_abbr','all_tgt');
          
          trialTable = struct2table(trialData);
+         trialTable(... % Remove invalid trial times
+            ((trialTable.Time + tPre) < 0)|...
+            ((trialTable.Time + tPost) > tTotal),:) = [];
          trialTable.TrialID = cellfun(@(C)string(C),trialTable.TrialID,'UniformOutput',true);
          trialTable.Type = categorical(trialTable.Type,[1,2,3],["Solenoid", "ICMS", "Solenoid + ICMS"]);
          Targ = cellfun(@(C)string(C),trialTable.Solenoid_Target,'UniformOutput',true);

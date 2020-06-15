@@ -656,7 +656,7 @@ classdef solBlock < handle
          % Convert sample indices to times (SECONDS)
          ts = data([true, diff(data) > 1]) ./ obj.fs;
          [~,tPre,tPost] = getSpikeBinEdges(obj);
-         ts((ts - tPre) <= 0) = [];
+         ts((ts + tPre) <= 0) = [];
          ts((ts + tPost) >= obj.TotalDuration) = [];
          
          if updateTrialsProp
