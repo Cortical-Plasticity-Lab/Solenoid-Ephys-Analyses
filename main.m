@@ -33,6 +33,10 @@ r = solRat(folder_to_process);
 % batchProbePETH(r,cfg.TrialType('Solenoid_ICMS'));
 % tocData.graphics = round(toc(graphicstic));
 
+%% LAUNCH FIGURE BROWSER
+h = figBrowser(r);
+
+
 %% SAVE RAT OBJECTS
 % savetic = tic;
 % save(r);

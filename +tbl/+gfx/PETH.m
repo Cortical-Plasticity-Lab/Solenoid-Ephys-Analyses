@@ -17,6 +17,8 @@ function [fig,params] = PETH(T,varargin)
 params = cfg.gfx(); % Loads default parameters
 params = utils.getOpt(params,3,varargin{:}); % Match optional parameters
 
+% % User can pass `Axes` or `Figure` using 'Axes' or 'Figure' pairs % %
+% This can be useful for generating subplots, etc.
 if isempty(params.Figure)
    if isempty(params.Axes)
       fig = figure('Name','PETH',params.FigureParams{:});

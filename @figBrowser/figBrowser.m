@@ -1,12 +1,16 @@
 classdef figBrowser < handle
    %FIGBROWSER  Handle class for viewing figures
+   %
    %   h = FIGBROWSER(solRatObj);
+   %
+   %  This is a tool for scanning through different graphics and
+   %  re-exporting them in high-resolution if needed.
    
    properties (Access = public)
-      Rat
-      Menu
-      FigViewer
-      CurFile
+      Rat         % Currently-selected rat
+      Menu        % "Menu" figure graphics object handle
+      FigViewer   % "Viewer" figure graphics object handle
+      CurFile     % Current file to be loaded
    end
    
    properties (Access = private)
@@ -14,6 +18,7 @@ classdef figBrowser < handle
       curBlock  % Block name (within rat folder)
       curFig    % Figure file 
       
+      Buttons        % struct with pushbutton uicontrol graphics objects
       ratMenu        % uicontrol listbox handle
       blockMenu      % uicontrol listbox handle
       figMenu        % uicontrol listbox handle
@@ -22,6 +27,18 @@ classdef figBrowser < handle
    methods (Access = public)
       % Class constructor
       function obj = figBrowser(p)
+         %FIGBROWSER Constructor for figBrowser object for viewing figures
+         %
+         %  obj = figBrowser(p);
+         %
+         % Inputs
+         %  p - Scalar or array of solRat objects
+         %
+         % Output
+         %  obj - figBrowser scalar object, which allows curation of PETH,
+         %        IFR plots, and LFP plots. Requires user to be mapped to
+         %        the KUMC Isilon Processed_Data network drives.
+         
          if ~isa(p,'solRat')
             error('Input must be of class SOLRAT');
          end
@@ -34,17 +51,34 @@ classdef figBrowser < handle
       
       % OVERLOAD OPEN method
       function open(obj)
-         obj.buildFigViewer;
+         %OPEN Overloaded method for opening figures
+         %
+         %  open(obj);
+         %
+         % Inputs
+         %  obj - Scalar figBrowser object
+         %
+         % Output
+         %  -- none -- Simply builds the figure viewer and menu
+         
+         buildFigViewer(obj);
          if ~isvalid(obj.Menu)
-            obj.buildMenu;
+            buildMenu(obj);
          end
       end
    end
    
-   % Private callback methods
-   methods (Access = private)
+   % Protected callback methods
+   methods (Access = protected)
       % Method called when block menu value is changed
       function blockChangedCB(obj,src,~)
+         %BLOCKCHANGEDCB Callback executed when block menu value is changed
+         %
+         %  obj.blockMenu.Callback = @obj.blockChangedCB;
+         %
+         % Updates list of potential figures when the Block Menu value is
+         % changed.
+         
          obj.curBlock = src.String{src.Value};
          F = dir(fullfile(obj.curRat,...
                      obj.curBlock,...
@@ -67,11 +101,25 @@ classdef figBrowser < handle
       
       % Method called when fig menu value is changed
       function figChangedCB(obj,src,~)
+         %FIGCHANGEDCB Callback executed when fig menu value is changed
+         %
+         %  obj.figMenu.Callback = @obj.figChangedCB;
+         %
+         % Updates reference to current figure string so if load button is
+         % clicked it loads the corresponding figure.
+         
          obj.curFig = src.String{src.Value};
       end
       
       % Method called by LOAD PUSHBUTTON callback
       function loadFigCB(obj,~,~)
+         %LOADFIGCB Callback invoked by the "Load" button
+         %
+         %  loadPushButton.Callback = @obj.loadFigCB;
+         %
+         % Load the correct figure when `Load` pushbutton is clicked in the
+         % figure selection menu (obj.Menu)
+         
          obj.CurFile = fullfile(...
             obj.curRat,...
             obj.curBlock,...
@@ -99,6 +147,17 @@ classdef figBrowser < handle
       
       % Method for capturing key presses
       function keyCaptureCB(obj,~,evt)
+         %KEYCAPTURECB Method for capturing key presses
+         %
+         %  obj.Menu.ButtonDownFcn = @obj.keyCaptureCB;
+         %
+         % Creates responses to key presses when menu has focus. Current
+         % buttons are:
+         %  {'rightarrow','d'} : Increase value of figMenu by 1
+         %  {'leftarrow','a'}  : Decrease value of figMenu by 1
+         %  {'uparrow','w'}    : Decrease value of blockMenu by 1
+         %  {'downarrow','s'}  : Increase value of blockMenu by 1
+         
          switch evt.Key
             case {'rightarrow','d'} % Increase Value of figMenu by 1
                val = obj.figMenu.Value + 1;
@@ -137,6 +196,13 @@ classdef figBrowser < handle
       
       % Method called when MENU is closed
       function menuClosedCB(obj,~,~)
+         %MENUCLOSEDCB Method called when MENU is closed
+         %
+         %  obj.Menu.DeleteFcn = @obj.menuClosedCB;
+         %
+         % Ensures that if the menu for selecting which figure to load is
+         % closed, the "FigViewer" object and browser object are deleted.
+         
          if ~isempty(obj.FigViewer)
             if isvalid(obj.FigViewer)
                close(obj.FigViewer);
@@ -146,8 +212,12 @@ classdef figBrowser < handle
       
       % Method called when rat menu value is changed
       function ratChangedCB(obj,src,~)
+         %RATCHANGEDCB Called when rat menu value is changed
+         %
+         %  graphicsObj.Callback = @obj.ratChangedCB;
+         
          obj.curRat = obj.Rat(src.Value).folder;
-         F = dir(fullfile(obj.curRat,[obj.Rat(src.Value).Name '*']));
+         F = dir(fullfile(obj.curRat,[char(obj.Rat(src.Value).Name) '*']));
          if ~isempty(obj.blockMenu)
             if isvalid(obj.blockMenu)
                obj.blockMenu.Value = 1;
@@ -164,6 +234,17 @@ classdef figBrowser < handle
    methods (Access = private)
       % Method to build the figure "VIEWER" window
       function buildFigViewer(obj)
+         %BUILDFIGVIEWER Method that creates "viewer" graphics
+         %
+         %  buildFigViewer(obj);
+         %
+         % Inputs
+         %  obj - Scalar `figBrowser` object
+         %
+         % Creates the `FigViewer` property object, which is a figure that
+         % contains the currently-loaded data graphic.
+         
+         
          if isempty(obj.FigViewer)
             obj.FigViewer = figure('Name','Figure Viewer',...
                   'NumberTitle','off',...
@@ -183,6 +264,21 @@ classdef figBrowser < handle
       
       % Method to build the (main) "MENU" figure 
       function buildMenu(obj)
+         %BUILDMENU Creates the "Menu" figure graphics
+         %
+         %  buildMenu(obj);
+         %
+         % Inputs
+         %  obj - Scalar `figBrowser` object
+         %
+         % Creates the "Menu" which has 3 listboxes, from left-to-right: 
+         %  * Animal (obj.ratMenu)
+         %  * Block  (obj.blockMenu)
+         %  * Figure (obj.figMenu)
+         %
+         % Combinations of selections from these listboxes influence what
+         % is executed when the `Load` or `Generate` buttons are pushed.
+         
          obj.Menu = figure('Name','Solenoid Rat Figure Browser',...
             'Units','Normalized',...
             'Position',[0.1 0.65 0.3 0.15],...
@@ -194,7 +290,8 @@ classdef figBrowser < handle
             'WindowKeyPressFcn',@obj.keyCaptureCB);
          
          % Load button
-         uicontrol(obj.Menu,'Style','Pushbutton',...
+         obj.Buttons = struct;
+         obj.Buttons.Load = uicontrol(obj.Menu,'Style','Pushbutton',...
             'Units','Normalized',...
             'ForegroundColor','w',...
             'BackgroundColor','b',...
@@ -228,7 +325,7 @@ classdef figBrowser < handle
          obj.ratMenu = uicontrol(obj.Menu,'Style','ListBox',...
             'Units','Normalized',...
             'Position',[0.025 0.2 0.15 0.775],...
-            'String',{obj.Rat.Name}.',...
+            'String',[obj.Rat.Name].',...
             'Value',1,...
             'Callback',@obj.ratChangedCB,...
             'CreateFcn',@obj.ratChangedCB);
@@ -239,9 +336,22 @@ classdef figBrowser < handle
    
    % Static methods for parsing simple stuff
    methods (Static = true)
-      % Allows looping (val) in menus (each row is an element of cell array
-      % str)
+      % Allows looping (val) in menus
       function Value = parseMenuValue(val,str)
+         %PARSEMENUVALUE Parses value based on menu to facilitate scrolling
+         %
+         %  Value = figBrowser.parseMenuValue(val,str);
+         %
+         % Inputs
+         %  val - Value (index) numeric integer scalar
+         %  str - String property of a particular listbox, which is used to
+         %        determine if the array index is too high or if it goes to
+         %        zero, what the "largest" value it should be reset to
+         %        should be.
+         %
+         % Output
+         %  Value - Updated value of the indexing integer
+         
          n = numel(str);
          if val > numel(str) % If index is too high
             Value = 1; % Set to first element
