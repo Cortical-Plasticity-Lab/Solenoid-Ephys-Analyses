@@ -50,6 +50,7 @@ classdef solBlock < handle
       Solenoid_Location        % Table of solenoid location data and metadata
       Solenoid_Onset_Latency   % Array of solenoid extend times (1 per pulse, within a trial)
       Solenoid_Offset_Latency  % Array of solenoid retract times (1 per pulse, within a trial)
+      TotalDuration            % Total duration of recording (seconds)
       Trials                   % "Trial" timestamps (NEW / CYCLE setup)
       Triggers                 % "Trigger" timestamps (OLD / original setup)
       TrialType                % Categorical array indicating trial type
@@ -142,6 +143,7 @@ classdef solBlock < handle
          setMetaNames(obj,subf,id);
          
          % Parse trial times
+         setTotalDuration(obj);
          setTrials(obj);
          
          % Set ICMS stimuli
@@ -487,7 +489,7 @@ classdef solBlock < handle
                ['\n\t->\t<strong>[GETCLOSESTTRIALONSET]:</strong> ' ...
                 'This method only accepts a scalar `obj` input\n']);
          end
-         ts = obj.getTrials;
+         ts = getTrials(obj);
          [~,idx] = min(abs(ts - tVec(1)));
          t = ts(idx);
       end
@@ -628,13 +630,13 @@ classdef solBlock < handle
          if numel(obj) > 1
             ts = cell(numel(obj),1);
             for i = 1:numel(obj)
-               ts{i} = getTrigs(obj(i),updateTrialsProp);
+               ts{i} = getTrials(obj(i),updateTrialsProp);
             end
             return;
          end
          
          if exist(obj.trial,'file')==0
-            successful_parse = obj.parseTrials;
+            successful_parse = parseTrials(obj);
             if ~successful_parse
                ts = [];
                return;
@@ -642,7 +644,7 @@ classdef solBlock < handle
          end
          
          in = load(obj.trial,'data');
-         thresh = cfg.default('analog_thresh');
+         thresh = solBlock.getDefault('analog_thresh');
          if sum(in.data > thresh) == 0
             ts = [];
             return;
@@ -653,11 +655,9 @@ classdef solBlock < handle
          
          % Convert sample indices to times (SECONDS)
          ts = data([true, diff(data) > 1]) ./ obj.fs;
-         
-         % Simplify parsing "incomplete" trials
-         if numel(ts) > 1
-            ts = ts(1:(end-1)); 
-         end
+         [~,tPre,tPost] = getSpikeBinEdges(obj);
+         ts((ts - tPre) <= 0) = [];
+         ts((ts + tPost) >= obj.TotalDuration) = [];
          
          if updateTrialsProp
             obj.Trials = ts;
@@ -1169,11 +1169,11 @@ classdef solBlock < handle
          %              each element of `obj`
          
          if nargin < 4
-            tPost = cfg.default('tpost');
+            tPost = solBlock.getDefault('tpost');
          end
          
          if nargin < 3
-            tPre = cfg.default('tpre');
+            tPre = solBlock.getDefault('tpre');
          end
          
          if nargin < 2
@@ -1186,9 +1186,7 @@ classdef solBlock < handle
             end
             return;
          end
-         
-         subf = cfg.default('subf');
-         id = cfg.default('id');
+         [subf,id] = solBlock.getDefault('subf','id');
          
 %          outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots,subf.lfpcoh);
          outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
@@ -1196,9 +1194,8 @@ classdef solBlock < handle
             mkdir(outpath);
          end
          
-         
          if isempty(obj.Trials)
-            fprintf(1,'Trial times not yet parsed for %s.\n',obj.Name,obj.Name);
+            fprintf(1,'Trial times not yet parsed for %s.\n',obj.Name);
             return;
          end
          
@@ -1420,11 +1417,11 @@ classdef solBlock < handle
          end
          
          if nargin < 4
-            tPost = cfg.default('tpost');
+            tPost = solBlock.getDefault('tpost');
          end
          
          if nargin < 3
-            tPre = cfg.default('tpre');
+            tPre = solBlock.getDefault('tpre');
          end
          
          if nargin < 2
@@ -1600,6 +1597,77 @@ classdef solBlock < handle
                 '<strong>%s</strong>\n\t\t\t\t' ...
                 '(Should only contain <strong>one</strong> row ' ...
                 'per unique BlockID)\n'],fname,obj.Name);
+         end
+      end
+      
+      % Parse the trial TYPE (for new CYCLE setup)
+      function parseTrialType(obj,tTrials,thresh)
+         %PARSETRIALTYPE Parses the enumerated TYPE for each trial
+         %
+         % parseTrialType(obj,tTrials,thresh);
+         %
+         % Inputs
+         %  obj     - Scalar or array of `solBlock` objects
+         %  tTrials - Time of each trial (seconds)
+         %  thresh  - Threshold (seconds) for distinguishing between trials
+         %
+         % Output
+         %  Associates the TYPE with each trial in `obj.TrialType` property
+         
+         if ~isscalar(obj)
+            switch nargin
+               case 1
+                  for i = 1:numel(obj)
+                     parseTrialType(obj(i));
+                  end
+               case 2
+                  if iscell(tTrials)
+                     for i = 1:numel(obj)
+                        parseTrialType(obj(i),tTrials{i});
+                     end
+                  else
+                     for i = 1:numel(obj)
+                        parseTrialType(obj(i),tTrials);
+                     end
+                  end
+               otherwise
+                  if iscell(tTrials)
+                     for i = 1:numel(obj)
+                        parseTrialType(obj(i),tTrials{i},thresh);
+                     end
+                  else
+                     for i = 1:numel(obj)
+                        parseTrialType(obj(i),tTrials,thresh);
+                     end
+                  end
+            end
+            return;
+         end
+         if nargin < 3
+            thresh = solBlock.getDefault('trial_duration');
+         end
+         
+         if nargin < 2
+            tTrials = getTrials(obj);
+         end
+         
+         tStim = getICMS(obj);
+         tSol = getSolOnset(obj);
+         
+         obj.TrialType = nan(numel(tTrials),1);
+         for ii = 1:numel(tTrials)
+            dStim = min(abs(tStim - tTrials(ii)));
+            dSol = min(abs(tSol - tTrials(ii)));
+            
+            if (dStim < thresh) && (dSol < thresh)
+               obj.TrialType(ii) = cfg.TrialType('SolICMS');
+            elseif dStim < thresh
+               obj.TrialType(ii) = cfg.TrialType('ICMS');
+            elseif dSol < thresh
+               obj.TrialType(ii) = cfg.TrialType('Solenoid');
+            else
+               obj.TrialType(ii) = cfg.TrialType('Catch');
+            end
          end
       end
       
@@ -1958,6 +2026,28 @@ classdef solBlock < handle
          parseStimDistance(obj);
       end
       
+      function setTotalDuration(obj)
+         %SETTOTALDURATION Set total duration of recording block
+         %
+         %  setTotalDuration(obj)
+         %
+         % Inputs
+         %  obj - Scalar or array of `solBlock` objects
+         %
+         % Output
+         %  -- none -- Sets the `TotalDuration` property (seconds)
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setTotalDuration(obj(i));
+            end
+            return;
+         end
+         
+         [~,t] = getRaw(obj.Children,1);
+         obj.TotalDuration = t(end);
+      end
+      
       % Set Trial times
       function setTrials(obj,tTrials)
          %SETTRIALS Set trial times for scalar or array of objects
@@ -1983,7 +2073,7 @@ classdef solBlock < handle
          end
          
          % Parse array input
-         if numel(obj) > 1
+         if ~isscalar(obj)
             if ~iscell(tTrials)
                error(['SOLENOID:' mfilename ':BadSyntax'],...
                   ['\n\t->\t<strong>[SETTRIALS]:</strong> ' ...
@@ -1992,7 +2082,7 @@ classdef solBlock < handle
                    'with each cell corresponding to element of `obj`\n']);
             end
             for ii = 1:numel(obj)
-               obj(ii).setTrials(tTrials{ii});
+               setTrials(obj(ii),tTrials{ii});
             end
             return;
          end
@@ -2144,54 +2234,6 @@ classdef solBlock < handle
          save(obj.trial,'-struct','out');
          fprintf(1,'successful\n');
          successful_parse_flag = true;
-      end
-      
-      % Parse the trial TYPE (for new CYCLE setup)
-      function parseTrialType(obj,tTrials,thresh)
-         %PARSETRIALTYPE Parses the enumerated TYPE for each trial
-         %
-         % parseTrialType(obj,tTrials,thresh);
-         %
-         % Inputs
-         %  obj     - Scalar or array of `solBlock` objects
-         %  tTrials - Time of each trial (seconds)
-         %  thresh  - Threshold (seconds) for distinguishing between trials
-         %
-         % Output
-         %  Associates the TYPE with each trial in `obj.TrialType` property
-         
-         if ~isscalar(obj)
-            error(['SOLENOID:' mfilename ':BadInputSize'],...
-               ['\n\t->\t<strong>[PARSETRIALTYPE]:</strong> ' ...
-                '`parseTrialType` is a method for SCALAR ' ...
-                '`solBlock` objects only']);
-         end
-         if nargin < 3
-            thresh = solBlock.getDefault('trial_duration');
-         end
-         
-         if nargin < 2
-            tTrials = obj.getTrials;
-         end
-         
-         tStim = getICMS(obj);
-         tSol = getSolOnset(obj);
-         
-         obj.TrialType = nan(numel(tTrials),1);
-         for ii = 1:numel(tTrials)
-            dStim = min(abs(tStim - tTrials(ii)));
-            dSol = min(abs(tSol - tTrials(ii)));
-            
-            if (dStim < thresh) && (dSol < thresh)
-               obj.TrialType(ii) = cfg.TrialType('SolICMS');
-            elseif dStim < thresh
-               obj.TrialType(ii) = cfg.TrialType('ICMS');
-            elseif dSol < thresh
-               obj.TrialType(ii) = cfg.TrialType('Solenoid');
-            else
-               obj.TrialType(ii) = cfg.TrialType('Catch');
-            end
-         end
       end
    end
    

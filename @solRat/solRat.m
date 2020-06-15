@@ -714,6 +714,51 @@ classdef solRat < handle
          
          parseSolenoidInfo(obj.Children,fname);
       end
+      
+      % Update TrialType info for all child Blocks
+      function parseTrialType(obj)
+         %PARSETRIALTYPE Update TrialType info for all child Blocks
+         %
+         %  parseTrialType(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array `solRat` object
+         %
+         % Output
+         %  -- none -- Updates `solBlock.TrialType` property of each child
+         %              block for each `solRat` element of `obj` input.
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               parseTrialType(obj(i));
+            end
+            return;
+         end
+         
+         parseTrialType(obj.Children);
+      end
+      
+      % Set total duration of each child Block
+      function setTotalDuration(obj)
+         %SETTOTALDURATION Set total duration of each child Block
+         %
+         %  setTotalDuration(obj);
+         %
+         % Inputs
+         %  obj - Scalar or array of `solRat` objects
+         %
+         % Output
+         %  -- none -- Updates `solBlock.TotalDuration` property of each
+         %              child `solBlock` object in `obj.Children`
+         
+         if ~isscalar(obj)
+            for i = 1:numel(obj)
+               setTotalDuration(obj(i));
+            end
+            return;
+         end
+         setTotalDuration(obj.Children);
+      end
    end
    
    % Private "helper" methods (for initialization, etc.)

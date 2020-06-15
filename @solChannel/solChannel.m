@@ -332,13 +332,51 @@ classdef solChannel < handle
          %  binCounts - Matrix of counts of binned spikes, where each row
          %              corresponds to a single trial
          
-         if nargin < 2
-            trialType = cfg.TrialType('All');
-         end
          
-         if nargin == 5
-            % Set the spike bin edges if this arg is given
-            obj.setSpikeBinEdges(tPre,tPost,binWidth);
+         switch nargin
+            case 1
+               trialType = cfg.TrialType('All');
+               if ~isscalar(obj)
+                  binCounts = cell(size(obj));
+                  for i = 1:numel(obj)
+                     binCounts{i} = getBinnedSpikes(obj,trialType);
+                  end
+                  return;
+               end
+            case 2
+               if ~isscalar(obj)
+                  binCounts = cell(size(obj));
+                  for i = 1:numel(obj)
+                     binCounts{i} = getBinnedSpikes(obj,trialType);
+                  end
+                  return;
+               end
+            case 3
+               if ~isscalar(obj)
+                  binCounts = cell(size(obj));
+                  for i = 1:numel(obj)
+                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre);
+                  end
+                  return;
+               end
+            case 4
+               if ~isscalar(obj)
+                  binCounts = cell(size(obj));
+                  for i = 1:numel(obj)
+                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre,tPost);
+                  end
+                  return;
+               end
+            otherwise
+               if ~isscalar(obj)
+                  binCounts = cell(size(obj));
+                  for i = 1:numel(obj)
+                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
+                  end
+                  return;
+               else
+                  setSpikeBinEdges(obj,tPre,tPost,binWidth);
+               end
          end
          
          % Do we clip bin counts to one (per trial)?
@@ -347,12 +385,12 @@ classdef solChannel < handle
          %  -> For multi-unit activity, it's not inconceivable to see
          %     multiple spikes within a 2-ms epoch, simply due to the
          %     possibility of multiple sources generating said spikes.
-         clipBinCounts = cfg.default('clip_bin_counts');
+         clipBinCounts = solBlock.getDefault('clip_bin_counts');
          
-         edges = obj.getSpikeBinEdges;
+         edges = getSpikeBinEdges(obj);
          
          tSpike = getSpikes(obj);
-         trials = obj.getTrials(trialType);
+         trials = getTrials(obj,trialType,edges);
          binCounts = zeros(numel(trials),numel(edges)-1);
          
          for iT = 1:numel(trials)
@@ -1145,7 +1183,7 @@ classdef solChannel < handle
       end
       
       % Return times of TRIALS as a vector of times (seconds)
-      function ts = getTrials(obj,trialType)
+      function ts = getTrials(obj,trialType,edges)
          %GETTRIALS Return times of experimental trials as vector
          %
          %  ts = getTrials(obj);
@@ -1168,19 +1206,33 @@ classdef solChannel < handle
          
          if ~isscalar(obj)
             ts = cell(size(obj));
-            for i = 1:numel(obj)
-               ts{i} = getTrials(obj(i),trialType);
+            if nargin < 3
+               for i = 1:numel(obj)
+                  ts{i} = getTrials(obj(i),trialType);
+               end
+            else
+               for i = 1:numel(obj)
+                  ts{i} = getTrials(obj(i),trialType,edges{i});
+               end
             end
             return;
+         end
+         
+         if nargin < 3
+            [~,tPre,tPost] = getSpikeBinEdges(obj);
+         else
+            tPre = edges(1);
+            tPost = edges(end);
          end
          
          if trialType >= 100
             ts = obj.Parent.Trials;
          else
             ts = obj.Parent.Trials(ismember(...
-               obj.Parent.TrialType,...
-               trialType));
+               obj.Parent.TrialType,trialType));
          end
+         ts((ts + tPre) <= 0) = [];
+         ts((ts + tPost) >= obj.Parent.TotalDuration) = [];
       end
       
       % Return times of "triggers" (TRIALS) as a vector of time stamps
