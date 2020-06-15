@@ -19,6 +19,14 @@ function varargout = default(varargin)
 % Change file path stuff here
 out = struct;
 out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
+out.excel = 'Reach-Scoring.xlsx';
+out.site_location_table = 'Probe-Info.xlsx';
+out.solenoid_location_table = 'Solenoid-Info.xlsx';
+out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
+%put the list of rat names ex: MM-T1, order matches namingValue
+out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2';'MM-V1'}; 
+%put the list of their animal ID ex R19-226, order matches namingKey
+out.namingValue = {'R19-224';'R19-225';'R19-226';'R19-227';'R19-230';'R19-231';'R19-232';'R19-233';'R19-234'}; 
 out.subf = struct('raw','_RawData',...
                   'filt','_FilteredCAR',...
                   'ds','_DS',...
@@ -76,10 +84,45 @@ out.L = {  '019','021','000','029',...
 %          '013','010','004','007'};
 
 % Probe depth parameters
-out.offset =  -50;
-out.spacing = -100;
-out.nshank = 4;
+out.offset =  50;  % (microns from bottom channel to tip)
+out.spacing = 100; % (microns between channels on a shank)
+out.nshank = 4;            % # of shanks on the electrode
+out.nchannelpershank = 8;  % # of channels on each shank
 out.depth = -500;
+out.shankspacing = 400; % microns, distance between array shanks
+out.depthkey = struct('A',1600,'B',1300); % A : RFA -- 1600 microns; B : S1 -- 1300 microns
+out.thetakey = struct('A',0,'B',45);      % degrees (rotated from midline; + is clockwise)
+out.areakey = struct('A',"RFA",'B',"S1"); % areas
+out.mlkey = struct('A',2.5,'B', 3.5); % (mm) Lateral from bregma
+out.apkey = struct('A',2.5,'B',-0.5); % (mm) Anterior (rostral) from bregma
+out.orientationkey = struct('A',"Caudal",'B',"Rostral");
+
+% Defaults for graphics things
+out.color_order = [0.0 0.0 0.0; ...
+                   0.1 0.1 0.9; ...
+                   0.9 0.1 0.1; ...
+                   0.8 0.0 0.8; ...
+                   0.4 0.4 0.4; ...
+                   0.5 0.6 0.0; ...
+                   0.0 0.7 0.7];
+out.figparams = {'Color','w','Units','Normalized','Position',[0.2 0.2 0.5 0.5]};
+out.axparams = {'NextPlot','add','XColor','k','YColor','k','LineWidth',1.25,'ColorOrder',out.color_order};
+out.scatterparams = {'Marker','o','MarkerFaceColor','flat','MarkerFaceAlpha',0.75};
+out.fontparams = {'FontName','Arial','Color','k'};
+
+% Trial data struct
+out.init_trial_data = struct(...
+               'TrialID',"",...
+               'Type',"",...
+               'Time',[],...
+               'Number',[],...
+               'ICMS_Onset',[],...
+               'ICMS_Channel',[],...
+               'Solenoid_Onset',[],...
+               'Solenoid_Offset',[],...
+               'Solenoid_Target',"",...
+               'Solenoid_Paw',"",...
+               'Solenoid_Abbrev',"");
 
 % Default figure position
 out.figpos = [0.15 0.15 0.3 0.3];
@@ -92,6 +135,8 @@ out.tpost = 0.750;
 out.binwidth = 0.002;
 out.ylimit = [0 50];
 out.xlimit = [-250 750];
+out.labelsindex = 23; % Index of channel to add labels to in subplot array
+out.indicator_pct = 0.9; % % of max. height for superimposing timing indicator lines
 
 % Rate estimation parameters
 out.rate.w = 20; % kernel size (ms)
@@ -103,6 +148,7 @@ out.ds.xlimit = [-250 750];
 out.ds.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ds.lw = 1.75;
 out.fs_d = 1000;
+out.clip_bin_counts = false; % Do not clip bin counts to one if false
 
 % Default IFR average trace parameters
 out.ifr.ylimit = [-4 4];
@@ -118,6 +164,80 @@ out.probe_a_loc = 'RFA'; % depends on recording block
 out.probe_b_loc = 'S1';  % depends on recording block
 out.trial_high_duration = 500; % ms (same for all recordings in CYCLE setup)
 out.fig_type_for_browser = 'Probe-Plots';
+
+% (main experiment) Lists for making categorical variables (reduce size)
+out.all_blocks = ...
+["R19-224_2019_11_04_0";
+"R19-224_2019_11_04_1";
+"R19-224_2019_11_04_2";
+"R19-224_2019_11_04_3";
+"R19-226_2019_11_05_0";
+"R19-226_2019_11_05_1";
+"R19-226_2019_11_05_2";
+"R19-226_2019_11_05_3";
+"R19-227_2019_11_05_0";
+"R19-227_2019_11_05_1";
+"R19-227_2019_11_05_2";
+"R19-227_2019_11_05_3";
+"R19-227_2019_11_05_4";
+"R19-227_2019_11_05_5";
+"R19-227_2019_11_05_6";
+"R19-230_2019_11_06_0";
+"R19-230_2019_11_06_1";
+"R19-230_2019_11_06_2";
+"R19-230_2019_11_06_3";
+"R19-230_2019_11_06_4";
+"R19-230_2019_11_06_5";
+"R19-231_2019_11_06_0";
+"R19-231_2019_11_06_1";
+"R19-231_2019_11_06_2";
+"R19-231_2019_11_06_3";
+"R19-231_2019_11_06_4";
+"R19-231_2019_11_06_5";
+"R19-231_2019_11_06_6";
+"R19-232_2019_11_07_0";
+"R19-232_2019_11_07_1";
+"R19-232_2019_11_07_2";
+"R19-232_2019_11_07_3";
+"R19-232_2019_11_07_4";
+"R19-232_2019_11_07_5";
+"R19-234_2019_11_07_0";
+"R19-234_2019_11_07_1";
+"R19-234_2019_11_07_2";
+"R19-234_2019_11_07_3";
+"R19-234_2019_11_07_4";
+"R19-234_2019_11_07_5";
+"R19-234_2019_11_07_6";
+"R19-234_2019_11_07_7"];
+out.all_abbr = ... % All possible abbreviations for TAG (see Solenoid-Info.xlsx)
+   ["U";
+    "WR";
+    "PAW";
+    "D1";
+    "D1P";
+    "D1K";
+    "D2";
+    "D2P";
+    "D2K";
+    "D3";
+    "D3P";
+    "D3K";
+    "D4";
+    "D4P";
+    "D4K";
+    "D5";
+    "D5P";
+    "D5K";
+    "PLM";
+    "DFL";
+    "PFL"];
+out.all_tgt= ... % All possible "generic" target options (see Solenoid-Info.xlsx, Target column)
+   ["Forelimb";
+    "Digit"; 
+    "Knuckle";
+    "Wrist";
+    "Paw";
+    "Palm"];
 
 % Parse output (don't change this part)
 if nargin < 1

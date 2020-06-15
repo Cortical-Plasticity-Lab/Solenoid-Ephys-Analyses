@@ -6,7 +6,7 @@ Analyses for multi-unit spiking responses &amp; evoked local field potentials (L
   * `solBlock` is "child" to `solRat`
   * `solChannel` is "child" to `solBlock`
     * I can't remember if `solChannel` is actually used that much
-
+## git test - sdalla##
 ## To-Do ##
 
 * Determine if there is usable data to test the following generic hypothesis:
