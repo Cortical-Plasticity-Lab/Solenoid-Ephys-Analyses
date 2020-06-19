@@ -22,6 +22,7 @@ out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
 out.site_location_table = 'Probe-Info.xlsx';
 out.solenoid_location_table = 'Solenoid-Info.xlsx';
+out.icms_file = 'ICMS-Info.xlsx';
 out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
 %put the list of rat names ex: MM-T1, order matches namingValue
 out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2';'MM-V1'}; 
