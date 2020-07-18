@@ -50,29 +50,38 @@ yline(meanPreSolTrim(i))
 %set a time delay to ignore solenoid artifact
 delayTime = 0.02;
 delayBin = floor(delayTime/binWidth);
-%set a time to ignore peaks after with respect to solenoid onset
-maxTime = 0.05;
+%set a time to ignore peaks after with respect to event
+maxTime = 0.1; %the difference between maxTime and delayTime is the window size in seconds
 maxBin = floor(maxTime/binWidth);
 
+% set the window of bins that we want to get the data from
+delays = floor(pPre*numBins)+delayBin;
+close = floor(pPre*numBins)+maxBin;
 
 peakCells = cell(length(meanPreSolTrim), length(sDev));
 locCells = cell(length(meanPreSolTrim), length(sDev));
 widthCells = cell(length(meanPreSolTrim), length(sDev));
 promCells = cell(length(meanPreSolTrim), length(sDev));
 
-%TODO: impliment ability to check solenoidOnset and add that accordingly
+%TODO: impliment ability to check solenoidOnset and add that accordingly?
+% or does the PETH used to generate spikes take that into account?
 
 for i = 1:length(sDev)
     iDev = sDev(i);
     for j = 1:length(meanPreSolTrim)
         thresh = iDev*meanPreSolTrim(j);
-        delays = floor(pPre*numBins)+delayBin;
-        d = sumSpikes(j, delays:end);
+        
+        % may need to group based on the solenoid onset and offset?
+        %sOnSet = T(T.SurgID == string(G_SurgID(j)) & T.Channel == G_Channel(j) & T.Type == G_Type(j),:);
+        %sOffSet = T(T.SurgID == string(G_SurgID(j)) & T.Channel == G_Channel(j) & T.Type == G_Type(j), T.Solenoid_Offset);
+        
+        
+        d = sumSpikes(j, delays:close);
         [pks, locs, w, p] = findpeaks(d, 'Threshold',thresh);
         
-        %check this for off by one error on the addition 
+         
         peakCells{j,i} = pks;
-        locCells{j,i} = locs+delays;
+        locCells{j,i} = locs+delays; %check this for off by one error on the addition
         widthCells{j,i} = w;
         promCells{j,i} = p;
         
