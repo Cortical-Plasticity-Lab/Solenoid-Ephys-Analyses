@@ -158,6 +158,7 @@ out.ifr.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ifr.lw = 1.75;
 
 % For CYCLE setup, parsing parameters
+out.sol_onset_phys_delay = 0.004; % Physical delay (seconds) between HIGH and solenoid striking paw
 out.analog_thresh = 0.02;     % Analog threshold for LOW to HIGH value
 out.trial_duration = 1;       % Trial duration (seconds)
 out.do_rate_estimate = true;  % Estimate rates (if not present)? [CAN BE LONG]

@@ -1,5 +1,5 @@
 classdef solBlock < handle
-%SOLBLOCK  Class for organizing data from an individual recording
+%SOLBLOCK  Handle class for organizing data from an individual recording
 %
 %   obj = solBlock(); Create a single solBlock object by selecting folder
 %   obj = solBlock(ratObj,folder); Create a child solBlock of solRat
