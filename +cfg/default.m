@@ -22,6 +22,7 @@ out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
 out.excel = 'Reach-Scoring.xlsx';
 out.site_location_table = 'Probe-Info.xlsx';
 out.solenoid_location_table = 'Solenoid-Info.xlsx';
+out.icms_file = 'ICMS-Info.xlsx';
 out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
 %put the list of rat names ex: MM-T1, order matches namingValue
 out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2';'MM-V1'}; 
@@ -157,6 +158,7 @@ out.ifr.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ifr.lw = 1.75;
 
 % For CYCLE setup, parsing parameters
+out.sol_onset_phys_delay = 0.004; % Physical delay (seconds) between HIGH and solenoid striking paw
 out.analog_thresh = 0.02;     % Analog threshold for LOW to HIGH value
 out.trial_duration = 1;       % Trial duration (seconds)
 out.do_rate_estimate = true;  % Estimate rates (if not present)? [CAN BE LONG]

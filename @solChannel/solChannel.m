@@ -1,5 +1,5 @@
 classdef solChannel < handle
-   %SOLCHANNEL  Organization object for data at the individual-channel level
+   %SOLCHANNEL  Handle class to organize data at the individual-channel level
    %
    %  obj = solChannel(solBlockObj,info);
    %

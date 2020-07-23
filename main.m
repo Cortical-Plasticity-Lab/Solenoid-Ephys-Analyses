@@ -34,13 +34,14 @@ r = solRat(folder_to_process);
 % tocData.graphics = round(toc(graphicstic));
 
 %% LAUNCH FIGURE BROWSER
-h = figBrowser(r);
-
+% h = figBrowser(r);
 
 %% SAVE RAT OBJECTS
 % savetic = tic;
 % save(r);
 % tocData.save = round(toc(savetic));
 
-%%
+%% CREATE MASTER TABLE FOR FURTHER STATISTICS
+T = makeTables(r);
+save('Solenoid-Table.mat','T','-v7.3'); % (Large-ish)
 % tocData.total = round(toc(maintic));

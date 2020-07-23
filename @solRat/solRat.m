@@ -211,12 +211,19 @@ classdef solRat < handle
          masterTable = [ratTable, blockTable];
          
          % Add unique "ID" to each row
-%          masterTable.RowID = utils.makeKey(...
-%             nBlockRows,'unique',[strrep(char(obj.Name),'-','') '_']);
          masterTable.RowID = (firstRowID:(firstRowID+nBlockRows-1)).';
          
          % Move appended `RowID` to first variable:
          masterTable = masterTable(:,[end, 1:(end-1)]);
+         masterTable.Properties.UserData = struct(...
+            'type','MasterTable',...
+            't',struct(...
+                  'Spikes',linspace(tPre,tPost,size(T.Spikes,2)),...
+                  'LFP',linspace(tPre,tPost,size(T.LFP,2)))...
+         );
+         masterTable.Properties.Description = ...
+            'Aggregate data from all experiments from each rat';
+         
       end
       
       % Overload of built-in `openfig` method
@@ -547,8 +554,8 @@ classdef solRat < handle
          
          % Parse relevant parameters from the model
          deficitTable.Rsquared = lme.Rsquared.Adjusted;
-         deficitTable.p = lme.Coefficients(2,6); % 'day', p-value column
-         deficitTable.coeff = lme.Coefficients(2,2); % Coefficient for day
+         deficitTable.p = lme.Coefficients(2,6).pValue; % 'day', p-value column
+         deficitTable.coeff = lme.Coefficients(2,2).Estimate; % Coefficient for day
       end
       
       % Displays a graph of a rats behavior over time (pre and post op)

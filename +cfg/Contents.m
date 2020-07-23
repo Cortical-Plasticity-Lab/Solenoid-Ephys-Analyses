@@ -13,11 +13,11 @@
 % arguments are specified, then a list of parameters is printed to the
 % Command Window.
 %
-% Enumeration Classes
+% <strong>Enumeration Classes<?strong>
 %  Hem       - Class with enumerations for Left and Right hemispheres
 %  TrialType - Class with enumerations for different Trial Types
 %
-% Files
+% <strong>Files</strong>
 %  default   - Default parameters for `sol` classes
 %  gfx       - Default parameters for functions in tbl.gfx package
 %  stats     - Default parameters for functions in tbl.stats package
