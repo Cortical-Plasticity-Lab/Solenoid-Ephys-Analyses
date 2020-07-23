@@ -397,7 +397,7 @@ classdef solChannel < handle
             binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
          end
          
-         if clipBinCounts
+         if clipBinCounts % Default is set to false (2020-07-23)
             binCounts = min(binCounts,1); % Clip to 1 spike per bin
          end
       end

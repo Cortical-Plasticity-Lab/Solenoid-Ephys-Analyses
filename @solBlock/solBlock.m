@@ -778,7 +778,7 @@ classdef solBlock < handle
       end
       
       % Return the spike bin (histogram) edge times
-      function [edges,tPre,tPost] = getSpikeBinEdges(obj)
+      function [edges,tPre,tPost,tCenters] = getSpikeBinEdges(obj)
          %GETSPIKEBINEDGES Return spike bin (histogram) edge times
          %
          %  edges = getSpikeBinEdges(obj);
@@ -810,6 +810,7 @@ classdef solBlock < handle
          edges = obj.edges;
          tPre = edges(1);
          tPost = edges(end);
+         tCenters = edges(1:(end-1)) + (diff(edges)./2);
       end
       
       % Return data related to each trial
