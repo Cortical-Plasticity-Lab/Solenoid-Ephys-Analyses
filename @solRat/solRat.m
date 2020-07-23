@@ -214,21 +214,15 @@ classdef solRat < handle
             masterTable.RowID = (firstRowID:(firstRowID+nBlockRows-1)).';
             
             % Move appended `RowID` to first variable:
-            masterTable = masterTable(:,[end, 1:(end-1)]);
-            
-            % Should be same for each child:
-            [~,~,~,tSpike] = getSpikeBinEdges(obj.Children(1));
-            
+            masterTable = masterTable(:,[end, 1:(end-1)]);            
             masterTable.Properties.UserData = struct(...
                 'exportDate',datetime,... % Current date/timestamp
                 'settings',cfg.default,...% Any default parameters associated with this Table Export
                 'type','MasterTable',...  % 'type' for other functions to check validity of Table
-                't',struct(... % struct with times since it is the same for every element of .Spikes or .LFP
-                'Spikes',tSpike,...
-                'LFP',linspace(tPre,tPost,size(T.LFP,2)))...
+                't',blockTable.Properties.UserData.t ...
                 );
             masterTable.Properties.Description = ...
-                'Aggregate data from all experiments from each rat';
+                'Aggregate data from all experimental recordings taken from each rat';
             
         end
         

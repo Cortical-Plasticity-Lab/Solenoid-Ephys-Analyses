@@ -314,7 +314,10 @@ classdef solBlock < handle
          thisTable.Properties.VariableDescriptions = {'Recording identifier'};
          thisTable.Properties.Description = 'Block information';
          thisTable.Properties.UserData = struct(...
-            'type','BlockTable');
+            'exportDate',datetime,...
+            'settings',cfg.default(),...
+            'type','BlockTable',...
+            't',channelTable.Properties.UserData.t);
          
          % Concatenate Block-level info with Channel-level info for output
          blockTable = [thisTable, channelTable];
@@ -782,7 +785,7 @@ classdef solBlock < handle
          %GETSPIKEBINEDGES Return spike bin (histogram) edge times
          %
          %  edges = getSpikeBinEdges(obj);
-         %  [edges,tPre,tPost] = getSpikeBinEdges(obj);
+         %  [edges,tPre,tPost,tCenters] = getSpikeBinEdges(obj);
          %
          % Inputs
          %  obj   - Scalar or array of `solBlock` objects
@@ -793,13 +796,14 @@ classdef solBlock < handle
          %          then returns a cell array of such vectors.
          %  tPre  - Time (sec) of first element of `edges` (convenience)
          %  tPost - Time (sec) of last element of `edges` (convenience)
+         %  tCenters - Times (sec) of center of each column (bin; sample)
          
          if ~isscalar(obj)
             edges = cell(numel(obj),1);
             tPre = nan(size(obj));
             tPost = nan(size(obj));
             for ii = 1:numel(obj)
-               [edges{ii},tPre(ii),tPost(ii)] = getSpikeBinEdges(obj(ii));
+               [edges{ii},tPre(ii),tPost(ii),tCenters] = getSpikeBinEdges(obj(ii));
             end
             return;
          end
