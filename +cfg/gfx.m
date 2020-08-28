@@ -26,6 +26,7 @@ p.ColorOrder = [0.0 0.0 0.0; ...
 p.FigureParams = {'Color','w','Units','Normalized','Position',[0.2 0.2 0.5 0.5]};
 p.AxesParams = {'NextPlot','add','XColor','k','YColor','k','LineWidth',1.25,'ColorOrder',p.ColorOrder};
 p.ScatterParams = {'Marker','o','MarkerFaceColor','flat','MarkerFaceAlpha',0.75};
+p.ShadedErrorParams = {'UseMedian',true};
 p.FontParams = {'FontName','Arial','Color','k'};
 
 % Parse output (don't change this part)

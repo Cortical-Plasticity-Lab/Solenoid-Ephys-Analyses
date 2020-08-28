@@ -1,12 +1,14 @@
-function [fig,params] = PETH(T,varargin)
+function [fig,params] = PETH(T,filtArgs,varargin)
 %PETH Generate/export peri-event time histograms (PETH)
 %
-%  fig = tbl.gfx.PETH(T);
-%  fig = tbl.gfx.PETH(T,...);
+%  fig = tbl.gfx.PETH(T,filtArgs);
+%  fig = tbl.gfx.PETH(T,filtArgs,...);
 %  [fig,params] = ...
 %
 % Inputs
 %  T        - Table exported using solRat.makeTables
+%  filtArgs - Cell array of 'Name',value pairs for filtering table
+%              -> e.g. {'Variable1',value1,'Variable2',value2...}
 %  varargin - (Optional) pairs of 'Name', value inputs
 %
 % Output
@@ -19,26 +21,7 @@ params = utils.getOpt(params,3,varargin{:}); % Match optional parameters
 
 % % User can pass `Axes` or `Figure` using 'Axes' or 'Figure' pairs % %
 % This can be useful for generating subplots, etc.
-if isempty(params.Figure)
-   if isempty(params.Axes)
-      fig = figure('Name','PETH',params.FigureParams{:});
-      ax = axes(fig,params.AxesParams{:});
-   else
-      ax = params.Axes;
-      fig = get(ax,'Parent');
-      if ~isa(fig,'matlab.ui.Figure')
-         fig = gcf;
-      end
-   end
-   params.Axes = ax;
-   params.Figure = fig;
-else
-   fig = params.Figure;
-   if isempty(params.Axes)
-      params.Axes = axes(fig,params.AxesParams{:});
-   end
-   ax = params.Axes;
-end
+[fig,ax] = utils.getFigAx(params,'PETH');
 
 % Add figure using `fig` or `ax` etc %
 

@@ -6,6 +6,7 @@
 %
 % <strong>Functions</strong>
 %  fastsmooth      - Smooths vector X
+%  getFigAx        - Return figure and axes handles given parameters struct
 %  getOpt          - Process paired optional arguments as `prop`,val1 
 %  getPathTo       - Return output from uigetdir basically
 %  makeKey         - Utility to make random alphanumeric key-string for naming a "row"
