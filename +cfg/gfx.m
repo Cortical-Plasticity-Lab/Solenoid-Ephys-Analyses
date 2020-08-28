@@ -15,7 +15,7 @@ function varargout = gfx(varargin)
 p = struct;
 p.Figure = [];
 p.Axes   = [];
-
+p.Color  = [0.5 0.5 0.5];
 p.ColorOrder = [0.0 0.0 0.0; ...
                 0.1 0.1 0.9; ...
                 0.9 0.1 0.1; ...
@@ -25,9 +25,15 @@ p.ColorOrder = [0.0 0.0 0.0; ...
                 0.0 0.7 0.7];
 p.FigureParams = {'Color','w','Units','Normalized','Position',[0.2 0.2 0.5 0.5]};
 p.AxesParams = {'NextPlot','add','XColor','k','YColor','k','LineWidth',1.25,'ColorOrder',p.ColorOrder};
-p.ScatterParams = {'Marker','o','MarkerFaceColor','flat','MarkerFaceAlpha',0.75};
+p.BarParams = {'FaceColor',p.Color,'EdgeColor','none','FaceAlpha',0.75,'Tag','Histogram'};
+p.ScatterParams = {'Marker','o','MarkerFaceColor','flat','MarkerFaceAlpha',0.75,'Tag','Scatter'};
 p.ShadedErrorParams = {'UseMedian',true};
 p.FontParams = {'FontName','Arial','Color','k'};
+p.LegendParams = {'TextColor','black','FontName','TimesNewRoman','FontSize',8,'Color','none','EdgeColor','none'};
+p.DisplayName = '';
+p.Title  = '';
+p.XLabel = '';
+p.YLabel = '';
 
 % Parse output (don't change this part)
 if nargin < 1

@@ -76,5 +76,7 @@ utils.addHelperRepos();
 
 % Now, add the shaded error plot
 gfx__.plotWithShadedError(ax,t,X,params.ShadedErrorParams{:});
+params = utils.checkXYLabels(params,'(ms)','(\muV)');
+utils.addLabelsToAxes(ax,params);
 
 end
