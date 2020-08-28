@@ -1,3 +1,12 @@
+% FINDEVOKEDPEAKS Script to test functions for finding evoked spike response
+%
+% General strategy is as follows:
+%  Input: rat, channel, trialType, varargin(for standard dev)
+%  Return: array of peak time, width, num spikes, and rank for each peak
+%
+%  Generic schema for output:
+%  [[tPeak1, binWidth1, numSpikes1, rank1] , [tPeak2, binWidth2, numSpikes2, rank2] ]
+
 % Load in the table, it will take a minute or so
 clearvars -except T
 close all force;
@@ -7,11 +16,6 @@ if exist('T','var')==0
    T = getfield(load('Solenoid-Table.mat', 'T'),'T');
 end
 %%
-% General:
-% Input: rat, channel, trialType, varargin(for standard dev)
-% Return: array of peak time, width, num spikes, and rank for each peak
-% ex: [[tPeak1, binWidth1, numSpikes1, rank1] , [tPeak2, binWidth2, numSpikes2, rank2] ]
-
 % Testing variables (can be changed)
 
 rat = "R19-226";

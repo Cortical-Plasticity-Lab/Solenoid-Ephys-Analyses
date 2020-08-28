@@ -5,5 +5,10 @@
 %  in table format.
 %
 % Packages
-%  gfx   - Package with figure export/generation functions
-%  stats - Package with statistics export or analysis functions
+%  gfx               - Package with figure export/generation functions
+%  stats             - Package with statistics export or analysis functions
+%
+% Functions
+%  addProcessing     - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
+%  addSlicing        - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
+%  slice             - Return "sliced" table using filters in `varargin`

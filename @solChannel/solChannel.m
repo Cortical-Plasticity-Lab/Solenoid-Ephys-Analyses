@@ -312,13 +312,14 @@ classdef solChannel < handle
       end
       
       % Returns matrix of counts of binned spikes
-      function binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
+      function [binCounts,binCenters] = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth)
          %GETBINNEDSPIKES Returns matrix of counts of binned spikes
          %
          % binCounts = getBinnedSpikes(obj);
          % binCounts = getBinnedSpikes(obj,trialType);
          % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost);
          % binCounts = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
+         % [binCounts,binCenters] = getBinnedSpikes(obj,__);
          %
          % Inputs
          %  obj       - Scalar or array of `solChannel` objects
@@ -331,6 +332,8 @@ classdef solChannel < handle
          % Output
          %  binCounts - Matrix of counts of binned spikes, where each row
          %              corresponds to a single trial
+         %  binCenters- Array of times of bin centers (corresponds to
+         %                  columns of `binCounts`)
          
          
          switch nargin
@@ -339,7 +342,7 @@ classdef solChannel < handle
                if ~isscalar(obj)
                   binCounts = cell(size(obj));
                   for i = 1:numel(obj)
-                     binCounts{i} = getBinnedSpikes(obj,trialType);
+                     [binCounts{i},binCenters] = getBinnedSpikes(obj,trialType);
                   end
                   return;
                end
@@ -347,7 +350,7 @@ classdef solChannel < handle
                if ~isscalar(obj)
                   binCounts = cell(size(obj));
                   for i = 1:numel(obj)
-                     binCounts{i} = getBinnedSpikes(obj,trialType);
+                     [binCounts{i},binCenters] = getBinnedSpikes(obj,trialType);
                   end
                   return;
                end
@@ -355,7 +358,7 @@ classdef solChannel < handle
                if ~isscalar(obj)
                   binCounts = cell(size(obj));
                   for i = 1:numel(obj)
-                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre);
+                     [binCounts{i},binCenters] = getBinnedSpikes(obj,trialType,tPre);
                   end
                   return;
                end
@@ -363,7 +366,7 @@ classdef solChannel < handle
                if ~isscalar(obj)
                   binCounts = cell(size(obj));
                   for i = 1:numel(obj)
-                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre,tPost);
+                     [binCounts{i},binCenters] = getBinnedSpikes(obj,trialType,tPre,tPost);
                   end
                   return;
                end
@@ -371,7 +374,7 @@ classdef solChannel < handle
                if ~isscalar(obj)
                   binCounts = cell(size(obj));
                   for i = 1:numel(obj)
-                     binCounts{i} = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
+                     [binCounts{i},binCenters] = getBinnedSpikes(obj,trialType,tPre,tPost,binWidth);
                   end
                   return;
                else
@@ -387,7 +390,7 @@ classdef solChannel < handle
          %     possibility of multiple sources generating said spikes.
          clipBinCounts = solBlock.getDefault('clip_bin_counts');
          
-         edges = getSpikeBinEdges(obj);
+         [edges,~,~,binCenters] = getSpikeBinEdges(obj);
          
          tSpike = getSpikes(obj);
          trials = getTrials(obj,trialType,edges);
@@ -397,7 +400,7 @@ classdef solChannel < handle
             binCounts(iT,:) = histcounts(tSpike-trials(iT),edges);
          end
          
-         if clipBinCounts
+         if clipBinCounts % Default is set to false (2020-07-23)
             binCounts = min(binCounts,1); % Clip to 1 spike per bin
          end
       end
@@ -510,6 +513,7 @@ classdef solChannel < handle
             channelTable.Hemisphere,["Right","Left"]);
          channelTable.Probe = categorical(...
             channelTable.Probe,["A","B"]);
+         channelTable.Properties.UserData = dataTable.Properties.UserData;
          
       end %%%% End of makeTables%%%%
    end
@@ -806,10 +810,10 @@ classdef solChannel < handle
          
          % Return all binned spikes (for all trials) on this channel
          allTrials = cfg.TrialType('All');
-         Spikes = getBinnedSpikes(obj,allTrials,tPre,tPost);
+         [Spikes,tSpike] = getBinnedSpikes(obj,allTrials,tPre,tPost);
          
          % Return all aligned LFP data
-         LFP = getAlignedLFP(obj,allTrials);
+         [LFP,tLFP] = getAlignedLFP(obj,allTrials);
          
          % Make table for Spikes & LFP data
          dataTable = table(Spikes, LFP);
@@ -819,9 +823,13 @@ classdef solChannel < handle
             {'Histogram bin counts of spikes by trial',...
              'Decimated LFP voltage signal (microvolts) during trial'};
           dataTable.Properties.UserData = struct(...
+             'exportDate',datetime,...
+             'settings',cfg.default(),...
              'type','Data',...
-             'tSpike',linspace(tPre,tPost,size(Spikes,2)),...
-             'tLFP',linspace(tPre,tPost,size(LFP,2)));
+             't',struct(... % struct with times since it is the same for every element of .Spikes or .LFP
+                    'Spikes',tSpike,...
+                    'LFP',tLFP)...
+              );
       end
       
       % Returns BANDPASS FILTERED (UNIT) data for this channel
@@ -1089,11 +1097,11 @@ classdef solChannel < handle
       end
       
       % Return SPIKE BIN EDGES used to generate spike histograms or rasters
-      function [edges,tPre,tPost] = getSpikeBinEdges(obj)
+      function [edges,tPre,tPost,tCenters] = getSpikeBinEdges(obj)
          %GETSPIKEBINEDGES Return spike bin edges used in histogram 
          %
          %  edges = getSpikeBinEdges(obj);
-         %  [edges,tPre,tPost] = getSpikeBinEdges(obj);
+         %  [edges,tPre,tPost,tCenters] = getSpikeBinEdges(obj);
          %
          % Inputs
          %  obj   - Scalar or array of `solChannel` objects
@@ -1106,13 +1114,14 @@ classdef solChannel < handle
          %           vector of edge times.
          %  tPre  - Time (sec) of first element of `edges` (convenience)
          %  tPost - Time (sec) of last element of `edges` (convenience)
+         %  tCenters - Times (sec) of center of each column (bin; sample)
          
          if ~isscalar(obj)
             edges = cell(size(obj));
             tPre = nan(size(obj));
             tPost = nan(size(obj));
             for i = 1:numel(obj)
-               [edges{i},tPre(i),tPost(i)] = getSpikeBinEdges(obj(i));
+               [edges{i},tPre(i),tPost(i),tCenters] = getSpikeBinEdges(obj(i));
             end
             return;
          end
@@ -1123,7 +1132,7 @@ classdef solChannel < handle
          edges = obj.edges;
          tPre = edges(1);
          tPost = edges(end);
-
+         tCenters = edges(1:(end-1)) + (diff(edges)./2);
       end
       
       % Return times of ICMS stimuli

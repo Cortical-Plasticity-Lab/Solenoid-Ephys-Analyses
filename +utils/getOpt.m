@@ -76,8 +76,12 @@ else
    matchtype = 0;
 end
 
-if iscell(varargin{1})
-   varargin = varargin{1};
+if numel(varargin) > 0
+   if iscell(varargin{1})
+      varargin = varargin{1};
+   end
+else
+   return; % Nothing left to parse
 end
 
 % Check that number of inputs makes sense

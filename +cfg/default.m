@@ -18,11 +18,24 @@ function varargout = default(varargin)
 
 % Change file path stuff here
 out = struct;
-out.path = 'P:\Rat\BilateralReach\Solenoid Experiments';
-out.excel = 'Reach-Scoring.xlsx';
-out.site_location_table = 'Probe-Info.xlsx';
-out.solenoid_location_table = 'Solenoid-Info.xlsx';
-out.icms_file = 'ICMS-Info.xlsx';
+out.repos = struct('Utilities','D:\MATLAB\Projects\Utilities');
+out.path = "P:\Rat\BilateralReach\Solenoid Experiments";
+out.rats = [ ...
+   "R19-224"; ...
+   "R19-226"; ...
+   "R19-227"; ...
+   "R19-230"; ...
+   "R19-231"; ...
+   "R19-232"; ...
+   "R19-234";
+   ];
+out.exported_database_table__local = "Solenoid-Table__5-ms.mat";
+out.exported_database_table__remote = fullfile(out.path,...
+   out.exported_database_table__local);
+out.excel = "Reach-Scoring.xlsx";
+out.site_location_table = "Probe-Info.xlsx";
+out.solenoid_location_table = "Solenoid-Info.xlsx";
+out.icms_file = "ICMS-Info.xlsx";
 out.transform = @(y)atan(pi*y - pi/2); % Transform for LME predicted output
 %put the list of rat names ex: MM-T1, order matches namingValue
 out.namingKey ={'MM-S1';'MM-S2';'MM-T1';'MM-T2';'MM-U1';'MM-U2';'MM-W1';'MM-W2';'MM-V1'}; 
@@ -132,10 +145,10 @@ out.barcols = {[0.8 0.2 0.2];[0.2 0.2 0.8]};
 
 % Default PETH parameters
 out.tpre = -0.250;
-out.tpost = 0.750;
-out.binwidth = 0.002;
+out.tpost = 0.500;    % Decrease (750-ms to 500-ms: 2020-07-23)
+out.binwidth = 0.005; % Increase (2-ms to 5-ms: 2020-07-23)
 out.ylimit = [0 50];
-out.xlimit = [-250 750];
+out.xlimit = [-250 500];
 out.labelsindex = 23; % Index of channel to add labels to in subplot array
 out.indicator_pct = 0.9; % % of max. height for superimposing timing indicator lines
 
@@ -145,7 +158,7 @@ out.rate.kernel = 'pg'; % pseudo-gaussian kernel (can be 'rect' or 'tri')
 
 % Default LFP raw average trace parameters
 out.ds.ylimit = [-1500 1500];
-out.ds.xlimit = [-250 750];
+out.ds.xlimit = [-250 500];
 out.ds.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ds.lw = 1.75;
 out.fs_d = 1000;
@@ -153,7 +166,7 @@ out.clip_bin_counts = false; % Do not clip bin counts to one if false
 
 % Default IFR average trace parameters
 out.ifr.ylimit = [-4 4];
-out.ifr.xlimit = [-250 750];
+out.ifr.xlimit = [-250 500];
 out.ifr.col = {[0.8 0.2 0.2]; [0.2 0.2 0.8]};
 out.ifr.lw = 1.75;
 
