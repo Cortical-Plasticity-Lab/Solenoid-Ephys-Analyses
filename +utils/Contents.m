@@ -5,9 +5,14 @@
 %  deprecated.
 %
 % <strong>Graphics</strong>
+%  addAreaToAxes   - Add label to axes indicating 'RFA' or 'S1' in a principled way
 %  addLabelsToAxes - Add default labels to axes
+%  addLegendToAxes - Add legend to axes depending on fields of params
+%  addTextToAxes   - Add text to a specified location on an axes
+%  addTypeToAxes   - Add label to axes indicating 'Solenoid (only)', 'ICMS (only)', or 'Solenoid+ICMS' in a principled way
 %  checkXYLabels   - Check X-Y axes for correct labels at end of label strings
 %  getFigAx        - Return figure and axes handles given parameters struct
+%  parseTitle      - Parses title from filter input arguments
 %  plotCoherence   - Helper function to plot coherence (from example R2017a)
 %  plotSpikeRaster - Create raster plot from binary spike data or spike times
 %

@@ -37,25 +37,19 @@ tocData.graphics = round(toc(graphicstic));
 
 %% CREATE MASTER TABLE FOR FURTHER STATISTICS
 T = makeTables(r);
-T = tbl.parseBlockID(T); % Format data
+T = tbl.parseBlockID(T);   % Format block-related info
+T = tbl.parseProbeData(T); % Format channel-related info
 % save(cfg.default('exported_database_table__local'),'T','-v7.3'); % (Large-ish)
 % save(cfg.default('exported_database_table__remote'),'T','-v7.3'); % (Large-ish)
 tocData.total = round(toc(maintic));
 
 %% EXAMPLES FOR CREATING GRAPHICS OF EVENT-RELATED DATA
-% Make spike histogram (peri-event histogram; PETH)
-fig_peth = tbl.gfx.PETH(T,...
-      {'SurgID','R19-224',... % "filtArgs"
-       'BlockIndex',1,...
-       'ChannelID','A002',...
-       'TrialType',2},...
-    'AxesParams', ... % (Optional 'Name', value args)
-      {'NextPlot','add',...
-       'XColor','k',...
-       'YColor','k',...
-       'LineWidth',1.25,...
-       'ColorOrder',cfg.gfx('ColorOrder'),...
-    'XLim',[-100 200]});
-% Make LFP event-related potential (peri-event potential; PEP)
-fig_pep = tbl.gfx.PEP(T,{'SurgID','R19-224','BlockIndex',1,'ChannelID','A002','TrialType',2},'AxesParams',{'NextPlot','add','XColor','k','YColor','k','LineWidth',1.25,'ColorOrder',cfg.gfx('ColorOrder'),'XLim',[-100 200]});
+surgID = 'R19-227';
+blockIndex = 3;
+trialType = 1;
+channelName = 'B005';
 
+% Make spike histogram (peri-event histogram; PETH)
+fig_peth = analyze.rat.plotPETH(T,surgID,blockIndex,trialType,channelName);
+% Make LFP event-related potential (peri-event potential; PEP)
+fig_pep = analyze.rat.plotPEP(T,surgID,blockIndex,trialType,channelName);

@@ -1,4 +1,5 @@
 classdef Hem < double
+   %HEM 1: Left | 2: Right
    enumeration
       Left (1)
       Right (2)

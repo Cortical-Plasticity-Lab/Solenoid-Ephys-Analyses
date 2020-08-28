@@ -7,3 +7,4 @@
 %
 % <strong>Sub-Packages</strong>
 %   control     - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
+%   rat         - Package for analyses of single-rat data

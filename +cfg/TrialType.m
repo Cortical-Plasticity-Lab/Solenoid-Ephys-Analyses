@@ -1,4 +1,5 @@
 classdef TrialType < double
+   %TRIALTYPE 1: Solenoid (only) | 2: ICMS (only) | 3: Solenoid+ICMS
    enumeration
       Solenoid (1)
       Solenoid_Only (1)
