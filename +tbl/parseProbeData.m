@@ -28,9 +28,5 @@ T = outerjoin(T,P,'Type','Left',...
    'Keys',{'BlockID','Probe'},...
    'LeftVariables',setdiff(T.Properties.VariableNames,'Area'),...
    'RightVariables',{'Area'});
-T.Properties.RowNames = T.ID;
-if ismember('RowID',T.Properties.VariableNames)
-   T.RowID = [];
-end
-
+T = tbl.formatDataTable(T);
 end

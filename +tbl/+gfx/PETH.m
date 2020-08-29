@@ -17,6 +17,8 @@ function [fig,params] = PETH(T,filtArgs,varargin)
 
 PRE_OFFSET = -50; % milliseconds relative to stimulus to end "baseline"
 N_SD = 3;         % # Of standard deviations to set threshold above "baseline"
+X_UNITS = '(ms)';          % X-label units
+Y_UNITS = '(Spikes/sec)';  % Y-label units
 
 % Parse inputs %
 params = cfg.gfx(); % Loads default parameters
@@ -34,6 +36,8 @@ if isa(T,'matlab.graphics.axis.Axes')
 end
 
 params = utils.getOpt(params,3,varargin{:}); % Match optional parameters
+params = utils.checkXYLabels(params,X_UNITS,Y_UNITS);
+params = utils.parseTitle(params,filtArgs);
 
 % % User can pass `Axes` or `Figure` using 'Axes' or 'Figure' pairs % %
 % This can be useful for generating subplots, etc.
@@ -69,15 +73,25 @@ else % Otherwise, this was passed via `splitapply` and args are different
 end
 dt = nanmean(diff(t));
 
+if istable(T)
+   c = params.GroupColor.Color(params.GroupColor.Type==string(T.Type(1)),:);
+   o = params.GroupColorOffset.(string(T.Area(1)));
+   params.Color = c + o;
+end
+
+% % % Add actual data % % %
 % At this point, we should only have the rows remaining that we want to put
 % on the axes. So we can just plot the median +/- the IQR in order to avoid
 % outlier trials biasing the data too much.
 
 % First, add helper repos
 utils.addHelperRepos();
+utils.addLabelsToAxes(ax,params);
+
 Z = X./dt; % Convert to spikes/sec
 mu = nanmean(Z,2); % Get mean for histograms
-bar(ax,t,mu,1,'DisplayName','PETH',params.BarParams{:});
+bar(ax,t,mu,1,'DisplayName','PETH','FaceColor',params.Color,...
+   params.BarParams{:});
 
 % IQR = iqr(Z(:));
 Z_s = sgolayfilt(Z,5,9,ones(1,9),1);
@@ -87,10 +101,10 @@ mu_s = nanmean(Z_s,2);
 % Superimpose shaded error to show IQR
 % gfx__.plotWithShadedError(ax,t,Z,params.ShadedErrorParams{:});
 gfx__.plotWithShadedError(ax,t,mu_s,cb_s,...
-   'FaceColor',[0.35 0.35 0.35],...
+   'FaceColor',params.Color,...
    'FaceAlpha',0.35,...
-   'Color',[0.2 0.2 0.2],...
-   'LineStyle',':',...
+   'Color',params.Color,...
+   'LineStyle','-',...
    'Annotation','on',...
    'LineWidth',2.5,...
    'Tag','CB95',...
@@ -112,10 +126,14 @@ if ax.YLim(2) < (thresh+sd_thresh)
 else
    set(ax,'YLim',[0 ax.YLim(2)]);
 end
-params = utils.checkXYLabels(params,'(ms)','(Spikes/sec)');
-params = utils.parseTitle(params,filtArgs);
-utils.addLabelsToAxes(ax,params);
-utils.addLegendToAxes(ax,params);
-utils.addAreaToAxes(ax,T,params,'northwest');
-utils.addTypeToAxes(ax,T,params,'north');
+% Add any trial-type related metadata (solenoid or ICMS strikes) %
+if istable(T)
+   utils.addStimInfoToAxes(ax,T,params,'west');
+end
+% Add any legend/labels as the very last things
+utils.addLegendToAxes(ax,params,'Location','northeast');
+if istable(T)
+   utils.addAreaToAxes(ax,T,params,'northwest');
+end
+
 end

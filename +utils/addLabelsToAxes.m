@@ -19,4 +19,11 @@ xlabel(ax,params.XLabel,params.FontParams{:});
 ylabel(ax,params.YLabel,params.FontParams{:});
 title(ax,params.Title,params.FontParams{:});
 
+if ~isempty(params.XLim)
+   set(ax,'XLim',params.XLim);
+end
+if ~isempty(params.YLim)
+   set(ax,'YLim',params.YLim);
+end
+
 end

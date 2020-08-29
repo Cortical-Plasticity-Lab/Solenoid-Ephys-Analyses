@@ -24,15 +24,23 @@ function txtObj = addTextToAxes(ax,txt,txtLoc,varargin)
 %              'southeast' | 'south' | 'southwest' | 'west'
 %  varargin - (Optional) 'Name',value input argument pairs for Font
 %                 parameters or other text 'Name',value parameters
+%              * 'X_SCALE' : 1 (def) | scalar that changes relative x-loc
+%              * 'Y_SCALE' : 1 (def) | scalar that changes relative y-loc
 %
 % Output
 %  txtObj   - Text object
 %
 % See also: utils, tbl.gfx, tbl.gfx.PEP, tbl.gfx.PETH
 
+X_SCALE = 1;
+Y_SCALE = 1;
+
 if nargin < 3
    txtLoc = 'northwest';
 end
+
+[X_SCALE,varargin] = utils.parseNamedVariable(varargin,X_SCALE);
+[Y_SCALE,varargin] = utils.parseNamedVariable(varargin,Y_SCALE);
 
 switch lower(txtLoc)
    case 'northwest'
@@ -72,8 +80,8 @@ switch lower(txtLoc)
       error('Invalid txtLoc specification ("%s")',txtLoc);
 end
 % Get <x,y> coordinate for text
-x = g(1)*diff(ax.XLim) + ax.XLim(1);
-y = g(2)*diff(ax.YLim) + ax.YLim(1);
+x = g(1)*diff(ax.XLim)*X_SCALE + ax.XLim(1);
+y = g(2)*diff(ax.YLim)*Y_SCALE + ax.YLim(1);
 
 if nargout > 0
    txtObj = text(ax,x,y,txt,...

@@ -24,6 +24,9 @@ function [fig,params] = PEP(T,filtArgs,varargin)
 %  fig      - Figure handle for generated PEP
 %  params   - Parameters struct
 
+X_UNITS = '(ms)';       % X-label units
+Y_UNITS = '(\muV)';     % Y-label units
+
 % Parse inputs %
 params = cfg.gfx(); % Loads default parameters
 if isa(T,'matlab.graphics.axis.Axes')
@@ -40,6 +43,8 @@ if isa(T,'matlab.graphics.axis.Axes')
 end
 
 params = utils.getOpt(params,3,varargin{:}); % Match optional parameters
+params = utils.checkXYLabels(params,X_UNITS,Y_UNITS);
+params = utils.parseTitle(params,filtArgs);
 
 % % User can pass `Axes` or `Figure` using 'Axes' or 'Figure' pairs % %
 % This can be useful for generating subplots, etc.
@@ -67,12 +72,20 @@ else % Otherwise, this was passed via `splitapply` and args are different
    end
 end
 
+if istable(T)
+   c = params.GroupColor.Color(params.GroupColor.Type==string(T.Type(1)),:);
+   o = params.GroupColorOffset.(string(T.Area(1)));
+   params.Color = c + o;
+end
+
+% % % Add actual data % % %
 % At this point, we should only have the rows remaining that we want to put
 % on the axes. So we can just plot the median +/- the IQR in order to avoid
 % outlier trials biasing the data too much.
 
 % First, add helper repos
 utils.addHelperRepos();
+utils.addLabelsToAxes(ax,params);
 
 % Now, add the shaded error plot
 gfx__.plotWithShadedError(ax,t,X,...
@@ -84,10 +97,14 @@ gfx__.plotWithShadedError(ax,t,X,...
    'LineWidth',2,...
    'Color',params.Color,...
    params.ShadedErrorParams{:});
-params = utils.checkXYLabels(params,'(ms)','(\muV)');
-params = utils.parseTitle(params,filtArgs);
-utils.addLabelsToAxes(ax,params);
+% Add any trial-type related metadata (solenoid or ICMS strikes) %
+if istable(T)
+   utils.addStimInfoToAxes(ax,T,params,'west');
+end
+% Add any legend/labels as the very last things
 utils.addLegendToAxes(ax,params);
-utils.addAreaToAxes(ax,T,params,'northwest');
-utils.addTypeToAxes(ax,T,params,'north');
+if istable(T)
+   utils.addAreaToAxes(ax,T,params,'northwest');
+end
+
 end

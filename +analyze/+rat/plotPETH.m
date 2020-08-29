@@ -1,4 +1,4 @@
-function fig = plotPETH(T,surgID,blockIndex,trialType,channelName)
+function fig = plotPETH(T,surgID,blockIndex,trialType,channelName,varargin)
 %PLOTPETH Plot peri-event spike histograms in plot that is laid out by channel
 %
 %  fig = analyze.rat.plotPETH(T,surgID,blockIndex,trialType);
@@ -27,7 +27,7 @@ if nargin > 4
           'YColor','k',...
           'LineWidth',1.25,...
           'ColorOrder',cfg.gfx('ColorOrder'),...
-       'XLim',[-100 200]});
+       'XLim',[-100 200]},varargin{:});
 else
    fig = tbl.gfx.PETH(T,...
          {'SurgID',surgID,... % "filtArgs"
@@ -40,7 +40,7 @@ else
           'YColor','k',...
           'LineWidth',1.25,...
           'ColorOrder',cfg.gfx('ColorOrder'),...
-       'XLim',[-100 200]});
+       'XLim',[-100 200]},varargin{:});
 end
 
 end

@@ -14,15 +14,8 @@ function leg = addLegendToAxes(ax,params,varargin)
 %
 % See also: utils, tbl.gfx, tbl.gfx.PEP, tbl.gfx.PETH
 
-if numel(varargin) > 1
-   idx = ismember(varargin{1:2:end},'Legend');
-   if any(idx)
-      idx = find(idx,1,'first');
-      idx = 2*(idx-1)+1;
-      params.Legend = varargin{idx+1};
-      varargin([idx,idx+1]) = [];
-   end
-end
+[params.Legend,varargin] = ...
+   utils.parseNamedVariable(varargin,params.Legend,'Legend');
       
 if strcmpi(params.Legend,'on')
    leg = legend(ax,'AutoUpdate','off',params.LegendParams{:},varargin{:});
