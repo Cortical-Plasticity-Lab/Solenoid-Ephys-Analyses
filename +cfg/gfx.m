@@ -25,6 +25,9 @@ p.ColorOrder = [0.0 0.0 0.0; ...
                 0.4 0.4 0.4; ...
                 0.5 0.6 0.0; ...
                 0.0 0.7 0.7];
+p.Color_CFA = [0.45 0.45 0.45];
+p.Color_RFA = [0.15 0.15 0.15];
+p.Color_S1  = [0.65 0.65 0.65];
 p.DisplayName = '';
 p.FigureParams = {'Color','w','Units','Normalized','Position',[0.2 0.2 0.5 0.5]};
 p.FontParams = {'FontName','Arial','Color','k'};

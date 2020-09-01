@@ -14,6 +14,10 @@ function leg = addLegendToAxes(ax,params,varargin)
 %
 % See also: utils, tbl.gfx, tbl.gfx.PEP, tbl.gfx.PETH
 
+if nargin < 2
+   params = cfg.gfx('Legend','LegendParams');
+end
+
 [params.Legend,varargin] = ...
    utils.parseNamedVariable(varargin,params.Legend,'Legend');
       
