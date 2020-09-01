@@ -2,6 +2,7 @@
 clearvars -except T C
 clc;
 
+%% Estimate cross-trial channel averages, by trial type and recording
 % Define a function handle to aggregate LFP data at the Channel level
 fcn = @(X){nanmean(X,1)}; % Returns trial-average time-series (as a cell)
 inputVars = {'LFP'}; % Will use the 'LFP' variable in T
@@ -10,6 +11,7 @@ outputVar = 'LFP_mean'; % Output variable name
 % Rows of this table represent unique Channel/Block/Trial Type combinations
 C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar); % ~15 sec
 
+%% Estimate time-to-minimum
 % Note 1:
 % This function can be repeated on the Channel-aggregated table (as shown 
 % next), as that table contains all the information that is needed to group 
@@ -24,8 +26,10 @@ fcn = @(LFP_mean)tbl.est.tLFPavgMin(LFP_mean,C.Properties.UserData.t.LFP);
 inputVars = 'LFP_mean';
 outputVar = 'LFP_tMin';
 C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar); % ~4 sec
-figure; histogram(C.LFP_tMin); title('LFP Time-to-Minimum (ms)');
-
-% Note that something went wrong with our algorithm: there is a (very)
-% negative peak, which should be impossible! 
-%  -> Let me know if you need help figuring out why that happened.
+fig = utils.formatDefaultFigure(figure,'Name','Distributions of LFP Time-to-Minima (ms)'); 
+ax = utils.formatDefaultAxes(subplot(1,2,1),'Parent',fig); % Helper to apply MM-preferred axes properties
+histogram(ax,C.LFP_tMin(C.Type=="Solenoid" & C.Area=="S1"),30:10:250);
+utils.formatDefaultLabel([title(ax,'S1');xlabel(ax,'Time (ms)');ylabel(ax,'Count')]);
+ax = utils.formatDefaultAxes(subplot(1,2,2),'Parent',fig); % Helper to apply MM-preferred axes properties
+histogram(ax,C.LFP_tMin(C.Type=="Solenoid" & C.Area=="RFA"),30:10:250);
+utils.formatDefaultLabel([title(ax,'RFA');xlabel(ax,'Time (ms)');ylabel(ax,'Count')]);

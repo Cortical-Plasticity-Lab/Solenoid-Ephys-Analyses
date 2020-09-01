@@ -14,6 +14,9 @@
 %  addTimeIndicatorToAxes  - Add graphics indicator for some event to an axes
 %  addTypeToAxes           - Add label to axes indicating 'Solenoid (only)', 'ICMS (only)', or 'Solenoid+ICMS' in a principled way
 %  checkXYLabels           - Check X-Y axes for correct labels at end of label strings
+%  formatDefaultAxes       - Apply default axes settings preferred by MM
+%  formatDefaultFigure     - Apply default figure settings preferred by MM
+%  formatDefaultLabel      - Apply default font settings preferred by MM
 %  getFigAx                - Return figure and axes handles given parameters struct
 %  parseTitle              - Parses title from filter input arguments
 %  plotCoherence           - Helper function to plot coherence (from example R2017a)

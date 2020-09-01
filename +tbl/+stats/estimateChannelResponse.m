@@ -40,7 +40,13 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 %
 % See also: tbl, tbl.stats
 
-[G,C] = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
+if strcmp(T.Properties.UserData.type,'MasterTable')
+   [G,C] = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
+   C.Properties.UserData.type = 'ChannelResponseTable';
+else
+   G = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
+   C = T;
+end
 tmp = splitapply(fcn,T(:,inputVars),G);
 try
    tmp = cell2mat(tmp);
@@ -50,5 +56,6 @@ catch
    C.(outputVar) = tmp;
    fprintf('\nLeft output <strong>(%s)</strong> as cell array.\n',outputVar);
 end
+
 end
 
