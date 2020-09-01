@@ -31,6 +31,7 @@ for iFig = 1:numel(fig)
       'NumberTitle','off',...    % Preference
       'Color','w',...            % White background
       'Units','Normalized',...   % Easier to get position using normalized coordinates
-      'Position',pos);           % This will make it so not every new figure overlaps when it pops ups
+      'Position',pos,...         % This will make it so not every new figure overlaps when it pops ups
+      varargin{:});  % And any other 'Name',value arguments to apply (note that these can overwrite "defaults" set previously)          
 end
 end

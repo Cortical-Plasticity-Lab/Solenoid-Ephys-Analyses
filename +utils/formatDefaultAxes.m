@@ -25,7 +25,8 @@ for iAx = 1:numel(ax)
       'NextPlot','add',... % Allow to add multiple graphics, same as "hold on"
       'XColor','k',... % This makes it nicer in Adobe Illustrator
       'YColor','k',... % This makes it nicer in Adobe Illustrator
-      'LineWidth',1.5,...  % Make the axes thicker (nicer in Adobe)
-      'FontName','Arial'); % Adobe does not understand Helvetica
+      'LineWidth',1.5,...    % Make the axes thicker (nicer in Adobe)
+      'FontName','Arial',... % Adobe does not understand Helvetica
+      varargin{:});  % And any other 'Name',value arguments to apply (note that these can overwrite "defaults" set previously)
 end
 end

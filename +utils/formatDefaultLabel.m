@@ -28,6 +28,7 @@ for iLab = 1:numel(label)
       'Color','k',...         % This makes it nicer in Adobe Illustrator
       'FontName','Arial',...  % Adobe does not understand Helvetica
       'FontWeight','bold',... % Make the lines more robust in Illustrator
-      'FontSize',16);         % Help old and tired eyes out  
+      'FontSize',16,... % Help old and tired eyes out  
+      varargin{:});     % And any other 'Name',value arguments to apply (note that these can overwrite "defaults" set previously)     
 end
 end
