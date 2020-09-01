@@ -16,6 +16,10 @@ function [fig,ax] = getFigAx(params,figName)
 %  fig     - Figure handle
 %  ax      - Axes handle
 
+if (nargin < 1) || (isempty(params))
+   params = cfg.gfx('Figure','Axes','FigureParams','AxesParams');
+end
+
 if nargin < 2
    figName = 'Figure';
 end
@@ -39,6 +43,9 @@ else
       params.Axes = axes(fig,params.AxesParams{:});
    end
    ax = params.Axes;
+end
+if isempty(ax(1).Title.String)
+   utils.formatDefaultLabel(title(ax,figName));
 end
 
 end

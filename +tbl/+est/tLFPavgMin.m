@@ -1,8 +1,8 @@
 function t = tLFPavgMin(LFP_mean,tLFP,varargin)
 %TLFPAVGMIN Estimate time to minimum average LFP deflection
 %
-%  t = tbl.est.tLFPavgMin(LFP_mean);
-%  t = tbl.est.tLFPavgMin(LFP_mean,'Name',value,...);
+%  t = tbl.est.tLFPavgMin(LFP_mean,tLFP);
+%  t = tbl.est.tLFPavgMin(LFP_mean,tLFP,'Name',value,...);
 %     -> e.g. tbl.est.tLFPavgMin(LFP_mean,'ZeroLFPBeforeThisTimeMS',150);
 %
 % Inputs

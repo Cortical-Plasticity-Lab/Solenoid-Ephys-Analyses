@@ -26,6 +26,8 @@ fcn = @(LFP_mean)tbl.est.tLFPavgMin(LFP_mean,C.Properties.UserData.t.LFP);
 inputVars = 'LFP_mean';
 outputVar = 'LFP_tMin';
 C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar); % ~4 sec
+
+%% Display figure of minima distribution, by area, for Solenoid strikes only
 fig = utils.formatDefaultFigure(figure,'Name','Distributions of LFP Time-to-Minima (ms)'); 
 ax = utils.formatDefaultAxes(subplot(1,2,1),'Parent',fig,'XLim',[30 250]); % Helper to apply MM-preferred axes properties
 histogram(ax,C.LFP_tMin(C.Type=="Solenoid" & C.Area=="S1"),30:10:250,'FaceColor',cfg.gfx('Color_S1'),'EdgeColor','none','Normalization','pdf');
@@ -56,3 +58,80 @@ utils.formatDefaultLabel([title(ax,'RFA');xlabel(ax,'Time (ms)');ylabel(ax,'Coun
 % Same result as previous steps:
 % C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar); % ~4 sec
 % fig = Figures.CompareTimeToLFPMinima(C);
+
+%% Illustrating intentional errors in prior code
+% So now we have a way to plot and compare time to LFP peak minima. 
+% 
+% Note 4:
+% I could have made Figures.CompareTimeToLFPMinima(C):
+%
+%  fig_min = Figures.CompareTimeToLFPpeak(C,'LFP_tMin');
+%  fig_max = Figures.CompareTimeToLFPpeak(C,'LFP_tMax');
+%
+% That way I could have generalized the function so that it handled both
+% "minima" and "maxima" without having to write the same code twice. It
+% would only require that I code a second input argument, specifying the
+% table variable to be used in the output graphic where histogram or
+% ksdensity is called in the "CompareTimeToLFPMinima" version.
+%
+% Note 5:
+% Something else is wrong: the Solenoid strike does not always occur at
+% experimental trial time "zero" -- sometimes it is lagged relative to
+% "trial" onset by some amount (so that ICMS could be delivered prior to
+% solenoid strike, for example). The code to compute time-to-peak only uses
+% the times with reference to the trial times, not with respect to the
+% stimulus, since on any given trial the stimulus might be one or multiple
+% different sources. We should redo it, specifying a reference time. We can
+% easily include this as an additional <'Name',value> parameter argument in
+% (new) `tLFPpeak`, which as previously pointed out, can be used to
+% flexibly compute min or max depending on an additional input argument.
+
+% Recompute values of minima
+tLFP = C.Properties.UserData.t.LFP;
+fcn = @(LFP_mean,Solenoid_Onset)tbl.est.tLFPpeak(LFP_mean,Solenoid_Onset,tLFP,'min');
+inputVars = {'LFP_mean','Solenoid_Onset'}; % Now we have to specify 2 args: anything that must be "matched" on a per-row basis when splitting up the table has to be done this way
+outputVar = 'LFP_tMin';  
+C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar); % ~1 sec
+
+% We should make sure it's understood what LFP_tMin refers to
+C.Properties.VariableUnits{'LFP_tMin'} = 'ms'; % milliseconds
+desc = ['Minimum average LFP time with respect to Solenoid Onset' newline ...
+    '(only valid for Solenoid-Only trials!)'];
+C.Properties.VariableDescriptions{'LFP_tMin'} = desc;
+   
+
+% Setting VariableDescriptions when we open the Table in the Workspace
+% variables list to inspect its properties, when we click the arrow next to
+% the variable name in the corresponding column for LFP_tMin, we will now
+% see this note included with the table.
+
+% Fortunately, since we specified the other graphic function, we can
+% correct the mistake easily, using the fixed table:
+fig = Figures.CompareTimeToLFPMinima(C);
+pause(1.5);
+delete(fig); % Using figure handle we can programmatically close/save figs
+
+% Looks like that doesn't even change the figure at all; we could have
+% avoided this by simply looking at distribution of Solenoid Onset times
+% for Solenoid-Only trials:
+[fig,ax] = utils.getFigAx([],...
+   sprintf('Solenoid Onset Distribution (%s)',...
+   C.Properties.VariableUnits{'Solenoid_Onset'}));
+histogram(ax,C.Solenoid_Onset(C.Type=="Solenoid"));
+pause(2.5);
+delete(fig);
+
+% Whoops, solenoid onset times are in seconds, which is the problem here.
+% We could correct it in the table, or alternatively we can handle it this
+% way:
+fcn = @(LFP_mean,Solenoid_Onset)tbl.est.tLFPpeak(LFP_mean,Solenoid_Onset.*1e3,tLFP,'min');
+% Now solenoid onset will be multiplied by 1000 prior to estimation of
+% minima times, which should resolve the issue.
+C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar,...
+   'OutputVariableUnits','ms','OutputVariableDescription',desc); % ~1 sec
+fig = Figures.CompareTimeToLFPMinima(C); % And create corrected figure
+figName = fullfile('figures','LFP Minima Comparison');
+utils.expAI(fig,[figName '.eps']);
+savefig(fig,[figName '.fig']);
+saveas(fig,[figName '.png']);
+delete(fig);

@@ -14,6 +14,7 @@
 %  addTimeIndicatorToAxes  - Add graphics indicator for some event to an axes
 %  addTypeToAxes           - Add label to axes indicating 'Solenoid (only)', 'ICMS (only)', or 'Solenoid+ICMS' in a principled way
 %  checkXYLabels           - Check X-Y axes for correct labels at end of label strings
+%  expAI                   - Export figure in appropriate format for Adobe Illustrator
 %  formatDefaultAxes       - Apply default axes settings preferred by MM
 %  formatDefaultFigure     - Apply default figure settings preferred by MM
 %  formatDefaultLabel      - Apply default font settings preferred by MM
