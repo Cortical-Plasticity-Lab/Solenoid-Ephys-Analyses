@@ -6,8 +6,10 @@
 %
 % <strong>Graphics</strong>
 %  addAreaToAxes           - Add label to axes indicating 'RFA' or 'S1' in a principled way
+%  addConnectingLine       - Add (annotated) line connecting point pairs <X,Y>
 %  addLabelsToAxes         - Add default labels to axes
 %  addLegendToAxes         - Add legend to axes depending on fields of params
+%  addPeakLabels           - Add labels denoting <x,y> value at list of peaks
 %  addSolenoidToAxes       - Add indicator of solenoid strike to axes
 %  addStimInfoToAxes       - Add information about stimulus-type, timing, and if ICMS occurred on this channel.
 %  addTextToAxes           - Add text to a specified location on an axes
