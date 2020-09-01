@@ -131,6 +131,7 @@ C = tbl.stats.estimateChannelResponse(C,fcn,inputVars,outputVar,...
    'OutputVariableUnits','ms','OutputVariableDescription',desc); % ~1 sec
 fig = Figures.CompareTimeToLFPMinima(C); % And create corrected figure
 figName = fullfile('figures','LFP Minima Comparison');
+utils.expAI(fig,[figName '.eps']);
 savefig(fig,[figName '.fig']);
 saveas(fig,[figName '.png']);
 delete(fig);

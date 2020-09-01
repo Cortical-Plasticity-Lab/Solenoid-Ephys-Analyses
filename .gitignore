@@ -8,3 +8,9 @@ misc
 *.PNG
 *.jpg
 *.jpeg
+*.pdf
+*.svg
+*.ai
+*.eps
+*.tiff
+*.ps
