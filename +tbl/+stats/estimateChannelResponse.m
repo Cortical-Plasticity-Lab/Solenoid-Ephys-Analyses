@@ -10,7 +10,7 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 %        return a scalar output.
 %
 %  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar)
-%  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar,'SplittingVar1','SplittingVar2',...)
+%  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar,'Name',value,...)
 %
 %  Example:
 %        ```
@@ -31,6 +31,8 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 %  inputVars   - Names of input argument variables, given as string array
 %                 or cell array of characters
 %  outputVar   - Name of output argument variable: string or char array
+%  varargin    - (Optional) 'Name',value parameter pairs: see "PARS" in
+%                           code
 %
 % Output
 %  C           - Condensed version of T, which contains response
@@ -40,11 +42,24 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 %
 % See also: tbl, tbl.stats
 
+% % PARS % % % %
+pars = struct;
+pars.OutputVariableUnits = '';
+pars.OutputVariableDescription = '';
+fn = fieldnames(pars);
+for iV = 1:2:numel(varargin)
+   idx = strcmpi(fn,varargin{iV}); % Do it this way to avoid case sensitive field assignment
+   if sum(idx)==1
+      pars.(fn{idx}) = varargin{iV+1};
+   end
+end
+% % END PARS % %
+
 if strcmp(T.Properties.UserData.type,'MasterTable')
-   [G,C] = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
+   [G,C] = findgroups(T(:,{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
    C.Properties.UserData.type = 'ChannelResponseTable';
 else
-   G = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
+   G = findgroups(T(:,{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
    C = T;
 end
 tmp = splitapply(fcn,T(:,inputVars),G);
@@ -56,6 +71,8 @@ catch
    C.(outputVar) = tmp;
    fprintf('\nLeft output <strong>(%s)</strong> as cell array.\n',outputVar);
 end
+C.Properties.VariableUnits{outputVar} = pars.OutputVariableUnits;
+C.Properties.VariableDescriptions{outputVar} = pars.OutputVariableDescription;
 
 end
 

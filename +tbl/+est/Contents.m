@@ -4,5 +4,6 @@
 %  See: tbl.stats.estimateChannelResponse
 %
 % Functions
-%  tLFPavgMin              - Estimate time to minimum average LFP deflection
-%  tLFPavgMax              - Estimate time to maximum average LFP deflection
+%  tLFPavgMin              - (Deprecated) Estimate time to minimum average LFP deflection
+%  tLFPavgMax              - (Deprecated) Estimate time to maximum average LFP deflection
+%  tLFPpeak                - Estimate time to peak average LFP deflection of specified type

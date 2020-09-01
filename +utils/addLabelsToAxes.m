@@ -15,6 +15,10 @@ function addLabelsToAxes(ax,params)
 %
 % See also: utils, tbl.gfx, tbl.gfx.PEP, tbl.gfx.PETH
 
+if nargin < 2
+   params = cfg.gfx('FontParams','Title','XLabel','YLabel','XLim','YLim');
+end
+
 xlabel(ax,params.XLabel,params.FontParams{:});
 ylabel(ax,params.YLabel,params.FontParams{:});
 title(ax,params.Title,params.FontParams{:});

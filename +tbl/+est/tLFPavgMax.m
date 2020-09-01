@@ -1,8 +1,8 @@
 function t = tLFPavgMax(LFP_mean,tLFP,varargin)
 %TLFPAVGMAX Estimate time to maximum average LFP deflection
 %
-%  t = tbl.est.tLFPavgMax(LFP_mean);
-%  t = tbl.est.tLFPavgMax(LFP_mean,'Name',value,...);
+%  t = tbl.est.tLFPavgMax(LFP_mean,tLFP);
+%  t = tbl.est.tLFPavgMax(LFP_mean,tLFP,'Name',value,...);
 %     -> e.g. tbl.est.tLFPavgMax(LFP_mean,'ZeroLFPBeforeThisTimeMS',150);
 %
 % Inputs

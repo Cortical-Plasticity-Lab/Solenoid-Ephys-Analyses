@@ -3,3 +3,8 @@
 *.m~
 misc
 *~$*
+*.fig
+*.png
+*.PNG
+*.jpg
+*.jpeg
