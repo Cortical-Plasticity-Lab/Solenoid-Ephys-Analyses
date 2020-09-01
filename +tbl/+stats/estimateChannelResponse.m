@@ -63,13 +63,18 @@ else
    C = T;
 end
 tmp = splitapply(fcn,T(:,inputVars),G);
-try
-   tmp = cell2mat(tmp);
+if isa(tmp,'cell')
+   try
+      tmp = cell2mat(tmp);
+      C.(outputVar) = tmp;
+      fprintf('\nConverted output <strong>(%s)</strong> from cell array to matrix format.\n',outputVar);
+   catch
+      C.(outputVar) = tmp;
+      fprintf('\nLeft output <strong>(%s)</strong> as cell array.\n',outputVar);
+   end
+else
    C.(outputVar) = tmp;
-   fprintf('\nConverted output <strong>(%s)</strong> from cell array to matrix format.\n',outputVar);
-catch
-   C.(outputVar) = tmp;
-   fprintf('\nLeft output <strong>(%s)</strong> as cell array.\n',outputVar);
+   fprintf('\nOutput <strong>(%s)</strong> returned as matrix.\n',outputVar);
 end
 C.Properties.VariableUnits{outputVar} = pars.OutputVariableUnits;
 C.Properties.VariableDescriptions{outputVar} = pars.OutputVariableDescription;

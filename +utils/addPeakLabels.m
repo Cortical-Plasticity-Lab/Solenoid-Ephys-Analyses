@@ -67,6 +67,7 @@ if addParams
    params.Color = nan;
    params.CoordinateSpec = '';
    params.CoordinateMarkerArgs = 1:4;
+   params.FixedOffset = [0 0];
    params.GroupTagSpec = 'Peak-%03d'; % Should contain one integer specifier
    params.HorizontalAlignment = 'left';
    params.HorizontalOffsetMultiplier = 0.02;
@@ -120,8 +121,8 @@ for ii = 1:numel(x)
    args = {xc,x(ii),yc,y(ii)};
    str = sprintf(spec,args{params.CoordinateMarkerArgs});
    hg(ii) = hggroup(ax,'Tag',sprintf(params.GroupTagSpec,ii));
-   tx = x(ii) + ox;
-   ty = y(ii) + oy;
+   tx = x(ii) + ox + params.FixedOffset(1);
+   ty = y(ii) + oy + params.FixedOffset(2);
    text(tx,ty,str,...
       'Color',params.Color,...
       'HorizontalAlignment',params.HorizontalAlignment,...
