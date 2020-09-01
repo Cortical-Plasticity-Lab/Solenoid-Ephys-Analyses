@@ -10,7 +10,7 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 %        return a scalar output.
 %
 %  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar)
-%  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar,'Name',value,...)
+%  C = tbl.stats.estimateChannelResponse(T,fcn,inputVars,outputVar,'SplittingVar1','SplittingVar2',...)
 %
 %  Example:
 %        ```
@@ -41,7 +41,14 @@ function C = estimateChannelResponse(T,fcn,inputVars,outputVar,varargin)
 % See also: tbl, tbl.stats
 
 [G,C] = findgroups(T(:,[{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'},varargin]));
-C.(outputVar) = splitapply(fcn,T(:,inputVars),G);
-
+tmp = splitapply(fcn,T(:,inputVars),G);
+try
+   tmp = cell2mat(tmp);
+   C.(outputVar) = tmp;
+   fprintf('\nConverted output <strong>(%s)</strong> from cell array to matrix format.\n',outputVar);
+catch
+   C.(outputVar) = tmp;
+   fprintf('\nLeft output <strong>(%s)</strong> as cell array.\n',outputVar);
+end
 end
 

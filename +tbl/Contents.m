@@ -5,6 +5,7 @@
 %  in table format.
 %
 % Packages
+%  est               - Package with small functions for estimating responses using `splitapply` workflow
 %  gfx               - Package with figure export/generation functions
 %  stats             - Package with statistics export or analysis functions
 %
