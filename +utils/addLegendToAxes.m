@@ -18,7 +18,7 @@ if (nargin < 2) || isempty(params)
    params = cfg.gfx('Legend','LegendParams');
 end
 
-[params.Legend,varargin] = ...
+[varargin,params.Legend] = ...
    utils.parseNamedVariable(varargin,params.Legend,'Legend');
       
 if strcmpi(params.Legend,'on')

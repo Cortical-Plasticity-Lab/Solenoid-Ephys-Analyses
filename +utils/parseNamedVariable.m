@@ -36,7 +36,7 @@ if nargin < 3
 end
 
 if numel(varArgs) > 1
-   idx = ismember(varArgs(1:2:end),Name);
+   idx = strcmpi(varArgs(1:2:end),Name);
    if any(idx)
       idx = find(idx,1,'first');
       idx = 2*(idx-1)+1;
