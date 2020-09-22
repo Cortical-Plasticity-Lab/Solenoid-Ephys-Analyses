@@ -28,13 +28,17 @@ if strcmpi(T.Properties.VariableUnits{'Solenoid_Onset'},'sec')
 end
 if isstruct(T.Properties.UserData)
    if isfield(T.Properties.UserData,'SolenoidDelay')
-      onset = onset + T.Properties.UserData.SolenoidDelay;
+      physicalDelayTime = T.Properties.UserData.SolenoidDelay;
    else
       warning('Missing SolenoidDelay UserData field for input data table.');
       disp('Assigning value of 4-ms (empirically determined)');
-      onset = onset + 4;
+      physicalDelayTime = 4; % ms
    end
+else
+   warning('Missing SolenoidDelay UserData field for input data table.');
+   disp('Assigning value of 4-ms (empirically determined)');
 end
+onset = onset + physicalDelayTime;
 
 % Get solenoid "offset" (time it begins to retract from target)
 offset = unique(T.Solenoid_Offset);
@@ -45,6 +49,11 @@ if numel(offset)~=1
    h = [];
    return;
 end
+if strcmpi(T.Properties.VariableUnits{'Solenoid_Offset'},'sec')
+   offset = offset*1e3;
+end
+offset = offset + physicalDelayTime;
+
 yConn = ax.YLim(1)+diff(ax.YLim)*0.75;
 h = line(ax,[onset,offset],ones(1,2).*yConn,...
    'Tag','Solenoid-Dwell','DisplayName','Solenoid Dwell Time',...

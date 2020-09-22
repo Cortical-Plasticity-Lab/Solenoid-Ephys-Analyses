@@ -14,6 +14,8 @@ function [fig,params] = PETH(T,filtArgs,varargin)
 % Output
 %  fig      - Figure handle for generated PETH
 %  params   - Parameters struct
+%
+% See also: Contents, tbl.gfx.batchPETH
 
 PRE_OFFSET = -50; % milliseconds relative to stimulus to end "baseline"
 N_SD = 3;         % # Of standard deviations to set threshold above "baseline"
@@ -74,6 +76,12 @@ end
 dt = nanmean(diff(t));
 
 if istable(T)
+   if size(T,1) < 1
+      error('GFX:PETH:NoTableRows',...
+         ['Double-check `<strong>filtArgs</strong>` or `<strong>T</strong>`:' ...
+             'no table rows meet criteria.']);
+   end
+   
    c = params.GroupColor.Color(params.GroupColor.Type==string(T.Type(1)),:);
    o = params.GroupColorOffset.(string(T.Area(1)));
    params.Color = c + o;
