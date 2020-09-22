@@ -4,5 +4,5 @@
 %  See: tbl.stats.estimateChannelResponse
 %
 % Exploratory Data Analysis (EDA)
-%  compareGroupedResponses                      - Compare arbitrarily grouped distributions of observed response variates of interest using histograms and smoothed trends
+%  CompareGroupedResponses                      - Compare arbitrarily grouped distributions of observed response variates of interest using histograms and smoothed trends
 %  CompareTimeToLFPMinima                       - Compare distribution of onset times between RFA and S1 on per-channel distribution for solenoid trials

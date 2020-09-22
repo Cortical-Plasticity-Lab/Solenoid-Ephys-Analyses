@@ -27,6 +27,7 @@
 %
 % <strong>Functions</strong>
 %  fastsmooth              - Smooths vector X
+%  findStims               - Return stimulation indices based on all STIM files
 %  getCB95                 - Return 95% confidence bounds
 %  getOpt                  - Process paired optional arguments as `prop`,val1 
 %  getPathTo               - Return output from uigetdir basically
