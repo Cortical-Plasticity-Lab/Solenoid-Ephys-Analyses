@@ -115,7 +115,7 @@ end
 
 for iProp=1:2:nPropArgs
    propName = varargin{iProp};
-   if ~ischar(propName)
+   if (~ischar(propName)) && (~isstring(propName))
       error(['UTILS:' mfilename ':BadClass'],...
          ['\n\t->\t<strong>[UTILS.GETOPT]</strong>: ' ...
 		  'Property names must be character arrays.\n']);

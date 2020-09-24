@@ -25,20 +25,27 @@ function fig = batchPETH(T,surgID,solOnset,solOffset,icmsOnset,varargin)
 
 pars = struct;
 pars.AxesParams = cfg.gfx('AxesParams');
+pars.Position = [0.1 0.1 0.8 0.8];
 pars.XLim = [-100 200];
-pars.YLim = [0 2];
+pars.YLim = [0 40];
 pars.Area = ["S1","RFA"];
 pars.Type = ["Solenoid","ICMS","Solenoid + ICMS"];
 fn = fieldnames(pars);
+iRemove = [];
 for iV = 1:2:numel(varargin)
    idx = strcmpi(fn,varargin{iV});
    if sum(idx)==1
       pars.(fn{idx}) = varargin{iV+1};
+      iRemove = [iRemove, iV, iV+1]; %#ok<AGROW>
    end
 end
+varargin(iRemove) = [];
 
 fig = figure('Name',sprintf('%s: PETH',surgID),...
-   'Color','w','Units','Normalized','Position',[0.1 0.1 0.8 0.8]);
+   'Color','w',...
+   'Units','Normalized',...
+   'Position',pars.Position);
+T = utils.roundEventTimesToNearestMillisecond(T);
 
 nRow = numel(pars.Area);
 nCol = numel(pars.Type);
@@ -56,7 +63,7 @@ for iRow = 1:nRow
                      solOnset,solOffset,icmsOnset);
       fprintf(1,'\t->\tMaking PETH for %s::%s...',pars.Area(iRow),pars.Type(iCol));
       try
-         tbl.gfx.PETH(ax,T,filtArgs,'XLim',pars.XLim,'YLim',pars.YLim);
+         tbl.gfx.PETH(ax,T,filtArgs,'XLim',pars.XLim,'YLim',pars.YLim,varargin{:});
       catch me % Catch error object
          if strcmp(me.identifier,'GFX:PETH:NoTableRows')
             if ~ismember(surgID,T.SurgID)
@@ -89,8 +96,16 @@ for iRow = 1:nRow
                end
             end
             me = addCause(me,causeException);
-            rethrow(me);
          end
+         fprintf(1,'\n\n<strong>Stack top-level</strong> <a href="matlab:opentoline(''%s'',%d);">(link)</a>\n',...
+            me.stack(1).file,me.stack(1).line);
+         disp(me.stack(1));
+         if numel(me.stack) > 1
+            fprintf(1,'<strong>Stack 2nd-level</strong> <a href="matlab:opentoline(''%s'',%d);">(link)</a>\n',...
+               me.stack(2).file,me.stack(2).line);
+            disp(me.stack(2));
+         end
+         rethrow(me);
       end
       title(ax,sprintf('%s::%s',pars.Area(iRow),pars.Type(iCol)),...
          'FontName','Arial','Color','k');

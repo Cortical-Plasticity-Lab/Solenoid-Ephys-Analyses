@@ -1,4 +1,4 @@
-function txtObj = addAreaToAxes(ax,T,params,txtLoc)
+function txtObj = addAreaToAxes(ax,T,params,txtLoc,varargin)
 %ADDAREATOAXES Add label to axes indicating 'RFA' or 'S1' in a principled way
 %
 %  txtObj = utils.addAreaToAxes(ax,T,params);
@@ -29,9 +29,9 @@ if numel(ch)==1
 end
 
 if nargout > 0
-   txtObj = utils.addTextToAxes(ax,txt,txtLoc,'Color',params.Color);
+   txtObj = utils.addTextToAxes(ax,txt,txtLoc,'Color',params.Color,varargin{:});
 else
-   utils.addTextToAxes(ax,txt,txtLoc,'Color',params.Color);
+   utils.addTextToAxes(ax,txt,txtLoc,'Color',params.Color,varargin{:});
 end
 
 end
