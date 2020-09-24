@@ -19,9 +19,9 @@ if nargin < 2
    params = cfg.gfx('FontParams','Title','XLabel','YLabel','XLim','YLim');
 end
 
-xlabel(ax,params.XLabel,params.FontParams{:});
-ylabel(ax,params.YLabel,params.FontParams{:});
-title(ax,params.Title,params.FontParams{:});
+xlabel(ax,strrep(params.XLabel,'_',' '),params.FontParams{:});
+ylabel(ax,strrep(params.YLabel,'_',' '),params.FontParams{:});
+title(ax,strrep(params.Title,'_',' '),params.FontParams{:});
 
 if ~isempty(params.XLim)
    set(ax,'XLim',params.XLim);

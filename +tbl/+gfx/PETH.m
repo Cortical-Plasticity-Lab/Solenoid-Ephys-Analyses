@@ -14,11 +14,13 @@ function [fig,params] = PETH(T,filtArgs,varargin)
 % Output
 %  fig      - Figure handle for generated PETH
 %  params   - Parameters struct
+%
+% See also: Contents, tbl.gfx.batchPETH
 
 PRE_OFFSET = -50; % milliseconds relative to stimulus to end "baseline"
 N_SD = 3;         % # Of standard deviations to set threshold above "baseline"
 X_UNITS = '(ms)';          % X-label units
-Y_UNITS = '(Spikes/sec)';  % Y-label units
+Y_UNITS = '\surd(Spikes/sec)';  % Y-label units
 
 % Parse inputs %
 params = cfg.gfx(); % Loads default parameters
@@ -74,6 +76,12 @@ end
 dt = nanmean(diff(t));
 
 if istable(T)
+   if size(T,1) < 1
+      error('GFX:PETH:NoTableRows',...
+         ['Double-check `<strong>filtArgs</strong>` or `<strong>T</strong>`:' ...
+             'no table rows meet criteria.']);
+   end
+   
    c = params.GroupColor.Color(params.GroupColor.Type==string(T.Type(1)),:);
    o = params.GroupColorOffset.(string(T.Area(1)));
    params.Color = c + o;
@@ -88,13 +96,13 @@ end
 utils.addHelperRepos();
 utils.addLabelsToAxes(ax,params);
 
-Z = X./dt; % Convert to spikes/sec
+Z = sqrt(X./(dt * 1e-3)); % Convert to sqrt(spikes/sec)
 mu = nanmean(Z,2); % Get mean for histograms
 bar(ax,t,mu,1,'DisplayName','PETH','FaceColor',params.Color,...
    params.BarParams{:});
 
 % IQR = iqr(Z(:));
-Z_s = sgolayfilt(Z,5,9,ones(1,9),1);
+Z_s = sgolayfilt(Z,params.SGOrder,params.SGLen,ones(1,params.SGLen),1);
 cb_s = utils.getCB95(Z_s,2); % Get confidence band for each "row" (2)
 mu_s = nanmean(Z_s,2);
 
@@ -114,11 +122,11 @@ gfx__.plotWithShadedError(ax,t,mu_s,cb_s,...
 );
 
 % Superimpose threshold set by pre-stimulus level of activity
-P = Z(:,t < PRE_OFFSET);
+P = Z(t < PRE_OFFSET,:);
 mu_thresh = nanmean(P(:));
 sd_thresh = nanstd(P(:));
 thresh = mu_thresh + N_SD*sd_thresh;
-line(ax,[min(t) max(t)],[mu_thresh, mu_thresh],'Color','m','LineWidth',2,...
+line(ax,[min(t) max(t)],[thresh, thresh],'Color','m','LineWidth',2,...
    'LineStyle','--',...
    'DisplayName',sprintf('Pre-Stimulus Mean + %d*SD (Threshold)',N_SD));
 if ax.YLim(2) < (thresh+sd_thresh)
@@ -126,14 +134,18 @@ if ax.YLim(2) < (thresh+sd_thresh)
 else
    set(ax,'YLim',[0 ax.YLim(2)]);
 end
+
+set(ax,'YLim',[0 ax.YLim(2)]);
+
 % Add any trial-type related metadata (solenoid or ICMS strikes) %
 if istable(T)
    utils.addStimInfoToAxes(ax,T,params,'west');
 end
-% Add any legend/labels as the very last things
-utils.addLegendToAxes(ax,params,'Location','northeast');
+% % Add any legend/labels as the very last things
+% utils.addLegendToAxes(ax,params,'Location','northeast');
+utils.addTextToAxes(ax,sprintf('\\bf\\itN\\rm = %d',size(Z,2)),'northeast','Color',[0 0 0]);
 if istable(T)
-   utils.addAreaToAxes(ax,T,params,'northwest');
+   utils.addAreaToAxes(ax,T,params,'northwest','BackgroundColor',[1 1 1]);
 end
 
 end
