@@ -1,26 +1,49 @@
-%% Spike Peak Amplitude
-% Determine time points of interest
+%% Determine time points of interest
 binSize = T.Properties.UserData.settings.binwidth;
-bin1 = 51;
-iT = [5; 40;... % input times of interest in ms
+binSize = binSize * 1e3; % Convert to ms
+binSt = 51; % 0 time bin
+binEnd = numel(T.Properties.UserData.t.Spikes); % Last bin
+buff = ceil(10/binSize); % Buffer at least 10ms before 0 timepoint
+preBin = binSt - buff;
+iT = [5; 40;... % Input times of interest in ms
     60; 85]; 
-% Return bin numbers 
-win = ((iT/(binSize.*1000)) + bin1); % return bin numbers
-% Generate pre-stim window based on variable bandwidths
-preBin = bin1-10;
-preWin = [preBin-(win(2)-win(1)); preBin;...
-    preBin-(win(4)-win(3)); preBin];
-% Create table 'C' with new variables for each condition
-tot = numel(win)/2;
-for i = 1 : tot;
+win = ((iT/binSize) + binSt); % Return bin numbers
+tot = numel(iT)/2;
+for i = 1 : tot % Generate corresponding pre-stim windows
+    n = i*2;
+    preWin = [preBin-(win(n)-win(n-1)); preBin;...
+        preBin-(win(n)-win(n-1)); preBin];
+end
+for i = 1 : tot % Find durations of each window of interest
+    n = i*2;
+    dt{i} = iT(n)-iT(n-1);
+end
+%% Eliminate channels with low spiking rates
+bt = (1+buff):(binEnd-buff); % Buffer edges of baseline period
+dur = ((binEnd-buff) - (1+buff))*(binSize*1e-3); % Determine duration in sec
+base = (T.Spikes(:,bt));
+T.Baseline = (sum(base,2))./dur;
+[G,B] = findgroups(T(:,{'ChannelID','BlockID'}));
+B.Mean_Baseline = cell2mat(splitapply(@(X){nanmean(X,1)},T.Baseline,G));
+% histogram(B.Mean_Baseline(B.Mean_Baseline <= 25),50);  % Visualize distribution of spikes/sec
+axis([0 25 0 150])
+thresh = B(B.Mean_Baseline <= 2.4,:); % Used to determine threshold of spikes/sec
+for i = 1:size(thresh,1)
+    blID = (T.BlockID == thresh.BlockID(i));
+    chID = (T.ChannelID == thresh.ChannelID(i));
+    idx = and(blID,chID);
+    T(idx,:)= [];
+end
+%% Create table 'C' with new variables for each condition
+for i = 1 : tot
     n = i*2;
     binTime = (win(n-1):win(n));
     winTitle = "Window_%d";
     varWin = char(sprintf(winTitle,i));
-    num = (T.Spikes(:,binTime));
-    T.(varWin) = sum(num,2);
-    fn = @(X){nanmedian(X,1)};
-    inputVars = {'Window'},;
+    num = sum(T.Spikes(:,binTime),2);
+    T.(varWin) = sqrt(num./dt{i});
+    fn = @(X){nanmean(X,1)};
+    inputVars = {varWin};
     varTitle = "Amp_Sum_%d";
     outputVars = char(sprintf(varTitle,i));
     C = tbl.stats.estimateChannelResponse(T,fn,inputVars,outputVars);
@@ -30,9 +53,9 @@ for i = 1 : tot;
     binPreTime = (preWin(n-1):preWin(n));
     winPreTitle = "Pre_Window_%d";
     varPreWin = char(sprintf(winPreTitle,i));
-    num = (T.Spikes(:,binPreTime));
-    T.(varPreWin) = sum(num,2);
-    inputVars = {'preWindow'},;
+    num = sum(T.Spikes(:,binPreTime),2);
+    T.(varPreWin) = sqrt(num./dt{i});
+    inputVars = {varPreWin};
     varTitle = "pre_Amp_Sum_%d";
     outputVars = char(sprintf(varTitle,i));
     C = tbl.stats.estimateChannelResponse(T,fn,inputVars,outputVars);
@@ -40,9 +63,9 @@ for i = 1 : tot;
     preC{i,2} = C.(newVar);
     preC{i,1} = outputVars;
 end
-for i = 1 : tot
-    C.(varC{i,1})= varC{1,2};
+for i = 1 : tot % Fill table 'C' with new variables
+    C.(varC{i,1})= varC{i,2};
 end
 for i = 1 : tot
-    C.(preC{i,1})= preC{1,2};
+    C.(preC{i,1})= preC{i,2};
 end
