@@ -93,7 +93,7 @@ for ii = 1:N % Total number of rows in groupings table
          if isnumeric(groupings.(varNames{iG})(ii))
             idx = idx & C.(varNames{iG})==groupings.(varNames{iG})(ii);
          else
-            idx = idx & ismember(string(C.(varNames{iG})),groupings.(varNames{iG})(ii));
+            idx = idx & ismember(C.(varNames{iG}),groupings.(varNames{iG})(ii));
          end
          titleStr(iG) = string(groupings.(varNames{iG})(ii));
       else
