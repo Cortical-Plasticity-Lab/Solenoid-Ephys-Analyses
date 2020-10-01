@@ -8,7 +8,7 @@ preBin = binSt - buff;
 iT = [5; 40;... % Input times of interest in ms
     60; 85]; 
 win = ((iT/binSize) + binSt); % Return bin numbers
-tot = numel(iT)/2;
+tot = numel(iT)/2; % Number of windows
 for i = 1 : tot % Generate corresponding pre-stim windows
     n = i*2;
     preWin = [preBin-(win(n)-win(n-1)); preBin;...
@@ -21,19 +21,8 @@ end
 %% Eliminate channels with low spiking rates
 bt = (1+buff):(binEnd-buff); % Buffer edges of baseline period
 dur = ((binEnd-buff) - (1+buff))*(binSize*1e-3); % Determine duration in sec
-base = (T.Spikes(:,bt));
-T.Baseline = (sum(base,2))./dur;
-[G,B] = findgroups(T(:,{'ChannelID','BlockID'}));
-B.Mean_Baseline = cell2mat(splitapply(@(X){nanmean(X,1)},T.Baseline,G));
-% histogram(B.Mean_Baseline(B.Mean_Baseline <= 25),50);  % Visualize distribution of spikes/sec
-axis([0 25 0 150])
-thresh = B(B.Mean_Baseline <= 2.4,:); % Used to determine threshold of spikes/sec
-for i = 1:size(thresh,1)
-    blID = (T.BlockID == thresh.BlockID(i));
-    chID = (T.ChannelID == thresh.ChannelID(i));
-    idx = and(blID,chID);
-    T(idx,:)= [];
-end
+thresh = 2.4; % Spikes/sec
+T= tbl.elimCh(T,bt,dur,thresh);
 %% Create table 'C' with new variables for each condition
 for i = 1 : tot
     n = i*2;
@@ -65,7 +54,16 @@ for i = 1 : tot
 end
 for i = 1 : tot % Fill table 'C' with new variables
     C.(varC{i,1})= varC{i,2};
-end
-for i = 1 : tot
     C.(preC{i,1})= preC{i,2};
 end
+%% Run GLME model
+for i = 1 : tot
+    new = tot*2;
+    mod = C(:,1:end-(new));
+    mod.VarC = varC{i,2};
+    mod.PreC = preC{i,2};
+    glme{i} = fitglme(mod,...
+        'VarC ~ 1 + Type*Area + (1|ChannelID) + (1 |PreC)',...
+        'Distribution','Normal','Link','identity');
+end
+clearvars -except T C glme

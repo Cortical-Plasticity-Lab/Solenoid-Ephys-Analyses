@@ -12,6 +12,8 @@
 % Functions
 %  addProcessing     - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
 %  addSlicing        - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
+%  elimCh            - Remove channels with low spiking activity 
+%  excludeIpsi       - Exclude trials from dataset on the ipsilateral side
 %  parseProbeData    - Parse data about probes from file Probe-info.xlsx
 %  parseBlockID      - Parse block ID metadata as variables
 %  slice             - Return "sliced" table using filters in `varargin`

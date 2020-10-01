@@ -1,8 +1,8 @@
 function T = excludeIpsi(T,exclBl)
 %EXCLUDEIPSI Exclude trials on the ipsilateral side from dataset 
 %
-%  t = tbl.excludeIpsilateralTrials(T,exclBl,);
-%  t = tbl.excludeIpsilateralTrials(T,exclBl,'Name',value,...);
+%  t = tbl.excludeIpsi(T,exclBl,);
+%  t = tbl.excludeIpsi(T,exclBl,'Name',value,...);
 %
 % Inputs
 %  T           - Table of spike and LFP data with each row as an individual
@@ -22,5 +22,5 @@ for i = 1:numTrials
     T(exc,:)= [];
 end
 clearvars('-except',initialVars{:})
-% save('Solenoid-Table_5-ms_excluded_ipsi','T','-v7.3');
+save('Solenoid-Table_5-ms_excluded_ipsi','T','-v7.3');
 end
