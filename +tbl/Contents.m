@@ -5,15 +5,16 @@
 %  in table format.
 %
 % Packages
-%  est               - Package with small functions for estimating responses using `splitapply` workflow
-%  gfx               - Package with figure export/generation functions
-%  stats             - Package with statistics export or analysis functions
+%  est                  - Package with small functions for estimating responses using `splitapply` workflow
+%  gfx                  - Package with figure export/generation functions
+%  stats                - Package with statistics export or analysis functions
 %
 % Functions
-%  addProcessing     - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
-%  addSlicing        - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
+%  parseProbeData       - Parse data about probes from file Probe-info.xlsx
+%  parseBlockID         - Parse block ID metadata as variables
+%  slice                - Return "sliced" table using filters in `varargin`
 %  elimCh            - Remove channels with low spiking activity 
 %  excludeIpsi       - Exclude trials from dataset on the ipsilateral side
-%  parseProbeData    - Parse data about probes from file Probe-info.xlsx
-%  parseBlockID      - Parse block ID metadata as variables
-%  slice             - Return "sliced" table using filters in `varargin`
+%  addSlicing           - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
+%  addProcessing        - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
+%  addLaminarCategories - Adds categorical variable `Lamina` based on depth/area

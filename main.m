@@ -39,6 +39,8 @@ tocData.graphics = round(toc(graphicstic));
 T = makeTables(r);
 T = tbl.parseBlockID(T);   % Format block-related info
 T = tbl.parseProbeData(T); % Format channel-related info
+T = utils.roundEventTimesToNearestMillisecond(T);
+T = tbl.addLaminarCategories(T);
 % save(cfg.default('exported_database_table__local'),'T','-v7.3'); % (Large-ish)
 % save(cfg.default('exported_database_table__remote'),'T','-v7.3'); % (Large-ish)
 tocData.total = round(toc(maintic));
