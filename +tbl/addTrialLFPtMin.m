@@ -28,19 +28,6 @@ T.ElectrodeID = strcat(string(T.SurgID),"-",string(T.ChannelID));
 T.Solenoid_ICMS_Delay = (T.Solenoid_Onset - T.ICMS_Onset).*1000;
 T.Solenoid_ICMS_Delay(isinf(T.Solenoid_ICMS_Delay) | isnan(T.Solenoid_ICMS_Delay)) = 0;
 T.Properties.VariableUnits{'Solenoid_ICMS_Delay'} = 'ms';
-% [G,TID] = findgroups(T(:,{'BlockID','ElectrodeID'}));
-% TID.Solenoid_ICMS_Delay = splitapply(@(tSol,tICMS)appendSolenoidICMSOffset(tSol,tICMS),...
-%    T.Solenoid_Onset,T.ICMS_Onset,G);
-% if isstruct(T.Properties.UserData)
-%    tmp = T.Properties.UserData; 
-% else
-%    tmp = struct;
-% end
-% T = outerjoin(T,TID,'Keys',{'BlockID','ElectrodeID'},...
-%    'Type','left',...
-%    'LeftVariables',setdiff(T.Properties.VariableNames,'Solenoid_ICMS_Delay'),...
-%    'RightVariables',{'Solenoid_ICMS_Delay'});
-% T.Properties.UserData = tmp;
 fprintf(1,'complete (%5.2f sec)\n',toc);
 
 tic;
@@ -57,14 +44,5 @@ T.tLFPMin = splitapply(@(LFP,tZero)tbl.est.tLFPavgMin(LFP,tLFP,'ZeroLFPBeforeThi
 T.Properties.VariableUnits{'tLFPMin'} = 'ms';
 fprintf(1,'complete (%5.2f sec)\n',toc);
 
-%    function tSolICMSoff = appendSolenoidICMSOffset(tSol,tICMS)
-%       tICMS = tICMS(~isnan(tICMS) & ~isinf(tICMS));
-%       tSol = tSol(~isnan(tSol) & ~isinf(tSol));
-%       if isempty(tICMS) || isempty(tSol)
-%          tSolICMSoff = 0;
-%       else
-%          tSolICMSoff = tSol(1) - tICMS(1);
-%       end
-%    end
 
 end
