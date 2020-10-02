@@ -20,19 +20,51 @@ else
    tOffset(isnan(tOffset) | isinf(tOffset)) = 0;   
 end
 
+tic;
+fprintf(1,'Adding Lamina, ElectrodeID, Solenoid_ICMS_Delay, and Solenoid_Dwell variables...');  
+T = tbl.addLaminarCategories(T);
+T.TrialType = string(T.Type);
+T.ElectrodeID = strcat(string(T.SurgID),"-",string(T.ChannelID));
+T.Solenoid_ICMS_Delay = (T.Solenoid_Onset - T.ICMS_Onset).*1000;
+T.Solenoid_ICMS_Delay(isinf(T.Solenoid_ICMS_Delay) | isnan(T.Solenoid_ICMS_Delay)) = 0;
+T.Properties.VariableUnits{'Solenoid_ICMS_Delay'} = 'ms';
+% [G,TID] = findgroups(T(:,{'BlockID','ElectrodeID'}));
+% TID.Solenoid_ICMS_Delay = splitapply(@(tSol,tICMS)appendSolenoidICMSOffset(tSol,tICMS),...
+%    T.Solenoid_Onset,T.ICMS_Onset,G);
+% if isstruct(T.Properties.UserData)
+%    tmp = T.Properties.UserData; 
+% else
+%    tmp = struct;
+% end
+% T = outerjoin(T,TID,'Keys',{'BlockID','ElectrodeID'},...
+%    'Type','left',...
+%    'LeftVariables',setdiff(T.Properties.VariableNames,'Solenoid_ICMS_Delay'),...
+%    'RightVariables',{'Solenoid_ICMS_Delay'});
+% T.Properties.UserData = tmp;
+fprintf(1,'complete (%5.2f sec)\n',toc);
 
 tic;
-
 G = (1:size(T,1))';
 tLFP = T.Properties.UserData.t.LFP;
-fprintf(1,'Computing individual trial time-to-minima...');
-T.ElectrodeID = categorical(strcat(string(T.SurgID),"-",string(T.ChannelID)));
-T.TrialType = categorical(string(T.Type));
+fprintf(1,'Computing individual trial time-to-LFP-minima...');
+
+T.Solenoid_Dwell = T.Solenoid_Offset - T.Solenoid_Onset;
+T.Properties.VariableUnits{'Solenoid_Dwell'} = 'sec';
 % tZero == tOffset; if we use this with respect to some offset, we are
 % interested in finding the (minima) that occurred after that offset.
 T.tLFPMin = splitapply(@(LFP,tZero)tbl.est.tLFPavgMin(LFP,tLFP,'ZeroLFPBeforeThisTimeMS',tZero),...
    T.LFP,tOffset,G) - tOffset;
 T.Properties.VariableUnits{'tLFPMin'} = 'ms';
 fprintf(1,'complete (%5.2f sec)\n',toc);
+
+%    function tSolICMSoff = appendSolenoidICMSOffset(tSol,tICMS)
+%       tICMS = tICMS(~isnan(tICMS) & ~isinf(tICMS));
+%       tSol = tSol(~isnan(tSol) & ~isinf(tSol));
+%       if isempty(tICMS) || isempty(tSol)
+%          tSolICMSoff = 0;
+%       else
+%          tSolICMSoff = tSol(1) - tICMS(1);
+%       end
+%    end
 
 end

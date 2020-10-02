@@ -55,11 +55,15 @@ for iV = 1:2:numel(varargin)
 end
 % % END PARS % %
 
+if ~ismember('ElectrodeID',T.Properties.VariableNames)
+   T.ElectrodeID = strcat(string(T.SurgID),"-",string(T.ChannelID));
+end
+
 if strcmp(T.Properties.UserData.type,'MasterTable')
-   [G,C] = findgroups(T(:,{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
+   [G,C] = findgroups(T(:,{'GroupID','SurgID','AnimalID','ElectrodeID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
    C.Properties.UserData.type = 'ChannelResponseTable';
 else
-   G = findgroups(T(:,{'GroupID','SurgID','AnimalID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
+   G = findgroups(T(:,{'GroupID','SurgID','AnimalID','ElectrodeID','BlockID','BlockIndex','Type','Area','ChannelID','AP','ML','Depth','Channel','Stim_Ch','ICMS_Onset','Solenoid_Onset','Solenoid_Offset','Impedance','coeff','p'}));
    C = T;
 end
 tmp = splitapply(fcn,T(:,inputVars),G);

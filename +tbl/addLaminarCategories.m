@@ -51,6 +51,8 @@ for iA = 1:numel(pars.Area)
    end
 end
 
-T = movevars(T,'Lamina','before','ChannelID');
+if ismember('ChannelID',T.Properties.VariableNames)
+   T = movevars(T,'Lamina','before','ChannelID');
+end
 
 end
