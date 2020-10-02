@@ -59,11 +59,12 @@ end
 %% Run GLME model
 for i = 1 : tot
     new = tot*2;
-    mod = C(:,1:end-(new));
+    mod = C(:,1:(end) - (new));
+    mod.SpChannelID = strcat(string(mod.BlockID),{'_'},string(mod.ChannelID));
     mod.VarC = varC{i,2};
     mod.PreC = preC{i,2};
     glme{i} = fitglme(mod,...
-        'VarC ~ 1 + Type*Area + (1|ChannelID) + (1 |PreC)',...
+        'VarC ~ 1 + Type*Area + (1+PreC|SpChannelID)',...
         'Distribution','Normal','Link','identity');
 end
 clearvars -except T C glme
