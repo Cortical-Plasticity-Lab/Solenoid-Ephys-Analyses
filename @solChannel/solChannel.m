@@ -899,9 +899,13 @@ classdef solChannel < handle
             end
             return;
          end
-         in = load(obj.ds,'fs');
-         fs = in.fs;
-         obj.fs_d = fs;
+         if exist(obj.ds,'file')==0
+            fs = 1000;
+         else
+            in = load(obj.ds,'fs');
+            fs = in.fs;
+            obj.fs_d = fs;
+         end
       end
       
       % Returns LOWPASS FILTERED (DECIMATED; LFP) data for this channel
@@ -939,20 +943,55 @@ classdef solChannel < handle
             end
             return;
          end
+%          fs = obj.getfs_d;
          
-         fs = obj.getfs_d;
-         in = load(obj.ds,'data');
-         if nargout > 1
-            t = (0:(numel(in.data)-1))/fs;
+         [pname,fname,ext] = fileparts(obj.ds);
+         if ~endsWith(pname,'-NEW')
+            pname = [pname '-NEW'];
+            obj.ds = fullfile(pname,[fname ext]);
          end
          
-         if ~isinf(vec)
-            data = in.data(vec);
-            if nargout > 1
-               t = t(vec);
+         if exist(pname,'dir')==0
+            mkdir(pname);
+         end
+         
+         if exist(obj.ds,'file')==0
+            tic;
+            fprintf(1,'Please wait, updating %s...',obj.Name);
+            in = load(obj.raw,'data','fs');
+            [pre_stim_suppress,post_stim_suppress,binwidth] = cfg.default('pre_stim_suppress','post_stim_suppress','binwidth');
+            ts = getStims(obj);
+            fs = round(1/binwidth);
+            
+            iStim_Pre = round(ts-pre_stim_suppress.*in.fs);
+            iStim_Post = round(ts+post_stim_suppress.*in.fs);
+
+            iAll = 1:numel(in.data);
+            for iT = 1:numel(ts)
+               iAll = setdiff(iAll,iStim_Pre(iT):iStim_Post(iT));
             end
+            fprintf(1,'suppressing stims...');
+            data_suppressed = interp1(1:numel(in.data),double(in.data),iAll,'spline');
+            fprintf(1,'interpolating uniform samples...');
+            data_uniform = interp1(iAll,data_suppressed,1:numel(in.data),'spline');
+            fprintf(1,'applying HPF...');
+            data_hpf = utils.HPF(data_uniform,1,in.fs);
+            fprintf(1,'resampling with LPF...');
+            data = resample(data_hpf,fs,in.fs);
+            fprintf(1,'saving...');
+            save(obj.ds,'data','fs','-v7.3');
+            fprintf(1,'complete (%5.2f sec)\n',toc);
          else
+            in = load(obj.ds,'data','fs');
             data = in.data;
+            fs = in.fs;
+         end
+         
+         t = (0:(numel(data)-1))/fs;
+         
+         if ~isinf(vec)
+            data = data(vec);
+            t = t(vec);
          end
       end
       
@@ -1884,6 +1923,7 @@ classdef solChannel < handle
          end
          
          obj.edges = tPre:binWidth:tPost;
+         obj.fs_d = round(1/binWidth);
       end
       
       % Set the STIM data file for this channel

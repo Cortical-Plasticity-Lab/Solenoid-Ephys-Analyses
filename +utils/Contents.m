@@ -17,6 +17,7 @@
 %  addTypeToAxes                       - Add label to axes indicating 'Solenoid (only)', 'ICMS (only)', or 'Solenoid+ICMS' in a principled way
 %  checkXYLabels                       - Check X-Y axes for correct labels at end of label strings
 %  expAI                               - Export figure in appropriate format for Adobe Illustrator
+%  exportSaveFigure                    - Export and save figures using Figures.PlotGroupedResponses
 %  formatDefaultAxes                   - Apply default axes settings preferred by MM
 %  formatDefaultFigure                 - Apply default figure settings preferred by MM
 %  formatDefaultLabel                  - Apply default font settings preferred by MM
@@ -32,6 +33,7 @@
 %  getCB95                             - Return 95% confidence bounds
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
+%  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
 %  parseNamedVariable                  - Parse optional inputs and update a named variable
 %  roundEventTimesToNearestMillisecond - Set ICMS onset/offset and Solenoid onset/offset to nearest millisecond value (as seconds)
