@@ -97,6 +97,10 @@ out.L = {  '019','021','000','029',...
 %          '015','012','002','005',... % NeuroNexus A4x4
 %          '013','010','004','007'};
 
+% ICMS suppression parameters
+out.pre_stim_suppress = 0.010;  % seconds
+out.post_stim_suppress = 0.015; % seconds
+
 % Probe depth parameters
 out.offset =  50;  % (microns from bottom channel to tip)
 out.spacing = 100; % (microns between channels on a shank)
