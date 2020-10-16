@@ -27,19 +27,19 @@
 %  (particularly during the initial COVID-19 quarantine phase).
 %
 % <strong>Scripts</strong>
-%   main.m      - General overview and main outline of workflow (after pre-processing)
-%   makeTables  - (Deprecated) initial function for exporting data table
+%   main.m                             - General overview and main outline of workflow (after pre-processing)
+%   batch_export_rms_figures           - Script to make RMS figures
 %
 % <strong>Functions</strong>
-%   batch_view_reaching_performances - Import/plot behavior data for all animals from spreadsheet  
+%   batch_view_reaching_performances   - Import/plot behavior data for all animals from spreadsheet  
 %
 % <strong>Classes</strong>
-%   @figBrowser - If figures are exported as .png/.fig for example using batchProbePETH method of solRat or solBlock, this can be used to view
-%   @solChannel - Handle class to organize data at the individual-channel level
-%   @solBlock   - Handle class for organizing data from an individual recording
-%   @solRat     - Handle class to organize data collected for all animal recordings
+%   @figBrowser                        - If figures are exported as .png/.fig for example using batchProbePETH method of solRat or solBlock, this can be used to view
+%   @solChannel                        - Handle class to organize data at the individual-channel level
+%   @solBlock                          - Handle class for organizing data from an individual recording
+%   @solRat                            - Handle class to organize data collected for all animal recordings
 %
 % <strong>Sub-Packages</strong>
-%   analyze     - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
-%   cfg         - Package containing any default configuration parameters
-%   tbl         - Package with sub-packages and functions for handling table exported using solRat.makeTables
+%   analyze                            - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
+%   cfg                                - Package containing any default configuration parameters
+%   tbl                                - Package with sub-packages and functions for handling table exported using solRat.makeTables
