@@ -20,9 +20,8 @@ end
 
 A = T(:,{'Solenoid_Onset','Solenoid_Offset','ICMS_Onset'});
 [G,TID] = findgroups(A);
-disp('<strong>Valid event time options:</strong>');
-
 if (nargout < 1) || printCombinations
+   disp('<strong>Valid event time options:</strong>');
    fprintf(1,'    %14s    %15s    %10s\n',...
       '   (sec)   ','   (sec)   ','   (sec)   ');
    disp(TID);

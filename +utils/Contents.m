@@ -33,6 +33,7 @@
 %  getCB95                             - Return 95% confidence bounds
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
+%  getPCs                              - Return principal components for response variable in data
 %  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
 %  parseNamedVariable                  - Parse optional inputs and update a named variable

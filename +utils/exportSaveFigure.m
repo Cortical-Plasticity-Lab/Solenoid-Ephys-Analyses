@@ -26,9 +26,11 @@ pars = struct;
 pars.Figure_Args = {'Units','Normalized','Position',[0.1 0.1 0.8 0.8]};
 pars.NPeaks = 1;
 pars.NameIndices = [2,3];
+pars.PC_Type = "Solenoid";
 pars.PeaksAfter = 0;
 pars.ResponseVar = 'LFP';
-pars.YLim = [-1500 1500];
+pars.XLim = [-50 500];
+pars.YLim = [-500 500];
 fn = fieldnames(pars);
 for iV = 1:2:numel(varargin)
    idx = strcmpi(fn,varargin{iV});
@@ -45,7 +47,11 @@ end
 strTitle = strrep(f,'-',' ');
 strTitle = strrep(strTitle,'SolenoidICMS','Solenoid + ICMS');
 
-xl = [pars.PeaksAfter-100, max(C.Properties.UserData.t.(pars.ResponseVar))];
+if any(isnan(pars.XLim)) || isempty(pars.XLim)
+   xl = [pars.PeaksAfter-100, max(C.Properties.UserData.t.(pars.ResponseVar))];
+else
+   xl = pars.XLim;
+end
 
 % Make actual figure
 fig = Figures.PlotGroupedResponses(...
@@ -54,6 +60,7 @@ fig = Figures.PlotGroupedResponses(...
    'FigureName',strTitle,...
    'NPeaks',pars.NPeaks,...
    'NameIndices',pars.NameIndices,...
+   'PC_Type',pars.PC_Type,...
    'PeaksAfter',pars.PeaksAfter,...
    'XLim',xl,...
    'YLim',pars.YLim);

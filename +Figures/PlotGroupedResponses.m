@@ -50,6 +50,7 @@ pars.LegendLocation = 'northeast';  % Default legend location
 pars.NameIndices = [];
 pars.NPeaks = 1;
 pars.PC_Color_Order = [0 0 1; 1 0 0; 1 1 0]; % Blue, Red, Yellow
+pars.PC_Type = "Solenoid";
 pars.PeakMarker_Args = {};          % Extra parameter value pairs for utils.addPeakLabels()
 pars.PeaksAfter = 0; % ms
 pars.SG_FrameLen = 21;
@@ -71,8 +72,8 @@ end
 % END PARS % %
 
 % Remove outlier rows
-idx = (C.(response) < pars.ExclusionThreshold(1)) | ...
-      (C.(response) > pars.ExclusionThreshold(2));
+idx = any(C.(response) < pars.ExclusionThreshold(1),2) | ...
+      any(C.(response) > pars.ExclusionThreshold(2),2);
 C(idx,:) = [];
 
 if isempty(pars.Bins)
@@ -95,9 +96,13 @@ fig(1) = utils.formatDefaultFigure(figure,...
 nRow = floor(sqrt(N));
 nCol = ceil(N/nRow);
 varNames = groupings.Properties.VariableNames;
-DATA = C.(response) - nanmean(C.(response),1);
-[coeff,SCORE,~,~,explained,~] = pca(DATA');
+if isempty(pars.PC_Type)
+   pc_idx = true(size(C,1),1);
+else
+   pc_idx = C.Type==pars.PC_Type;
+end
 
+[DATA,SCORE,coeff,explained] = utils.getPCs(C.(response),pc_idx);
 
 if ~isempty(pars.Bins)
    SD = nanstd(SCORE(pars.Bins > pars.PeaksAfter,:),[],1);
@@ -109,7 +114,7 @@ end
 
 for ii = 1:N % Total number of rows in groupings table
    % First: identify indices of included rows from `C` for this subplot.
-   idx = true(size(C,1),1);
+   idx = true(size(DATA,1),1);
    titleStr = strings(1,numel(varNames));
    if isempty(pars.NameIndices)
       nameVec = 1:min(2,numel(varNames));
@@ -134,9 +139,7 @@ for ii = 1:N % Total number of rows in groupings table
    end
    titleStr = strjoin(titleStr," ");
    
-   data = DATA(idx,:) - nanmean(DATA(idx,:),2);
-   
-   score = data' * coeff(idx,:);
+   [data,score] = utils.applyPCs(DATA,coeff,pc_idx(idx));
    
    ax = utils.formatDefaultAxes(subplot(nRow,nCol,ii),...
       'Parent',fig(1),...
@@ -161,7 +164,7 @@ for ii = 1:N % Total number of rows in groupings table
       R2 = 1 - RSS/TSS;
       score(pars.Bins > pars.PeaksAfter,:) = sgolayfilt(...
          score(pars.Bins > pars.PeaksAfter,:),pars.SG_Order,pars.SG_FrameLen);
-      tS = repmat(pars.Bins,sum(idx),1);
+      tS = repmat(pars.Bins,sum(pc_idx(idx)),1);
       scatter(ax,tS(:)+randn(numel(tS),1).*0.5,data(:),...
          'MarkerFaceColor',[0.5 0.5 0.5],...
          'Marker','o','MarkerEdgeColor','none',...
@@ -175,22 +178,24 @@ for ii = 1:N % Total number of rows in groupings table
          'Color',pars.PC_Color_Order(iL,:),...
          'DisplayName',sprintf('PC-%02d',iL),...
          'LineWidth',2/(1+exp(-(iL-1))));
-      [pks,loc_idx] = findpeaks(abs(l(iL).YData),...
-         'NPeaks',pars.NPeaks,...
-         'SortStr','descend',...
-         'MinPeakDistance',40,...
-         pars.FindPeaks_Args{:});
-      locs = l(iL).XData(loc_idx);
-      iPk = locs > pars.PeaksAfter;
-      pks = pks(iPk);
-      locs = locs(iPk);
-      loc_idx = loc_idx(iPk);
-      pks = pks .* sign(l(iL).YData(loc_idx));
-      utils.addPeakLabels(ax,locs,pks,[],...
-         'Color',pars.PC_Color_Order(iL,:),...
-         'Clipping','on',...
-         'CoordinateMarkerArgs',pars.Axes_Coordinate_Marker_Args,...
-         pars.PeakMarker_Args{:});
+      if iL == 1
+         [pks,loc_idx] = findpeaks(abs(l(iL).YData),...
+            'NPeaks',pars.NPeaks,...
+            'SortStr','descend',...
+            'MinPeakDistance',40,...
+            pars.FindPeaks_Args{:});
+         locs = l(iL).XData(loc_idx);
+         iPk = locs > pars.PeaksAfter;
+         pks = pks(iPk);
+         locs = locs(iPk);
+         loc_idx = loc_idx(iPk);
+         pks = pks .* sign(l(iL).YData(loc_idx));
+         utils.addPeakLabels(ax,locs,pks,[],...
+            'Color',pars.PC_Color_Order(iL,:),...
+            'Clipping','on',...
+            'CoordinateMarkerArgs',pars.Axes_Coordinate_Marker_Args,...
+            pars.PeakMarker_Args{:});
+      end
    end
    
    
