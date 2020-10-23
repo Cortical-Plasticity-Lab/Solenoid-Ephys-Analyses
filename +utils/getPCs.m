@@ -1,8 +1,8 @@
-function [DATA,SCORE,coeff,explained,TID] = getPCs(data,idx)
+function [DATA,SCORE,coeff,explained] = getPCs(data,idx)
 %GETPCS Return principal components for response variable in data
 %
 %  [DATA,SCORE,coeff,explained] = utils.getPCs(data);
-%  [DATA,SCORE,coeff,explained,TID] = utils.getPCs(data,idx);
+%  [DATA,SCORE,coeff,explained] = utils.getPCs(data,idx);
 %
 % Inputs
 %  data - C.(responseVar) where responseVar is for example 'LFP'
@@ -24,11 +24,15 @@ function [DATA,SCORE,coeff,explained,TID] = getPCs(data,idx)
 %  SCORE     - Principal component scores
 %  coeff     - Principal component coefficients
 %  explained - Percent explained for each PC
-%  TID       - Identifier table (just does indices corresponding to `idx` 
-%                                if data not provided as table)
 
 if nargin < 2
    idx = true(size(data,1),1);
+   wrapOutput = false;
+elseif isscalar(idx)
+   wrapOutput = idx;
+   idx = true(size(data,1),1);
+else
+   wrapOutput = false;
 end
 
 if istable(data)
@@ -44,12 +48,16 @@ if istable(data)
       error('The defined ResponseVariable ("%s") is not a table variable. Check input `data` table.',responseVar);
    end
    data = T.(responseVar);
-   tableFlag = true;
-else
-   
 end
 
 DATA = data - nanmean(data,1);
 [coeff,SCORE,~,~,explained,~] = pca(data(idx,:)');
+
+if wrapOutput
+   coeff = {coeff};
+   SCORE = {SCORE};
+   DATA = {DATA};
+   explained = {explained};
+end
 
 end
