@@ -31,6 +31,7 @@
 %  findStims                           - Return stimulation indices based on all STIM files
 %  findUniqueEventCombinations         - Return or print table of unique event combinations
 %  getCB95                             - Return 95% confidence bounds
+%  getNeuralStatePCs                   - Return PCA data for neural state by concatenating trials
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
 %  getPCs                              - Return principal components for response variable in data
