@@ -31,6 +31,7 @@
 %  findStims                           - Return stimulation indices based on all STIM files
 %  findUniqueEventCombinations         - Return or print table of unique event combinations
 %  getCB95                             - Return 95% confidence bounds
+%  getFactors_Batch                    - Return NNMF Factors in batch for several combinations of number of factors
 %  getNeuralStatePCs                   - Return PCA data for neural state by concatenating trials
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
@@ -38,5 +39,6 @@
 %  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
 %  parseNamedVariable                  - Parse optional inputs and update a named variable
+%  reduceData                          - Return reduced table version
 %  roundEventTimesToNearestMillisecond - Set ICMS onset/offset and Solenoid onset/offset to nearest millisecond value (as seconds)
 %  sec2string                          - Take seconds (double) and return time string for hours, minutes, and seconds
