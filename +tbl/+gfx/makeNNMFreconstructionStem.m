@@ -41,20 +41,14 @@ end
 
 xlabel(ax,'Number Factors','FontName','Arial','Color','black');
 ylabel(ax,'R^2','FontName','Arial','Color','black');
-if isempty(tag)
-   title(ax,'Factor Reconstruction Accuracy','FontName','Arial','Color','black');
-else
-   title(ax,sprintf('Factor Reconstruction Accuracy (%s)',strrep(tag,'_','')),...
-      'FontName','Arial','Color','black');
-end
+tagStr = io.appendTag(tag,...
+   ["Factor Reconstruction Accuracy","Factor Reconstruction Accuracy (%s)"]);
+title(ax,tagStr,'FontName','Arial','Color','black');
 
-if nargout < 1
-   if exist('figures/NNMF','dir')==0
-      mkdir('figures/NNMF');
-   end
-   saveas(fig,['figures/NNMF/NNMF-Spikes-Reconstruction-Accuracy' tag '.png']);
-   savefig(fig,['figures/NNMF/NNMF-Spikes-Reconstruction-Accuracy' tag '.fig']);
-   delete(fig);
+
+if nargout < 1   
+   io.optSaveFig(fig,fullfile(pwd,'figures/NNMF'),...
+      'NNMF-Spikes-Reconstruction-Accuracy',tag);
 end
 
 end

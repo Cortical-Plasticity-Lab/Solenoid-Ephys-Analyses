@@ -24,20 +24,23 @@ ax = axes(fig,'XColor','k','YColor','k',...
 plot(ax,t.*1e3,W,'LineWidth',1.5);
 xlabel(ax,'Time (ms)','FontName','Arial','Color','black');
 ylabel(ax,'Factor Weighting','FontName','Arial','Color','black');
+
 if isempty(tag)
    title(ax,sprintf('Spikes NNMF (N = %d)',size(W,2)),'FontName','Arial','Color','black');
 else
    title(ax,sprintf('Spikes NNMF (N = %d | %s)',size(W,2),strrep(tag,'_','')),...
       'FontName','Arial','Color','black');
 end
+strOpts = [...
+   string(sprintf('Spikes NNMF (N = %d)',size(W,2))),  ...
+   string(sprintf('Spikes NNMF (N = %d | %%s)',size(W,2))) ...
+   ];
+tagStr = io.appendTag(tag,strOpts);
+title(ax,tagStr,'FontName','Arial','Color','black');
 
-if nargout < 1
-   if exist('figures/NNMF','dir')==0
-      mkdir('figures/NNMF');
-   end
-   saveas(fig,sprintf('figures/NNMF/NNMF-Spikes-Factors-N_%d%s.png',size(W,2),tag));
-   savefig(fig,sprintf('figures/NNMF/NNMF-Spikes-Factors-N_%d%s.fig',size(W,2),tag));
-   delete(fig);
+if nargout < 1   
+   io.optSaveFig(fig,fullfile(pwd,'figures/NNMF'),...
+      sprintf('NNMF-Spikes-Factors-N_%d',size(W,2)),tag);
 end
 
 end
