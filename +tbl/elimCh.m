@@ -1,7 +1,7 @@
 function T = elimCh(T,bt,dur,thresh)
 %ELIMCH Eliminate channels from blocks with low spiking 
 %
-%   = tbl.elimCh(T,bt,dur);
+%   T = tbl.elimCh(T,bt,dur);
 %
 % Inputs
 %  T           - Table of spike and LFP data with each row as an individual
