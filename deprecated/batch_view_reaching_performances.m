@@ -1,7 +1,7 @@
 function figH = batch_view_reaching_performances(score_var)
 
 %% SET CONSTANTS HERE
-SCORE_FILE = 'G:\Lab Member Folders\Max Murphy\__Experiments\Solenoid\Reach-Scoring.xlsx';
+SCORE_FILE = '..\Reach-Scoring.xlsx';
 SCORE_THRESHOLD = 0.60; % Scoring threshold
 
 %% PARSE INPUT ARGS
@@ -58,9 +58,9 @@ ylabel(strrep(score_var,'_',' '),'FontName','Arial','FontSize',14,'Color','k');
 if strcmpi(score_var,'Percent_Success')
    line([min(t) max(t)],[SCORE_THRESHOLD SCORE_THRESHOLD],...
       'Color','r','LineStyle','--','LineWidth',2);
-   legend([R;'Score Threshold'],'Location','SouthWest');
+   legend([R;'Score Threshold'],'Location','best');
 else
-   legend(R,'Location','SouthWest');
+   legend(R,'Location','best');
 end
 
 

@@ -19,7 +19,7 @@ function t = tLFPavgMin(LFP_mean,tLFP,varargin)
  
 % PARS % % % % %
 pars = struct;
-pars.ZeroLFPBeforeThisTimeMS = 50;
+pars.ZeroLFPBeforeThisTimeMS = 0;
 fn = fieldnames(pars);
 for iV = 1:2:numel(varargin)
    idx = strcmpi(fn,varargin{iV});

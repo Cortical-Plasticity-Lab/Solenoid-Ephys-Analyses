@@ -39,6 +39,9 @@ tocData.graphics = round(toc(graphicstic));
 T = makeTables(r);
 T = tbl.parseBlockID(T);   % Format block-related info
 T = tbl.parseProbeData(T); % Format channel-related info
+T = utils.roundEventTimesToNearestMillisecond(T);
+T = tbl.addTrialLFPtMin(T,T.Solenoid_Onset*1e3); % adds `TrialType` and `ElectrodeID` and `Lamina` and `Solenoid_Dwell` variables also
+
 % save(cfg.default('exported_database_table__local'),'T','-v7.3'); % (Large-ish)
 % save(cfg.default('exported_database_table__remote'),'T','-v7.3'); % (Large-ish)
 tocData.total = round(toc(maintic));

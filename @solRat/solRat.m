@@ -154,9 +154,11 @@ classdef solRat < handle
             %                    the data rows.
             
             if nargin < 2
-                [tPre,tPost] = solRat.getDefault('tpre','tpost');
+               [tPre,tPost,binWidth] = solRat.getDefault('tpre','tpost','binwidth');
             elseif nargin < 3
-                [tPost] = solRat.getDefault('tpost');
+               [tPost,binWidth] = solRat.getDefault('tpost','binwidth');
+            else
+               binWidth = cfg.default('binwidth');
             end
             
             if nargin < 4
@@ -177,6 +179,8 @@ classdef solRat < handle
                 end
                 return; % End "recursion"
             end
+            
+            setSpikeBinEdges(obj.Children,tPre,tPost,binWidth);
             
             % Need to parse the following variables from Rat:
             %  * `RowID`            (at very end of table-making process)
