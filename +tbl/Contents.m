@@ -11,6 +11,7 @@
 %
 % Functions
 %  addLaminarCategories - Adds categorical variable `Lamina` based on depth/area
+%  addLV                - Add lesion volume information to table
 %  addTrialLFPtMin      - Add LFP time-to-min as variable to main data table
 %  addProcessing        - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
 %  addSlicing           - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
