@@ -18,5 +18,3 @@ end
 % Split up data
 T = tbl.stats.addSolenoidLFPbetas(T,C,3);
 
-% Use principal component coefficients
-C = tbl.stats.estimateChannelResponse(T,@(

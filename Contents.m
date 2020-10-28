@@ -28,7 +28,7 @@
 %
 % <strong>Scripts</strong>
 %   main.m                             - General overview and main outline of workflow (after pre-processing)
-%   batch_export_rms_figures           - Script to make RMS figures
+%   batch_Fig3                         - Batch script to run code associated with generating Figure 3
 %
 % <strong>Functions</strong>
 %   batch_view_reaching_performances   - Import/plot behavior data for all animals from spreadsheet  
@@ -40,6 +40,7 @@
 %   @solRat                            - Handle class to organize data collected for all animal recordings
 %
 % <strong>Sub-Packages</strong>
+%   Fig3                               - Package for tools used in Figure 3
 %   analyze                            - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
 %   cfg                                - Package containing any default configuration parameters
 %   tbl                                - Package with sub-packages and functions for handling table exported using solRat.makeTables

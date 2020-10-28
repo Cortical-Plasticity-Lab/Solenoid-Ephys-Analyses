@@ -15,6 +15,8 @@ function [out,state_out] = HPF(in,fc,fs,state_in)
 %   INPUTS
 %  --------
 %     in    :     Input (raw) sample data.
+%                 -> If array, then operates along ROWS (assumes that
+%                       each COLUMN is a new time sample)
 %
 %     fc    :     Desired cutoff frequency (Hz)
 %
@@ -35,8 +37,7 @@ function [out,state_out] = HPF(in,fc,fs,state_in)
 %                 if you are filtering data in "chunks" so that the
 %                 subsequent chunk has the correct state initialization.
 %
-% By: Intan Technologies
-% Modified by Max Murphy   06/12/2018 (Matlab R2017b)
+% Modified from original script provided by Intan Technologies.
 
 % DEFAULTS
 FS = 30000; % Default sample rate is 30 kSamples/sec
@@ -50,20 +51,29 @@ switch nargin
       warning('No sample rate specified. Using default FS (%d Hz).',FS);
       fs = FS;
       outLPF = zeros(size(in));
-%       outLPF(1) = in(1);  
+      state_in = zeros(size(in,1),1);
    case 2
       warning('No sample rate specified. Using default FS (%d Hz).',FS);
       fs = FS;
       outLPF = zeros(size(in));
-%       outLPF(1) = in(1);  
+      state_in = zeros(size(in,1),1);
    case 3
       outLPF = zeros(size(in));
-%       outLPF(1) = in(1);  
+      state_in = zeros(size(in,1),1);
    case 4
       outLPF = zeros(size(in));
-      outLPF(1) = state_in;
+      outLPF(:,1) = state_in;
    otherwise
       error('Too many inputs. Check syntax.');
+end
+
+if (size(in,1) > 1) && (size(in,2) > 1)
+   out = nan(size(in));
+   state_out = nan(size(in,1),1);
+   for iRow = 1:size(in,1)
+      [out(iRow,:),state_out(iRow)] = utils.HPF(in(iRow,:),fc,fs,state_in(iRow));
+   end
+   return;
 end
 
 % COMPUTE IIR FILTER COEFFICIENTS
