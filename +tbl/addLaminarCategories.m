@@ -18,7 +18,7 @@ function [T,L] = addLaminarCategories(T,varargin)
 pars = struct;
 pars.Area = ["RFA","S1"];
 pars.CategoryVars = {1:5,...
-   ["Layer I", "Layer II/III", "Layer IV", "Layer V", "Layer VI"]};
+   {'Layer I', 'Layer II/III', 'Layer IV', 'Layer V', 'Layer VI'}};
 pars.LaminaFile = 'Lamina-Info.xlsx';
 
 fn = fieldnames(pars);
@@ -33,7 +33,7 @@ end
 warning('off','MATLAB:table:ModifiedAndSavedVarnames');
 L = readtable(pars.LaminaFile);
 warning('on','MATLAB:table:ModifiedAndSavedVarnames');
-L.Properties.VariableNames = ["Area","Lamina","UB","LB"];
+L.Properties.VariableNames = {'Area','Lamina','UB','LB'};
 L.Properties.VariableUnits = {'','','\mum','\mum'};
 
 % Initialize categories for output variable
@@ -51,8 +51,8 @@ for iA = 1:numel(pars.Area)
    end
 end
 
-if ismember('ChannelID',T.Properties.VariableNames)
-   T = movevars(T,'Lamina','before','ChannelID');
-end
+% if ismember('ChannelID',T.Properties.VariableNames)
+%    T = movevars(T,'Lamina','before','ChannelID');
+% end
 
 end
