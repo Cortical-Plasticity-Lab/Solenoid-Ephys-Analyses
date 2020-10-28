@@ -1,4 +1,4 @@
-function [T,B] = elimCh(T,bt,dur,thresh)
+ function [T,B] = elimCh(T,bt,dur,thresh)
 %ELIMCH Eliminate channels from blocks with low spiking 
 %
 %   [T,B] = tbl.elimCh(T,bt,dur);
