@@ -48,48 +48,41 @@ C.ampBin = idx(:,1:pk);
 n = isnan(C.ampMax);
 C.ampBin(n) = 0;
 C.pkTime = C.ampBin.*binSize;
-histogram(C.ampBin(C.ampBin > 1),99) % Plot amplitudes
-[index,ref] = findgroups(C(:,{'ICMS_Onset','Solenoid_Onset','Area','Type'}));
-for i = 1:size(ref,1)
-    gr = index == i;
-    figure;
-    group = C.ampBin(gr,:);
-    histogram(group(group > 1),99);
-    hold on
-    v1 = table2array(ref(i,1));
-    v2 = table2array(ref(i,2));
-    v3 = char(table2array(ref(i,3)));
-    v4 = char(table2array(ref(i,4)));
-    varTitle = "ICMS %02d Solenoid %02d Area %s Type %s";
-    title(sprintf(varTitle,v1,v2,v3,v4));
-    hold off
+%% Plot histograms 
+% histogram(C.ampBin(C.ampBin > 1),99) % Plot amplitudes
+% [index,ref] = findgroups(C(:,{'ICMS_Onset','Solenoid_Onset','Area','Type'}));
+% for i = 1:size(ref,1)
+%     gr = index == i;
+%     figure;
+%     group = C.ampBin(gr,:);
+%     histogram(group(group > 1),99);
+%     hold on
+%     v1 = table2array(ref(i,1));
+%     v2 = table2array(ref(i,2));
+%     v3 = char(table2array(ref(i,3)));
+%     v4 = char(table2array(ref(i,4)));
+%     varTitle = "ICMS %02d Solenoid %02d Area %s Type %s";
+%     title(sprintf(varTitle,v1,v2,v3,v4));
+%     hold off
+% end
+%% Model
+peakTime = C.pkTime.';
+k = peakTime(:);
+nC = repelem(C(1:end, :), pk, 1);
+nC.pkTime = k;
+nC.Spike_Mean = [];
+nC.binom = nC.pkTime;
+nC.binom(:) = 0;
+nC = nC(nC.Type == 'Solenoid',:); % Look at solenoid trials only first
+uniq = unique(nC.Solenoid_Onset);
+for i = 1:numel(uniq)
+    stim = uniq(i);
+    idx = nC.Solenoid_Onset == stim;
+    r1 = 25 + (uniq(i)*1e3);
+    r2 = 55 + (uniq(i)*1e3);
+    idx2 = nC.pkTime >= r1 & nC.pkTime <= r2;
+    ind = idx & idx2;
+    nC.binom(ind) = 1;
 end
-glme = fitglme(C,...
-        'pkTime ~ 1 + Type*Area + (1|SurgID)',...
-        'Distribution','Normal','Link','identity');
-%% Use windows
-iT = [5; 40;... % Input times of interest in ms
-    60; 85]; 
-win = ((iT/binSize) + binSt); % Return bin numbers
-tot = numel(iT)/2; % Number of windows
-for i = 1 : tot % Generate corresponding pre-stim windows
-    n = i*2;
-    preWin = [preBin-(win(n)-win(n-1)); preBin;...
-        preBin-(win(n)-win(n-1)); preBin];
-end
-for i = 1 : tot % Find durations of each window of interest
-    n = i*2;
-    dt{i} = iT(n)-iT(n-1);
-end
-%% Run GLME model
-for i = 1 : tot
-    new = tot*2;
-    mod = C(:,1:(end) - (new));
-    mod.SpChannelID = strcat(string(mod.BlockID),{'_'},string(mod.ChannelID));
-    mod.VarC = varC{i,2};
-    mod.PreC = preC{i,2};
-    glme{i} = fitglme(mod,...
-        'VarC ~ 1 + Type*Area + (1+PreC|SpChannelID)',...
-        'Distribution','Normal','Link','identity');
-end
-clearvars -except T C glme
+mdl = fitcsvm(nC.pkTime,nC.binom);
+plotconfusion(data.ResponseLabels,predict(posteriorMdl));
