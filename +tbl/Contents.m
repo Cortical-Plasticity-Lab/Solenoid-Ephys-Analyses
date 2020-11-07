@@ -18,8 +18,8 @@
 %  parseProbeData       - Parse data about probes from file Probe-info.xlsx
 %  parseBlockID         - Parse block ID metadata as variables
 %  slice                - Return "sliced" table using filters in `varargin`
-%  elimCh            - Remove channels with low spiking activity 
-%  excludeIpsi       - Exclude trials from dataset on the ipsilateral side
+%  elimCh               - Remove channels with low spiking activity 
+%  excludeBlocks        - Exclude trials from dataset by blockID
 %  addSlicing           - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
 %  addProcessing        - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
 %  addLaminarCategories - Adds categorical variable `Lamina` based on depth/area
