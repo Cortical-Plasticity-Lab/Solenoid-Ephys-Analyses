@@ -9,11 +9,12 @@ preBin = binSt - buff;
 bt = (1+buff):(binEnd-buff); % Buffer edges of baseline period
 dur = ((binEnd-buff) - (1+buff))*(binSize*1e-3); % Determine duration in sec
 thresh = 2.4; % Spikes/sec
-[T,B]= tbl.elimCh(T,bt,dur,thresh);
+[T_small,B]= tbl.elimCh(T,bt,dur,thresh);
 %% Create table 'C' with mean spikes per channel
+disp("Creating table `C`...");
 fn = @(X){nanmean(X,1)};
 outputVars = 'Spike_Mean';
-C = tbl.stats.estimateChannelResponse(T,fn,'Spikes',outputVars);
+C = tbl.stats.estimateChannelResponse(T_small,fn,'Spikes',outputVars);
 B.Threshold = (B.Mean_Baseline.*0.005) + ((B.STD_Baseline.*0.005).*3); % Threshold is 3SD over baseline and should be in spikes/5ms or spikes per bin
 C.Threshold = zeros(size(C,1),1);
 for i = 1:size(B.Threshold,1)
@@ -21,6 +22,8 @@ for i = 1:size(B.Threshold,1)
     C.Threshold(idx) = B.Threshold(i);
 end
 %% Find latencies of peaks
+disp("Finding peak latencies...")
+ts = C.Properties.UserData.t.Spikes(binSt:end);
 P = C.Spike_Mean(:,binSt:end);
 C.ICMS_Onset = round(C.ICMS_Onset,2);
 C.Solenoid_Onset = round(C.Solenoid_Onset,2);
@@ -41,14 +44,25 @@ for i = 1: size(P,1) % Zero spikes under threshold
 end
 rep = P == 0;
 P(rep) = NaN;
-[P, idx] = sort(P,2,'descend','MissingPlacement','last');
+[P_sort, idx] = sort(P,2,'descend','MissingPlacement','last');
 pk = 5;
-C.ampMax = [P(:,1:pk)];
+C.ampMax = [P_sort(:,1:pk)];
 C.ampBin = idx(:,1:pk);
+C.ampTime = cell2mat(arrayfun(@(bin)ts(bin),C.ampBin,'UniformOutput',false));
 n = isnan(C.ampMax);
 C.ampBin(n) = 0;
+C.ampTime(n) = nan;
 C.pkTime = C.ampBin.*binSize;
+fig = figure('Name','Distribution of Peak Times','Color','w');
+ax = axes(fig,'NextPlot','add','XColor','k','YColor','k','FontName','Arial');
+histogram(ax,C.ampTime*1000);
+xlabel(ax,'Time (ms)','Color','k','FontName','Arial');
+ylabel(ax,'Count (channels/block/type)','Color','k','FontName','Arial');
+title(ax,'Distribution of Evoked Spike Peak times (all types)','FontName','Arial','Color','k');
+io.optSaveFig(fig,'figures/new_analysis','A - All Spike Peak Times Histogram');
+
 %% Plot histograms 
+% disp('Plotting histograms...');
 % histogram(C.ampBin(C.ampBin > 1),99) % Plot amplitudes
 % [index,ref] = findgroups(C(:,{'ICMS_Onset','Solenoid_Onset','Area','Type'}));
 % for i = 1:size(ref,1)
@@ -66,6 +80,7 @@ C.pkTime = C.ampBin.*binSize;
 %     hold off
 % end
 %% Model
+disp('Generating model...');
 peakTime = C.pkTime.';
 k = peakTime(:);
 nC = repelem(C(1:end, :), pk, 1);
@@ -84,5 +99,5 @@ for i = 1:numel(uniq)
     ind = idx & idx2;
     nC.binom(ind) = 1;
 end
-mdl = fitcsvm(nC.pkTime,nC.binom);
-plotconfusion(data.ResponseLabels,predict(posteriorMdl));
+% mdl = fitcsvm(nC.pkTime,nC.binom);
+% plotconfusion(mdl.Y,predict(mdl,mdl.X));
