@@ -1,5 +1,5 @@
 function T = addVarMaxMinTime(T,tOffset,varNameIn,varNameOut,maxMin)
-%ADDTRIALLFPTMIN Add LFP time-to-min as variable to main data table
+%ADDVARMAXMINTIME Add LFP variance time-to-min as variable to main data table
 %
 %  T = tbl.addVarMaxMinTime(T,tOffset);
 %
