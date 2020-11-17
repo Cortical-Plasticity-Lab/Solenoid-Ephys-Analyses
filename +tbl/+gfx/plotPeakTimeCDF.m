@@ -1,7 +1,7 @@
-function fig = plotPeakTimeCDF(C,tStart_Fixed,tStop_Fixed,tag)
+function fig = plotPeakTimeCDF(C,tStart_Fixed,tStop_Fixed,type,tag)
 %PLOTPEAKTIMECDF Plot peak-time cumulative distribution function
 %
-%  fig = tbl.gfx.plotPeakTimeCDF(C,tStart_Fixed,tStop_Fixed,tag);
+%  fig = tbl.gfx.plotPeakTimeCDF(C,tStart_Fixed,tStop_Fixed,type,tag);
 %
 % Inputs
 %  C            - See `C` from new_analysis.m
@@ -16,6 +16,8 @@ function fig = plotPeakTimeCDF(C,tStart_Fixed,tStop_Fixed,tag)
 %
 %  tStop_Fixed - End time (ms) for window "sweeps" to construct CDF
 %           -> Should always be a positive value
+%
+%  type - "Solenoid" or "ICMS" -- which reference for stimuli?
 %
 %  tag - (Optional) tag for saving the file
 %
@@ -33,6 +35,10 @@ if nargin < 3
 end
 
 if nargin < 4
+   type = "Solenoid";
+end
+
+if nargin < 5
    tag = '';
 end
 
@@ -62,7 +68,8 @@ present = false(size(C,1),nSweep);
 tic; fprintf(1,'"Sweeping" incrementally <strong>%s</strong> windows...%03d%%\n',wtype,0);
 
 % % % Compute the response-offset-normalized timings % % %
-t = C.ampTime*1e3 - C.Response_Offset__Exp;
+offsetVar = sprintf('%s_Onset__Exp',type);
+t = C.ampTime*1e3 - C.(offsetVar)*1e3;
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 
 for ii = 1:nSweep
@@ -75,7 +82,8 @@ fprintf(1,'\b\b\b\b\bcomplete (%5.2f sec)\n',toc);
 fig = figure('Name',sprintf('CDF %s',tag),'Color','w',...
    'Units','Normalized','Position',[0.15 0.1 0.8 0.7],...
    'PaperOrientation','landscape');
-TYPE = ["Solenoid", "ICMS", "Solenoid + ICMS"];
+
+TYPE = [type, "Solenoid + ICMS"];
 
 if tStart_Fixed >= 0
    xdir = "normal";
@@ -87,8 +95,8 @@ else
    yRand = [100 0];
 end
 
-for ii = 1:3
-   ax = subplot(1,3,ii);
+for ii = 1:numel(TYPE)
+   ax = subplot(1,2,ii);
    set(ax,'Parent',fig,'FontName','Arial','XColor','k','YColor','k',...
       'NextPlot','add',...
       'XLim',[0 max(tVec)],...
@@ -123,12 +131,11 @@ for ii = 1:3
       ylabel(ax,'% Trials with Peak',...
          'FontName','Arial','Color','k','FontSize',18);
    end
+
+   xlabel(ax,sprintf('%s (ms)',wlabel),'FontName','Arial','Color','k','FontSize',18);
+
    
    if ii == 2
-      xlabel(ax,sprintf('%s (ms)',wlabel),'FontName','Arial','Color','k','FontSize',18);
-   end
-   
-   if ii == 3
       title(ax,"BOTH",'FontName','Arial','Color','k','FontSize',24);
       legend(ax,...
          'FontName','Arial',...
