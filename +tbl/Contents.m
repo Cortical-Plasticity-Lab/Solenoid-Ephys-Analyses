@@ -16,17 +16,15 @@
 %   addTrialLFPtMin               - Add LFP time-to-min as variable to main data table
 %   addProcessing                 - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
 %   addSlicing                    - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
-%   countWindowedResponses        - Count the number of response peaks in a given window.
-%   export_table                  - Shortcut to export to "aggregator" table.
-%   parseProbeData                - Parse data about probes from file Probe-info.xlsx
-%   parseBlockID                  - Parse block ID metadata as variables
-%   slice                         - Return "sliced" table using filters in `varargin`
-%   elimCh                        - Eliminate channels from blocks with low spiking 
-%   excludeBlocks                 - Exclude blocks from dataset 
-%   addSlicing                    - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
-%   addProcessing                 - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
-%   addLaminarCategories          - Adds categorical variable `Lamina` based on depth/area
 %   addStimLamina                 - Add Laminar classification of ICMS stimulation channel
 %   addVarMaxMinTime              - Add LFP variance time-to-min as variable to main data table
+%   countWindowedResponses        - Count the number of response peaks in a given window.
+%   elimCh                        - Eliminate channels from blocks with low spiking 
+%   excludeBlocks                 - Exclude blocks from dataset 
+%   export_table                  - Shortcut to export to "aggregator" table.
 %   formatDataTable               - Get data table into correct format with largest grouping variables on the left, and dependent variables on the right
 %   getTopPCscores                - Return table with top-K principal component scores
+%   parseProbeData                - Parse data about probes from file Probe-info.xlsx
+%   parseBlockID                  - Parse block ID metadata as variables
+%   requireAnyResponse            - Requires observation by "ID" to have --any-- response at least once across each combination of ID and Type
+%   slice                         - Return "sliced" table using filters in `varargin`
