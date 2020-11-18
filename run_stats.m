@@ -9,11 +9,12 @@ if exist('C','var')==0
 end
 
 % DEFINE WINDOWS HERE:
-W_EARLY = [0.015 0.045];
-W_LATE  = [0.090 0.300];
+W_EARLY = [0.015 0.045]; % Seconds [window start | window stop]
+W_LATE  = [0.090 0.300]; % Seconds [window start | window stop]
+W_ANY   = [0.005 0.500]; % Seconds [window start | window stop]
 
 % DEFINE MODELS HERE:
-mdlspec_str = "%s ~ 1 + Area + Lesion_Volume + (1|SurgID)";
+mdlspec_str = "%s ~ 1 + Area + Lesion_Volume + (1|BlockID)";
 glme_mdl_args = {...
    'Distribution','binomial',...
    'Link','logit',...
@@ -26,6 +27,9 @@ glme_mdl_args = {...
 C.NPeak_Solenoid_Late = tbl.countWindowedResponses(...
    C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_LATE(1),W_LATE(2));                  % Window (seconds)
+C.NPeak_Solenoid_Any = tbl.countWindowedResponses(...
+   C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
+   W_ANY(1),W_ANY(2));                    % Window (seconds)
 
 % COMPUTE ICMS RESPONSES SECOND:
 C.NPeak_ICMS_Early = tbl.countWindowedResponses(...
@@ -34,13 +38,16 @@ C.NPeak_ICMS_Early = tbl.countWindowedResponses(...
 C.NPeak_ICMS_Late = tbl.countWindowedResponses(...
    C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
    W_LATE(1),W_LATE(2));               % Window (seconds)
+C.NPeak_ICMS_Any = tbl.countWindowedResponses(...
+   C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
+   W_ANY(1),W_ANY(2));                 % Window (seconds)
 
 % EVALUATE STATISTICAL MODELS:
 % Initialize struct to organize GLME model objects
 mdl = struct('Solenoid',...
-               struct('Early',[],'Late',[]),...
+               struct('Early',[],'Late',[],'Any',[]),...
              'ICMS',...
-               struct('Early',[],'Late',[]));
+               struct('Early',[],'Late',[],'Any',[]));
           
 % mdlspec_str allows us to just insert the name of the response variable.
 % glme_mdl_args are "generic" model arguments that will always be the same.
@@ -57,6 +64,7 @@ Cs(exc,:) = [];
 Csol = Cs(string(Cs.Type)~="ICMS",:);
 exc = tbl.requireAnyResponse(Csol.NPeak_Solenoid_Early + Csol.NPeak_Solenoid_Late,strcat(Csol.ElectrodeID,'::',num2str(Csol.BlockIndex)),string(Csol.Type));
 
+% Run model for SOLENOID + EARLY
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Early"));
@@ -72,6 +80,7 @@ disp('R-squared:');
 disp(mdl.Solenoid.Early.Rsquared);
 fprintf(1,'\n------------------------------------\n');
 
+% Run model for SOLENOID + LATE
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Late"));
@@ -87,10 +96,27 @@ disp('R-squared:');
 disp(mdl.Solenoid.Late.Rsquared);
 fprintf(1,'\n------------------------------------\n');
 
+% Run model for SOLENOID + ANY
+tic; 
+fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
+   sprintf(mdlspec_str,"NPeak_Solenoid_Any"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
+fprintf(1,'Fitting Binomial GLME for solenoid-any...');
+mdl.Solenoid.Any = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Any"),...
+   glme_mdl_args{:},...
+   'BinomialSize',Csol.BinomialSize,...
+   'Exclude',exc);
+fprintf(1,'complete (%5.2f sec)\n',toc);
+disp(mdl.Solenoid.Any);
+disp('R-squared:');
+disp(mdl.Solenoid.Any.Rsquared);
+fprintf(1,'\n------------------------------------\n');
+
 % ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
 Cicms = Cs(string(Cs.Type)~="Solenoid",:);
 exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,strcat(Cicms.ElectrodeID,'::',num2str(Cicms.BlockIndex)),string(Cicms.Type));
 
+% Run model for ICMS + EARLY
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Early"));
@@ -106,6 +132,7 @@ disp('R-squared:');
 disp(mdl.ICMS.Early.Rsquared);
 fprintf(1,'\n------------------------------------\n');
 
+% Run model for ICMS + LATE
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Late"));
@@ -119,4 +146,20 @@ fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.ICMS.Late);
 disp('R-squared:');
 disp(mdl.ICMS.Late.Rsquared);
+fprintf(1,'\n------------------------------------\n');
+
+% Run model for ICMS + ANY
+tic; 
+fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
+   sprintf(mdlspec_str,"NPeak_ICMS_Any"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
+fprintf(1,'Fitting Binomial GLME for ICMS-any...');
+mdl.ICMS.Any = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Any"),...
+   glme_mdl_args{:},...
+   'BinomialSize',Cicms.BinomialSize,...
+   'Exclude',exc);
+fprintf(1,'complete (%5.2f sec)\n',toc);
+disp(mdl.ICMS.Any);
+disp('R-squared:');
+disp(mdl.ICMS.Any.Rsquared);
 fprintf(1,'\n------------------------------------\n');
