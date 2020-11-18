@@ -1,7 +1,7 @@
-function exclude = requireAnyResponse(N,ID,Type)
-%REQUIREANYRESPONSE Requires observation by "ID" to have --any-- response at least once across each combination of ID and Type
+function BinomialSize = findMaxResponse(N,ID,Type)
+%FINDMAXRESPONSE Get BinomialSize using maximum number of responses for "ID" by "Type"
 %
-%  exclude = tbl.requireAnyResponse(N,ID,Type);
+%  BinomialSize = tbl.findMaxResponse(N,ID,Type);
 %
 % Inputs
 %  N     - Counts of responses
@@ -11,8 +11,7 @@ function exclude = requireAnyResponse(N,ID,Type)
 %               elements.
 %
 % Output
-%  exclude     - Logical vector size of N with true values indicating which
-%                 observations to exclude.
+%  BinomialSize - Maximum number of responses for "ID" by "Type"
 %
 % See also: tbl, run_stats.m
 
@@ -20,18 +19,17 @@ T = table(ID,Type,N);
 
 [G,TID] = findgroups(T(:,'ID'));
 
-TID.N = splitapply(@(x)sum(x),T.N,G);
-TID.exclude = TID.N <= 0;  
+TID.BinomialSize = splitapply(@(x)max(x),T.N,G);
 
 [T,iOrig] = outerjoin(T,TID,...
    'Keys',{'ID'},...
    'Type','left',...
    'LeftVariables',{'ID','Type','N'},...
-   'RightVariables',{'exclude'});
+   'RightVariables',{'BinomialSize'});
 
 [~,iSort] = sort(iOrig,'ascend');
 T = T(iSort,:);
 
-exclude = T.exclude;
+BinomialSize = T.BinomialSize;
 
 end

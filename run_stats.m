@@ -23,7 +23,7 @@ glme_mdl_args = {...
    'DummyVarCoding','effects'};
 
 % COMPUTE SOLENOID RESPONSES FIRST:
-[C.NPeak_Solenoid_Early,C.BinomialSize] = tbl.countWindowedResponses(...
+C.NPeak_Solenoid_Early = tbl.countWindowedResponses(...
    C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_EARLY_SOL(1),W_EARLY_SOL(2));                % Window (seconds)
 C.NPeak_Solenoid_Late = tbl.countWindowedResponses(...
@@ -65,10 +65,18 @@ Cs(exc,:) = [];
 
 % SOLENOID: Exclude ICMS trials (there will be no "solenoid" peak)
 Csol = Cs(Cs.Type~="ICMS",:);
-exc = tbl.requireAnyResponse(Csol.NPeak_Solenoid_Early + Csol.NPeak_Solenoid_Late,strcat(Csol.ElectrodeID,'::',num2str(Csol.BlockIndex)),string(Csol.Type));
+id = strcat(Csol.ElectrodeID,'::',num2str(Csol.BlockIndex));
+exc = tbl.requireAnyResponse(Csol.NPeak_Solenoid_Early + Csol.NPeak_Solenoid_Late,id,string(Csol.Type));
+Csol(exc,:) = [];
+id(exc) = [];
+Csol.BinomialSize = tbl.findMaxResponse(Csol.NPeak_Solenoid_Any,id,string(Csol.Type));
 
 % Run model for SOLENOID + EARLY
 tic; 
+fprintf(1,'\n------------------------------------\n');
+fprintf(1,'\n\t<strong>EARLY SOLENOID</strong> (%d <= t < %d ms)\n',...
+   W_EARLY_SOL*1e3);
+fprintf(1,'\n------------------------------------\n');
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Early"));
 fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
@@ -76,16 +84,18 @@ fprintf(1,'Fitting Binomial GLME for solenoid-early...');
 mdl.Solenoid.Early = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Early"),...
    glme_mdl_args{:},...
    'BinomialSize',Csol.BinomialSize,...
-   'Exclude',exc,...
    'Offset',ones(size(Csol,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.Solenoid.Early);
 disp('R-squared:');
 disp(mdl.Solenoid.Early.Rsquared);
-fprintf(1,'\n------------------------------------\n');
 
 % Run model for SOLENOID + LATE
 tic; 
+fprintf(1,'\n------------------------------------\n');
+fprintf(1,'\n\t<strong>LATE SOLENOID</strong> (%d <= t < %d ms)\n',...
+   W_LATE_SOL*1e3);
+fprintf(1,'\n------------------------------------\n');
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Late"));
 fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
@@ -93,7 +103,6 @@ fprintf(1,'Fitting Binomial GLME for solenoid-late...');
 mdl.Solenoid.Late = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Late"),...
    glme_mdl_args{:},...
    'BinomialSize',Csol.BinomialSize,...
-   'Exclude',exc,...
    'Offset',ones(size(Csol,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.Solenoid.Late);
@@ -101,29 +110,20 @@ disp('R-squared:');
 disp(mdl.Solenoid.Late.Rsquared);
 fprintf(1,'\n------------------------------------\n');
 
-% Run model for SOLENOID + ANY
-tic; 
-fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
-   sprintf(mdlspec_str,"NPeak_Solenoid_Any"));
-fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
-fprintf(1,'Fitting Binomial GLME for solenoid-any...');
-mdl.Solenoid.Any = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Any"),...
-   glme_mdl_args{:},...
-   'BinomialSize',Csol.BinomialSize,...
-   'Exclude',exc,...
-   'Offset',ones(size(Csol,1),1));
-fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid.Any);
-disp('R-squared:');
-disp(mdl.Solenoid.Any.Rsquared);
-fprintf(1,'\n------------------------------------\n');
-
 % ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
 Cicms = Cs(Cs.Type~="Solenoid",:);
-exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,strcat(Cicms.ElectrodeID,'::',num2str(Cicms.BlockIndex)),string(Cicms.Type));
+id = strcat(Cicms.ElectrodeID,'::',num2str(Cicms.BlockIndex));
+exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,id,string(Cicms.Type));
+Cicms(exc,:) = [];
+id(exc) = [];
+Cicms.BinomialSize = tbl.findMaxResponse(Cicms.NPeak_ICMS_Any,id,string(Cicms.Type));
 
 % Run model for ICMS + EARLY
 tic; 
+fprintf(1,'\n------------------------------------\n');
+fprintf(1,'\n\t<strong>EARLY ICMS</strong> (%d <= t < %d ms)\n',...
+   W_EARLY_ICMS*1e3);
+fprintf(1,'\n------------------------------------\n');
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Early"));
 fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
@@ -131,16 +131,18 @@ fprintf(1,'Fitting Binomial GLME for ICMS-early...');
 mdl.ICMS.Early = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Early"),...
    glme_mdl_args{:},...
    'BinomialSize',Cicms.BinomialSize,...
-   'Exclude',exc,...
    'Offset',ones(size(Cicms,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.ICMS.Early);
 disp('R-squared:');
 disp(mdl.ICMS.Early.Rsquared);
-fprintf(1,'\n------------------------------------\n');
 
 % Run model for ICMS + LATE
 tic; 
+fprintf(1,'\n------------------------------------\n');
+fprintf(1,'\n\t<strong>LATE ICMS</strong> (%d <= t < %d ms)\n',...
+   W_LATE_ICMS*1e3);
+fprintf(1,'\n------------------------------------\n');
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Late"));
 fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
@@ -148,27 +150,9 @@ fprintf(1,'Fitting Binomial GLME for ICMS-late...');
 mdl.ICMS.Late = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Late"),...
    glme_mdl_args{:},...
    'BinomialSize',Cicms.BinomialSize,...
-   'Exclude',exc,...
    'Offset',ones(size(Cicms,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.ICMS.Late);
 disp('R-squared:');
 disp(mdl.ICMS.Late.Rsquared);
-fprintf(1,'\n------------------------------------\n');
-
-% Run model for ICMS + ANY
-tic; 
-fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
-   sprintf(mdlspec_str,"NPeak_ICMS_Any"));
-fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
-fprintf(1,'Fitting Binomial GLME for ICMS-any...');
-mdl.ICMS.Any = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Any"),...
-   glme_mdl_args{:},...
-   'BinomialSize',Cicms.BinomialSize,...
-   'Exclude',exc,...
-   'Offset',ones(size(Cicms,1),1));
-fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.ICMS.Any);
-disp('R-squared:');
-disp(mdl.ICMS.Any.Rsquared);
 fprintf(1,'\n------------------------------------\n');
