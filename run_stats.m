@@ -9,12 +9,14 @@ if exist('C','var')==0
 end
 
 % DEFINE WINDOWS HERE:
-W_EARLY = [0.015 0.045]; % Seconds [window start | window stop]
-W_LATE  = [0.090 0.300]; % Seconds [window start | window stop]
-W_ANY   = [0.005 0.500]; % Seconds [window start | window stop]
+W_EARLY_SOL    = [0.015 0.045]; % Seconds [window start | window stop]
+W_LATE_SOL     = [0.090 0.300]; % Seconds [window start | window stop]
+W_EARLY_ICMS   = [0.005 0.020]; % Seconds [window start | window stop]
+W_LATE_ICMS    = [0.050 0.300]; % Seconds [window start | window stop]
+W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 
 % DEFINE MODELS HERE:
-mdlspec_str = "%s ~ 1 + Area + Lesion_Volume + (1|BlockID)";
+mdlspec_str = "%s ~ 1 + Area*Lesion_Volume*Type + (1|BlockID)";
 glme_mdl_args = {...
    'Distribution','binomial',...
    'Link','logit',...
@@ -23,10 +25,10 @@ glme_mdl_args = {...
 % COMPUTE SOLENOID RESPONSES FIRST:
 [C.NPeak_Solenoid_Early,C.BinomialSize] = tbl.countWindowedResponses(...
    C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
-   W_EARLY(1),W_EARLY(2));                % Window (seconds)
+   W_EARLY_SOL(1),W_EARLY_SOL(2));                % Window (seconds)
 C.NPeak_Solenoid_Late = tbl.countWindowedResponses(...
    C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
-   W_LATE(1),W_LATE(2));                  % Window (seconds)
+   W_LATE_SOL(1),W_LATE_SOL(2));                  % Window (seconds)
 C.NPeak_Solenoid_Any = tbl.countWindowedResponses(...
    C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_ANY(1),W_ANY(2));                    % Window (seconds)
@@ -34,10 +36,10 @@ C.NPeak_Solenoid_Any = tbl.countWindowedResponses(...
 % COMPUTE ICMS RESPONSES SECOND:
 C.NPeak_ICMS_Early = tbl.countWindowedResponses(...
    C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
-   W_EARLY(1),W_EARLY(2));             % Window (seconds)
+   W_EARLY_ICMS(1),W_EARLY_ICMS(2));             % Window (seconds)
 C.NPeak_ICMS_Late = tbl.countWindowedResponses(...
    C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
-   W_LATE(1),W_LATE(2));               % Window (seconds)
+   W_LATE_ICMS(1),W_LATE_ICMS(2));               % Window (seconds)
 C.NPeak_ICMS_Any = tbl.countWindowedResponses(...
    C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
    W_ANY(1),W_ANY(2));                 % Window (seconds)
@@ -56,12 +58,13 @@ mdl = struct('Solenoid',...
 % 5373 observations).
 exc = C.Lamina~="Layer V";
 Cs = C;
+Cs.Type = string(Cs.Type);
 Cs.Properties.UserData.NumExcluded = struct;
 Cs.Properties.UserData.NumExcluded.Lamina = sum(exc);
 Cs(exc,:) = [];
 
 % SOLENOID: Exclude ICMS trials (there will be no "solenoid" peak)
-Csol = Cs(string(Cs.Type)~="ICMS",:);
+Csol = Cs(Cs.Type~="ICMS",:);
 exc = tbl.requireAnyResponse(Csol.NPeak_Solenoid_Early + Csol.NPeak_Solenoid_Late,strcat(Csol.ElectrodeID,'::',num2str(Csol.BlockIndex)),string(Csol.Type));
 
 % Run model for SOLENOID + EARLY
@@ -113,7 +116,7 @@ disp(mdl.Solenoid.Any.Rsquared);
 fprintf(1,'\n------------------------------------\n');
 
 % ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
-Cicms = Cs(string(Cs.Type)~="Solenoid",:);
+Cicms = Cs(Cs.Type~="Solenoid",:);
 exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,strcat(Cicms.ElectrodeID,'::',num2str(Cicms.BlockIndex)),string(Cicms.Type));
 
 % Run model for ICMS + EARLY
