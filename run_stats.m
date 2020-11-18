@@ -55,13 +55,17 @@ Cs(exc,:) = [];
 
 % SOLENOID: Exclude ICMS trials (there will be no "solenoid" peak)
 Csol = Cs(string(Cs.Type)~="ICMS",:);
+exc = tbl.requireAnyResponse(Csol.NPeak_Solenoid_Early + Csol.NPeak_Solenoid_Late,strcat(Csol.ElectrodeID,'::',num2str(Csol.BlockIndex)),string(Csol.Type));
+
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Early"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
 fprintf(1,'Fitting Binomial GLME for solenoid-early...');
 mdl.Solenoid.Early = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Early"),...
    glme_mdl_args{:},...
-   'BinomialSize',Csol.BinomialSize);
+   'BinomialSize',Csol.BinomialSize,...
+   'Exclude',exc);
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.Solenoid.Early);
 disp('R-squared:');
@@ -71,10 +75,12 @@ fprintf(1,'\n------------------------------------\n');
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_Solenoid_Late"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
 fprintf(1,'Fitting Binomial GLME for solenoid-late...');
 mdl.Solenoid.Late = fitglme(Csol,sprintf(mdlspec_str,"NPeak_Solenoid_Late"),...
    glme_mdl_args{:},...
-   'BinomialSize',Csol.BinomialSize);
+   'BinomialSize',Csol.BinomialSize,...
+   'Exclude',exc);
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.Solenoid.Late);
 disp('R-squared:');
@@ -83,13 +89,17 @@ fprintf(1,'\n------------------------------------\n');
 
 % ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
 Cicms = Cs(string(Cs.Type)~="Solenoid",:);
+exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,strcat(Cicms.ElectrodeID,'::',num2str(Cicms.BlockIndex)),string(Cicms.Type));
+
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Early"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
 fprintf(1,'Fitting Binomial GLME for ICMS-early...');
 mdl.ICMS.Early = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Early"),...
    glme_mdl_args{:},...
-   'BinomialSize',Cicms.BinomialSize);
+   'BinomialSize',Cicms.BinomialSize,...
+   'Exclude',exc);
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.ICMS.Early);
 disp('R-squared:');
@@ -99,10 +109,12 @@ fprintf(1,'\n------------------------------------\n');
 tic; 
 fprintf(1,'Wilkinson Formula: <strong>%s</strong>\n',...
    sprintf(mdlspec_str,"NPeak_ICMS_Late"));
+fprintf(1,'Excluding <strong>%d</strong> observations.\n',sum(exc));
 fprintf(1,'Fitting Binomial GLME for ICMS-late...');
 mdl.ICMS.Late = fitglme(Cicms,sprintf(mdlspec_str,"NPeak_ICMS_Late"),...
    glme_mdl_args{:},...
-   'BinomialSize',Cicms.BinomialSize);
+   'BinomialSize',Cicms.BinomialSize,...
+   'Exclude',exc);
 fprintf(1,'complete (%5.2f sec)\n',toc);
 disp(mdl.ICMS.Late);
 disp('R-squared:');
