@@ -32,7 +32,7 @@ N = sum(tPeak >= tStart & tPeak < tStop,2);
 
 if nargout > 1
    nPeaks = size(tPeak,2);
-   BinomialSize = ones(size(N)).*nPeaks;
+   BinomialSize = ones(size(N)).*(nPeaks + 1);
 end
 
 end

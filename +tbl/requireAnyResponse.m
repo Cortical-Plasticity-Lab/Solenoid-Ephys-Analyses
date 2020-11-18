@@ -21,7 +21,7 @@ T = table(ID,Type,N);
 [G,TID] = findgroups(T(:,'ID'));
 
 TID.N = splitapply(@(x)sum(x),T.N,G);
-TID.exclude = TID.N == 0;
+TID.exclude = TID.N <= 0;  
 
 [T,iOrig] = outerjoin(T,TID,...
    'Keys',{'ID'},...
