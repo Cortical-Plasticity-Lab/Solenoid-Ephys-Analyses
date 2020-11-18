@@ -47,7 +47,7 @@ mdl = struct('Solenoid',...
 
 % In ALL cases, exclude channels from Layer II/III (too few cases: 192 of
 % 5373 observations).
-exc = C.Lamina=="Layer II/III";
+exc = C.Lamina~="Layer V";
 Cs = C;
 Cs.Properties.UserData.NumExcluded = struct;
 Cs.Properties.UserData.NumExcluded.Lamina = sum(exc);
