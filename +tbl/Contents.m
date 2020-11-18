@@ -16,6 +16,8 @@
 %   addTrialLFPtMin               - Add LFP time-to-min as variable to main data table
 %   addProcessing                 - Add 'Processing' field to UserData struct table property or append to existing 'Processing' list
 %   addSlicing                    - Add 'Slicing' field to UserData struct table property or append to existing 'Slicing' list
+%   countWindowedResponses        - Count the number of response peaks in a given window.
+%   export_table                  - Shortcut to export to "aggregator" table.
 %   parseProbeData                - Parse data about probes from file Probe-info.xlsx
 %   parseBlockID                  - Parse block ID metadata as variables
 %   slice                         - Return "sliced" table using filters in `varargin`

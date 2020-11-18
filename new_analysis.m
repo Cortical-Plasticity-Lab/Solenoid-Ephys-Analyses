@@ -47,3 +47,10 @@ fig = tbl.gfx.plotPeakTimeCDF(C,0,75,"ICMS"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','D - ICMS - Window Spike Peak Detect Upper Bound Sweep CDF');
 fig = tbl.gfx.plotPeakTimeCDF(C,-75,300,"ICMS"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','E - ICMS - Window Spike Peak Detect Lower Bound Sweep CDF');
+
+%%
+clearvars -except C
+tic;
+fprintf(1,'Saving table <strong>`C`</strong>...');
+save('Fig3_Table.mat','C','-v7.3');
+fprintf(1,'complete (%5.2f sec)\n',toc);
