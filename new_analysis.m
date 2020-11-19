@@ -4,9 +4,9 @@ if exist('T','var')==0
    T = getfield(load('Solenoid-Table_5-ms_excluded_ipsi.mat','T'),'T');
 end
 
-binSt = 51;   % 0 time bin
-pk = 5;       % Number of peaks
-nSD = 3;      % # Standard deviations
+binSt  = 51;  % 0 time bin
+pk     = 5;   % Number of peaks
+nSD    = 3;   % # Standard deviations
 thresh = 2.4; % Spikes/sec
 
 binSize = T.Properties.UserData.settings.binwidth;
@@ -24,17 +24,17 @@ C = analyze.meanSpikesPerChannel(T_small,B,nSD,binSt,binSize,pk);
 % Plot histogram of overall distribution of peaks
 fig = figure('Name','Distribution of Peak Times','Color','w');
 ax = axes(fig,'NextPlot','add','XColor','k','YColor','k','FontName','Arial');
-histogram(ax,C.ampTime*1000,0:5:300);
+histogram(ax,C.peakTime*1000,0:5:300);
 xlabel(ax,'Time (ms)','Color','k','FontName','Arial');
 ylabel(ax,'Count (channels/block/type)','Color','k','FontName','Arial');
 title(ax,'Distribution of Evoked Spike Peak times (all types)','FontName','Arial','Color','k');
 io.optSaveFig(fig,'figures/new_analysis','A - All Spike Peak Times Histogram');
-d = nansum(C.ampTime(~isnan(C.ampMax))*1e3 - (C.pkTime(~isnan(C.ampMax)) - (binSize*1e3)/2));
-if d < (0.001 - eps)
-   fprintf(1,'<strong>Good:</strong> Method difference is less-than <strong>%5.3f</strong> (ms)\n',round(d,3));
-else
-   fprintf(1,'<strong>Bad:</strong> Method difference is <strong>%5.3f</strong> (ms)\n',round(d,3));
-end
+% d = nansum(C.peakTime(~isnan(C.peakVal))*1e3 - (C.pkTime(~isnan(C.ampMax)) - (binSize*1e3)/2));
+% if d < (0.001 - eps)
+%    fprintf(1,'<strong>Good:</strong> Method difference is less-than <strong>%5.3f</strong> (ms)\n',round(d,3));
+% else
+%    fprintf(1,'<strong>Bad:</strong> Method difference is <strong>%5.3f</strong> (ms)\n',round(d,3));
+% end
 
 %% 
 disp('Plotting cumulative distribution functions (CDF)...');

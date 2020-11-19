@@ -33,6 +33,7 @@
 %  getCB95                             - Return 95% confidence bounds
 %  getFactors_Batch                    - Return NNMF Factors in batch for several combinations of number of factors
 %  getNeuralStatePCs                   - Return PCA data for neural state by concatenating trials
+%  getNormDepth                        - Return "normalized" depth based on laminar groupings
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
 %  getPCs                              - Return principal components for response variable in data

@@ -69,7 +69,7 @@ tic; fprintf(1,'"Sweeping" incrementally <strong>%s</strong> windows...%03d%%\n'
 
 % % % Compute the response-offset-normalized timings % % %
 offsetVar = sprintf('%s_Onset__Exp',type);
-t = C.ampTime*1e3 - C.(offsetVar)*1e3;
+t = C.peakTime*1e3 - C.(offsetVar)*1e3;
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 
 for ii = 1:nSweep

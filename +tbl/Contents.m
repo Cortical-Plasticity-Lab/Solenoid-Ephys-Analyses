@@ -23,6 +23,7 @@
 %   excludeBlocks                 - Exclude blocks from dataset 
 %   export_table                  - Shortcut to export to "aggregator" table.
 %   findMaxResponse               - Get BinomialSize using maximum number of responses for "ID" by "Type"
+%   findResponseDIff              - Return "differential" response for different peak latency windows
 %   formatDataTable               - Get data table into correct format with largest grouping variables on the left, and dependent variables on the right
 %   getTopPCscores                - Return table with top-K principal component scores
 %   parseProbeData                - Parse data about probes from file Probe-info.xlsx

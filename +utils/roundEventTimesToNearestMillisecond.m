@@ -18,10 +18,7 @@ if nargin < 2
 end
 
 for iV = 1:numel(eventVars)
-   x = T.(eventVars{iV});
-   x = x.*1e3; % Convert to milliseconds
-   y = round(x).*1e-3; % Round and convert back to seconds
-   T.(eventVars{iV}) = y;      
+   T.(eventVars{iV}) = round(T.(eventVars{iV}),3);      
 end
 
 end

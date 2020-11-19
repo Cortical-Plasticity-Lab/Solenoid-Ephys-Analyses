@@ -47,35 +47,48 @@ end
 
 % Find latencies of peaks
 disp("Finding peak latencies...")
-ts = C.Properties.UserData.t.Spikes(binSt:end);
-P = C.Spike_Mean(:,binSt:end);
-C.ICMS_Onset = round(C.ICMS_Onset,2);
-C.Solenoid_Onset = round(C.Solenoid_Onset,2);
-[G,uniq] = findgroups(C(:,{'ICMS_Onset','Solenoid_Onset'}));
-for i = 1:size(uniq, 1) % Zero activity before first stim
-    a = min(table2array(uniq(i,:)));
-    alignBin = a/(binSize*0.001);
-    if alignBin > 0
-        idx = G == i;
-        P(idx,1:alignBin) = 0;
-    end
+ts = C.Properties.UserData.t.Spikes;
+C = utils.roundEventTimesToNearestMillisecond(C);
+
+% ts = C.Properties.UserData.t.Spikes(binSt:end);
+% P = C.Spike_Mean(:,binSt:end);
+% [G,uniq] = findgroups(C(:,{'ICMS_Onset','Solenoid_Onset'}));
+% for i = 1:size(uniq, 1) % Zero activity before first stim
+%     a = min(table2array(uniq(i,:)));
+%     alignBin = a/(binSize*0.001);
+%     if alignBin > 0
+%         idx = G == i;
+%         P(idx,1:alignBin) = 0;
+%     end
+% end
+% for i = 1: size(P,1) % Zero spikes under threshold
+%     p = P(i,:);
+%     idx = p <= (C.Threshold(i)); 
+%     p(idx) = 0;
+%     P(i,:) = p;
+% end
+% rep = P == 0;
+% P(rep) = NaN;
+% [P_sort, idx] = sort(P,2,'descend','MissingPlacement','last');
+% C.ampMax = [P_sort(:,1:pk)];
+% C.ampBin = idx(:,1:pk);
+% C.ampTime = cell2mat(arrayfun(@(bin)ts(bin),C.ampBin,'UniformOutput',false));
+% n = isnan(C.ampMax);
+% C.ampBin(n) = 0;
+% C.ampTime(n) = nan;
+% C.pkTime = C.ampBin.*binSize;
+
+% Use Matlab builtin `findpeaks`
+C.peakVal  = nan(size(C,1),pk);
+C.peakTime = nan(size(C,1),pk);
+for iC = 1:size(C,1)
+   [peaks,locs] = findpeaks(C.Spike_Mean(iC,ts > 0.005),ts(ts > 0.005),...
+      'NPeaks',pk,...
+      'MinPeakHeight',C.Threshold(iC));
+   nCur = numel(peaks);
+   C.peakVal(iC,1:nCur) = peaks;
+   C.peakTime(iC,1:nCur) = locs;
 end
-for i = 1: size(P,1) % Zero spikes under threshold
-    p = P(i,:);
-    idx = p <= (C.Threshold(i)); 
-    p(idx) = 0;
-    P(i,:) = p;
-end
-rep = P == 0;
-P(rep) = NaN;
-[P_sort, idx] = sort(P,2,'descend','MissingPlacement','last');
-C.ampMax = [P_sort(:,1:pk)];
-C.ampBin = idx(:,1:pk);
-C.ampTime = cell2mat(arrayfun(@(bin)ts(bin),C.ampBin,'UniformOutput',false));
-n = isnan(C.ampMax);
-C.ampBin(n) = 0;
-C.ampTime(n) = nan;
-C.pkTime = C.ampBin.*binSize;
 
 % Add "unified" stimulus times for ease-of-use
 C = tbl.addExperimentOnsetOffsetTimes(C);
