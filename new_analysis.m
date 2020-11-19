@@ -55,3 +55,6 @@ tic;
 fprintf(1,'Saving table <strong>`C`</strong>...');
 save('Fig3_Table.mat','C','-v7.3');
 fprintf(1,'complete (%5.2f sec)\n',toc);
+
+%%
+run_stats;

@@ -25,10 +25,13 @@ if nargin < 4
    pk = 5; 
 end
 
+dt = min(diff(T.Properties.UserData.t.Spikes));
+
 disp("Creating table `C`...");
-fn = @(X){nanmean(X,1)};
+fn = @(X){nanmean(X,1)}; % Have to do smoothing and rate estimation at this step
+T.Smoothed_Spike_Rates = sgolayfilt(T.Spikes./dt,3,21,kaiser(21,38),2);
 outputVars = 'Spike_Mean';
-C = tbl.stats.estimateChannelResponse(T,fn,'Spikes',outputVars);
+C = tbl.stats.estimateChannelResponse(T,fn,'Smoothed_Spike_Rates',outputVars);
 B.Threshold = B.Mean_Baseline + B.STD_Baseline.*nSD; % Threshold is 3SD over baseline and should be in spikes/5ms or spikes per bin
 C.Threshold = zeros(size(C,1),1);
 for i = 1:size(B.Threshold,1)
@@ -45,9 +48,11 @@ C = utils.roundEventTimesToNearestMillisecond(C);
 C.peakVal  = nan(size(C,1),pk);
 C.peakTime = nan(size(C,1),pk);
 warning('off','signal:findpeaks:largeMinPeakHeight');
+tSpikeSamples = ts(ts > DEBOUNCE);
 for iC = 1:size(C,1)
+   smoothedSpikeRate = C.Spike_Mean(iC,ts > DEBOUNCE);
    [peaks,locs] = findpeaks(...
-      C.Spike_Mean(iC,ts > DEBOUNCE),ts(ts > DEBOUNCE),...
+      smoothedSpikeRate,tSpikeSamples,...
       'NPeaks',pk,...
       'MinPeakHeight',C.Threshold(iC));
    nCur = numel(peaks);
