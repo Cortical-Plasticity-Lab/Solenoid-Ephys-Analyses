@@ -5,15 +5,16 @@ if exist('T','var')==0
 end
 
 %% Get subset of data
-pk          = 5;        % Number of peaks
-adpt_nSD    = 3;        % # Standard deviations for "adaptive" threshold
-hard_thresh = 2.4;      % Spikes/sec
+N_PK             = 5;        % Number of peaks
+N_SD             = 3;        % # Standard deviations for "adaptive" threshold
+FIXED_RAW_THRESH = 2.4;      % Spikes/sec
 
-[T_small,B,fig]= tbl.elimCh(T,hard_thresh);
+% Select only "Active" channels (T_active) with a reasonably high FR
+[T_active,B,fig]= tbl.elimCh(T,FIXED_RAW_THRESH);
 io.optSaveFig(fig,'figures/new_analysis','A3 - Excluded Channels');
 
 %% Create table 'C' with mean spikes per channel
-C = analyze.meanSpikesPerChannel(T_small,B,adpt_nSD,pk);
+C = analyze.meanSpikesPerChannel(T_active,B,N_SD,N_PK);
 
 % Plot histogram of overall distribution of peaks
 fig = figure('Name','Distribution of Peak Times','Color','w');
@@ -57,4 +58,4 @@ save('Fig3_Table.mat','C','-v7.3');
 fprintf(1,'complete (%5.2f sec)\n',toc);
 
 %%
-run_stats;
+% run_stats;

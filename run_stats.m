@@ -18,8 +18,8 @@ W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 % DEFINE MODELS HERE:
 % mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
 % mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
-mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
-mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
+mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1 + peakVal|BlockID:Type) + (1 + peakVal|Area:Type)";
+mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1 + peakVal|BlockID:Type) + (1 + peakVal|Area:Type) + (1|StimLamina)";
 glme_mdl_args = {...
    'Distribution','binomial',...
    'Link','logit',...
@@ -29,6 +29,10 @@ glme_mdl_args = {...
 C.Properties.RowNames = strcat(string(C.SurgID),"-",num2str(C.BlockIndex),"::",C.ChannelID,"-",strrep(string(C.Type)," ",""),"::",string(C.Area));
 C.ZDepth = utils.getNormDepth(C.Depth,string(C.Area),string(C.Lamina));
 C.ZLesion_Volume = zscore(C.Lesion_Volume);
+
+% REORGANIZE DATA:
+[P,fig] = tbl.peaks2rows(C);
+io.optSaveFig(fig,'figures/fig3_stats','A - Ranked Peak Values Swarm Charts');
 
 % COMPUTE SOLENOID RESPONSES FIRST:
 C.NPeak_Solenoid_Early = tbl.countWindowedResponses(...

@@ -27,6 +27,7 @@
 %  plotSpikeRaster                     - Create raster plot from binary spike data or spike times
 %
 % <strong>Functions</strong>
+%  computeSmoothMeanSpikeRate          - Compute smoothed average spike rate from individual trial observations
 %  fastsmooth                          - Smooths vector X
 %  findStims                           - Return stimulation indices based on all STIM files
 %  findUniqueEventCombinations         - Return or print table of unique event combinations
@@ -40,6 +41,7 @@
 %  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
 %  parseNamedVariable                  - Parse optional inputs and update a named variable
+%  pivotRows                           - Pivot rows of each corresponding variable in `T1` to produce `T2`
 %  reduceData                          - Return reduced table version
 %  roundEventTimesToNearestMillisecond - Set ICMS onset/offset and Solenoid onset/offset to nearest millisecond value (as seconds)
 %  sec2string                          - Take seconds (double) and return time string for hours, minutes, and seconds

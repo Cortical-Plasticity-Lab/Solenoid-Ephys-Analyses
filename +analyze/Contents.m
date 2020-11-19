@@ -6,8 +6,9 @@
 %  described in the paper.
 %
 % <strong>Sub-Packages</strong>
-%   control                - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
-%   rat                    - Package for analyses of single-rat data
+%   control                   - Analyses for endpoints related to positive or negative controls, such as testing for evoked sensory activity on solenoid stimuli in FL-S1
+%   rat                       - Package for analyses of single-rat data
 %
 % <strong>Functions</strong>
-%   meanSpikesPerChannel   - Return table where rows are average spikes/channel
+%   meanSpikesPerChannel      - Return table where rows are average spikes/channel
+%   perObservationThreshold   - Create table of per-observation thresholds

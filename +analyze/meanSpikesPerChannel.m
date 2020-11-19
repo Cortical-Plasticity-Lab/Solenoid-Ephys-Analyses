@@ -1,38 +1,36 @@
-function C = meanSpikesPerChannel(T,B,nSD,pk)
+function C = meanSpikesPerChannel(T,B,nSD,nPk)
 %MEANSPIKESPERCHANNEL Return table where rows are average spikes/channel
 %
 %  C = analyze.meanSpikesPerChannel(T,B)
-%  C = analyze.meanSpikesPerChannel(T,B,nSD,pk)
+%  C = analyze.meanSpikesPerChannel(T,B,nSD,nPk)
 %
 % Inputs
 %  T       - Main data table
 %  B       - Thresholds table
 %  nSD     - Table with number of standard deviations (default: 3)
-%  pk      - Max. # of peaks to detect (default: 5)
+%  nPk     - Max. # of peaks to detect (default: 5)
 %
 % Output
 %  C       - Table for mean spikes/channel with detected peak and peak times
 %
 % See also: Contents, new_analysis.m
 
-DEBOUNCE = 0.005; % Don't get peaks any closer to zero than this (seconds)
+WINDOW = [0.005 0.350]; % ONLY find peaks in this window (seconds)
+ORD = 3;       % polynomial order                       (sgolayfilt)
+WLEN = 21;     % window length for polynomial smoothing (sgolayfilt)
+KSHAPE = 38;   % kaiwer window shape coefficient        (sgolayfilt)
 
 if nargin < 3
    nSD = 3;
 end
 
 if nargin < 4
-   pk = 5; 
+   nPk = 5; 
 end
 
-dt = min(diff(T.Properties.UserData.t.Spikes));
-
-disp("Creating table `C`...");
-fn = @(X){nanmean(X,1)}; % Have to do smoothing and rate estimation at this step
-T.Smoothed_Spike_Rates = sgolayfilt(T.Spikes./dt,3,21,kaiser(21,38),2);
-outputVars = 'Spike_Mean';
-C = tbl.stats.estimateChannelResponse(T,fn,'Smoothed_Spike_Rates',outputVars);
-B.Threshold = B.Mean_Baseline + B.STD_Baseline.*nSD; % Threshold is 3SD over baseline and should be in spikes/5ms or spikes per bin
+disp("Creating table `C` with smoothed spike rates...");
+C = utils.computeSmoothMeanSpikeRate(T,ORD,WLEN,KSHAPE);
+B.Threshold = B.Mean_Baseline + B.STD_Baseline.*nSD;
 C.Threshold = zeros(size(C,1),1);
 for i = 1:size(B.Threshold,1)
     idx = (C.BlockID == B.BlockID(i) & C.ChannelID == B.ChannelID(i));
@@ -40,26 +38,28 @@ for i = 1:size(B.Threshold,1)
 end
 
 % Find latencies of peaks
-disp("Finding peak latencies...")
+tic; fprintf(1,"Finding peak latencies...");
 ts = C.Properties.UserData.t.Spikes;
 C = utils.roundEventTimesToNearestMillisecond(C);
 
 % Use Matlab builtin `findpeaks`
-C.peakVal  = nan(size(C,1),pk);
-C.peakTime = nan(size(C,1),pk);
+C.peakVal  = nan(size(C,1),nPk);
+C.peakTime = nan(size(C,1),nPk);
 warning('off','signal:findpeaks:largeMinPeakHeight');
-tSpikeSamples = ts(ts > DEBOUNCE);
+inWindow = ts >= WINDOW(1) & ts < WINDOW(2);
+tSpikeSamples = ts(inWindow);
 for iC = 1:size(C,1)
-   smoothedSpikeRate = C.Spike_Mean(iC,ts > DEBOUNCE);
+   smoothedSpikeRate = C.Smoothed_Mean_Spike_Rate(iC,inWindow);
    [peaks,locs] = findpeaks(...
       smoothedSpikeRate,tSpikeSamples,...
-      'NPeaks',pk,...
+      'NPeaks',nPk,...
       'MinPeakHeight',C.Threshold(iC));
    nCur = numel(peaks);
    C.peakVal(iC,1:nCur) = peaks;
    C.peakTime(iC,1:nCur) = locs;
 end
 warning('on','signal:findpeaks:largeMinPeakHeight');
+fprintf(1,'complete (%5.2f sec required)\n\n',toc);
 
 % Add "unified" stimulus times for ease-of-use
 C = tbl.addExperimentOnsetOffsetTimes(C);

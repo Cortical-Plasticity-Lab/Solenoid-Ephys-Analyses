@@ -28,5 +28,6 @@
 %   getTopPCscores                - Return table with top-K principal component scores
 %   parseProbeData                - Parse data about probes from file Probe-info.xlsx
 %   parseBlockID                  - Parse block ID metadata as variables
+%   peaks2rows                    - Convert arrays of peak times and values to individual rows for each channel
 %   requireAnyResponse            - Requires observation by "ID" to have --any-- response at least once across each combination of ID and Type
 %   slice                         - Return "sliced" table using filters in `varargin`
