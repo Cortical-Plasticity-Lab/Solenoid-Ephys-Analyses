@@ -1,7 +1,7 @@
 %RUN_STATS Run statistical analyses for Frontiers paper
 
 clc; close all force;
-clearvars -except C
+clearvars -except B C
 
 if exist('C','var')==0
    % This is the table `C` produced in `new_analysis.m`
@@ -18,8 +18,8 @@ W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 % DEFINE MODELS HERE:
 % mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
 % mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
-mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
-mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
+mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
+mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
 glme_mdl_args = {...
    'Distribution','binomial',...
    'Link','logit',...
@@ -32,24 +32,24 @@ C.ZLesion_Volume = zscore(C.Lesion_Volume);
 
 % COMPUTE SOLENOID RESPONSES FIRST:
 C.NPeak_Solenoid_Early = tbl.countWindowedResponses(...
-   C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
+   C.peakTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_EARLY_SOL(1),W_EARLY_SOL(2));                % Window (seconds)
 C.NPeak_Solenoid_Late = tbl.countWindowedResponses(...
-   C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
+   C.peakTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_LATE_SOL(1),W_LATE_SOL(2));                  % Window (seconds)
 C.NPeak_Solenoid_Any = tbl.countWindowedResponses(...
-   C.ampTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
+   C.peakTime - C.Solenoid_Onset__Exp,...  % Relative times (seconds)
    W_ANY(1),W_ANY(2));                    % Window (seconds)
 
 % COMPUTE ICMS RESPONSES SECOND:
 C.NPeak_ICMS_Early = tbl.countWindowedResponses(...
-   C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
+   C.peakTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
    W_EARLY_ICMS(1),W_EARLY_ICMS(2));             % Window (seconds)
 C.NPeak_ICMS_Late = tbl.countWindowedResponses(...
-   C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
+   C.peakTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
    W_LATE_ICMS(1),W_LATE_ICMS(2));               % Window (seconds)
 C.NPeak_ICMS_Any = tbl.countWindowedResponses(...
-   C.ampTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
+   C.peakTime - C.ICMS_Onset__Exp,...   % Relative times (seconds)
    W_ANY(1),W_ANY(2));                 % Window (seconds)
 
 % EVALUATE STATISTICAL MODELS:
