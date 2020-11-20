@@ -1,13 +1,20 @@
- function [T,B,fig] = elimCh(T,fixed_raw_thresh)
+ function [T,B,fig] = elimCh(T,fixed_raw_thresh,baselineWindow)
 %ELIMCH Eliminate channels from blocks with low spiking 
 %
 %   T = tbl.elimCh(T,fixed_raw_thresh);
-%   [T,fig] = tbl.elimCh(T,fixed_raw_thresh);
+%   [T,fig] = tbl.elimCh(T,fixed_raw_thresh,baselineWindow);
 %
 % Inputs
-%  T           - Table of spike and LFP data with each row as an individual
-%                 trial from the solenoid experiment
-%  thresh      - User-defined spike/sec threshold
+%  T                     - Table of spike and LFP data with each row as 
+%                          an individual trial from the solenoid experiment
+%  fixed_raw_thresh      - User-defined spike/sec threshold
+%
+%     OPTIONAL:
+%  
+%  baselineWindow        - Time range for defining the per-channel/block
+%                             threshold for what could be considered as
+%                             peaks (sec). Otherwise uses value in 
+%                             BASELINE_DEF, which is [-0.200 -0.050].
 %
 % Output
 %  T           - Table without low-spiking channels in each block
@@ -19,7 +26,13 @@
 %
 % See also: tbl, tbl.est.spike_peak_amplitude
 
-[T,B] = analyze.perObservationThreshold(T); % Get mean spike rate in basal (for exclusion)
+BASELINE_DEF = [-0.200 -0.050];
+if nargin < 3
+   baselineWindow = BASELINE_DEF;
+end
+
+% Get mean spike rate in basal (for exclusion)
+[T,B] = analyze.perObservationThreshold(T,baselineWindow); 
 
 if nargout > 1
    fig = figure(...

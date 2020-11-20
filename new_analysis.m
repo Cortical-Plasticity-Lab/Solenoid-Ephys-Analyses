@@ -5,15 +5,19 @@ if exist('T','var')==0
 end
 
 %% Get subset of data
+FIXED_RAW_THRESH = 2.4;            % Minimum spikes/sec required
+BASELINE_EPOCH = [-0.200 -0.050];  % Baseline epoch relative to trial onset for defining threshold to compare with peaks
+
 N_PK             = 8;        % Number of peaks
-N_SD             = 5;        % # Standard deviations for "adaptive" threshold
-FIXED_RAW_THRESH = 2.4;      % Spikes/sec
+N_SD             = 6.5;      % # Standard deviations for "adaptive" threshold
+
 EVOKED_WINDOW = [0.005 0.350];      % ONLY find peaks in this window (seconds)
 RATE_UPPER_LIMIT = 500;             % Remove values greater than this
 MIN_SPIKE_RATE_PROMINENCE = 5;      % Peaks must have prominence of at least 5-Hz
 
+
 % Select only "Active" channels (T_active) with a reasonably high FR
-[T_active,B,fig]= tbl.elimCh(T,FIXED_RAW_THRESH);
+[T_active,B,fig]= tbl.elimCh(T,FIXED_RAW_THRESH,BASELINE_EPOCH);
 io.optSaveFig(fig,'figures/new_analysis','A - Excluded Channels');
 
 %% Create table 'C' with mean spikes per channel

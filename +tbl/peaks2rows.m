@@ -46,7 +46,7 @@ switch nargout
    case {0,1}
       return;
    case 2
-      swarmFig = tbl.gfx.makePeakRankScatter(P,nCol);
+      swarmFig = tbl.gfx.makePeakRankScatter(P,"Solenoid",nCol);
    case 3
       if nargin < 3
          exampleRowIndex = EXAMPLE_INDEX_DEF; % if not provided in function call
@@ -54,7 +54,7 @@ switch nargout
       iHighlight = P.ChannelID==C.ChannelID(exampleRowIndex) & ...
          string(P.Type)==string(C.Type(exampleRowIndex)) & ...
          string(P.BlockID)==string(C.BlockID(exampleRowIndex));
-      swarmFig = tbl.gfx.makePeakRankScatter(P,nCol,iHighlight);
+      swarmFig = tbl.gfx.makePeakRankScatter(P,"Solenoid",nCol,iHighlight);
       exFig = tbl.gfx.makeMultiPeakExamplePETH(...
          C,...
          exampleRowIndex,...
