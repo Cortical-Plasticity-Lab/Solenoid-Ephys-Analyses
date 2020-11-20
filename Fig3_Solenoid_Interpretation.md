@@ -8,7 +8,7 @@ Initially, I tried using the following model:
 
 Counts of spike peaks in windows following either Solenoid or ICMS stimulus. Binomial GLME with logit link function was fit for different responses defined by windows and stimulus response (4 different models) with the following general structure:
 
-`"# peaks" ~ 1 + Type*Volume*Area + (1 | Block)`
+`"# peaks" ~ 1 + Type*Volume*Area + (1 | Block) `
 
 * Type: [Solenoid or ICMS] or Solenoid + ICMS
 * Area: RFA or S1
@@ -21,7 +21,9 @@ The Binomial Size parameter was determined by the maximum total number of peaks 
 
 ### Improved Model ###
 
-Upon evaluating the distribution of residuals generated in the first model conception, I realized there were some problems. I was concerned about the apparent discrete trends that I at first couldn't associate to any evident model parameter since they didn't match up even when I named them using model terms and looked at the individual data points (**[Figure R1](#figure-r1)**).
+Upon evaluating the distribution of residuals generated in the first model conception, I realized there were some problems. I was concerned about the apparent discrete trends that I at first couldn't associate to any evident model parameter since they didn't match up even when I named them using model terms and looked at the individual data points. Fortunately, I realized that this was actually due to a combination of data features and not a single model term per se; plotting the scatter by the "joint" input distribution incorporating `BinomialSize` parameter gives intuition about why these discrete trends form (**[Figure R1](#figure-r1)**). 
+
+At that point, we have to think about what the model is telling us. Clearly our data is really biased by having all these entries with no responses. Having apparently correlated trends in residuals is also troubling. 
 
 ## Interpreting Model Results ##
 
