@@ -21,8 +21,8 @@ function C = sortMatchedArrayValues(C,sortVar,varargin)
 nRow = size(C,1);
 nCol = size(C.(sortVar),2);
 
-[C.(sortVar),idx] = sort(C.(sortVar),2,'descend','MissingPlacement','last');
-idx = mat2cell(idx,ones(1,nRow),nCol);
+[C.(sortVar),C.sortRank] = sort(C.(sortVar),2,'descend','MissingPlacement','last');
+idx = mat2cell(C.sortRank,ones(1,nRow),nCol);
 
 for iV = 1:numel(varargin)
    C.(varargin{iV}) = mat2cell(C.(varargin{iV}),ones(1,nRow),nCol);

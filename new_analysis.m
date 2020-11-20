@@ -35,14 +35,14 @@ io.optSaveFig(jointFig,'figures/new_analysis','C - Joint Peak Time Distribution 
 
 %% 
 disp('Plotting cumulative distribution functions (CDF)...');
-fig = tbl.gfx.plotPeakTimeCDF(C,0,75,"Solenoid"); % Referenced to SOLENOID
+fig = tbl.gfx.plotPeakTimeCDF(C,5,300,"Solenoid"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','D - Solenoid - Window Spike Peak Detect Upper Bound Sweep CDF');
-fig = tbl.gfx.plotPeakTimeCDF(C,-75,300,"Solenoid"); % Referenced to SOLENOID
+fig = tbl.gfx.plotPeakTimeCDF(C,-5,300,"Solenoid"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','E - Solenoid - Window Spike Peak Detect Lower Bound Sweep CDF');
 
-fig = tbl.gfx.plotPeakTimeCDF(C,0,75,"ICMS"); % Referenced to SOLENOID
+fig = tbl.gfx.plotPeakTimeCDF(C,5,300,"ICMS"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','F - ICMS - Window Spike Peak Detect Upper Bound Sweep CDF');
-fig = tbl.gfx.plotPeakTimeCDF(C,-75,300,"ICMS"); % Referenced to SOLENOID
+fig = tbl.gfx.plotPeakTimeCDF(C,-5,300,"ICMS"); % Referenced to SOLENOID
 io.optSaveFig(fig,'figures/new_analysis','G - ICMS - Window Spike Peak Detect Lower Bound Sweep CDF');
 
 %%

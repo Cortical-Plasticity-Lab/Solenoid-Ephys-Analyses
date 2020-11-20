@@ -16,8 +16,6 @@ W_LATE_ICMS    = [0.050 0.300]; % Seconds [window start | window stop]
 W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 
 % DEFINE MODELS HERE:
-% mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type)";
-% mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + (1|BlockID) + (ZLesion_Volume + ZDepth|Area:Type) + (1|StimLamina)";
 mdlspec_str_sol = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1 + peakVal|BlockID:Type) + (1 + peakVal|Area:Type)";
 mdlspec_str_icms = "%s ~ 1 + ZLesion_Volume + ZDepth + %s + peakVal + (1 + peakVal|BlockID:Type) + (1 + peakVal|Area:Type) + (1|StimLamina)";
 glme_mdl_args = {...
