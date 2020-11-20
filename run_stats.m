@@ -1,7 +1,7 @@
 %RUN_STATS Run statistical analyses for Frontiers paper
 
 clc; close all force;
-clearvars -except B C
+clearvars -except B C T
 
 if exist('C','var')==0
    % This is the table `C` produced in `new_analysis.m`
@@ -25,14 +25,10 @@ glme_mdl_args = {...
    'Link','logit',...
    'DummyVarCoding','effects'};
 
-% GIVE LABELS TO EACH DATA OBSERVATION:
-C.Properties.RowNames = strcat(string(C.SurgID),"-",num2str(C.BlockIndex),"::",C.ChannelID,"-",strrep(string(C.Type)," ",""),"::",string(C.Area));
-C.ZDepth = utils.getNormDepth(C.Depth,string(C.Area),string(C.Lamina));
-C.ZLesion_Volume = zscore(C.Lesion_Volume);
-
 % REORGANIZE DATA:
-[P,fig] = tbl.peaks2rows(C);
-io.optSaveFig(fig,'figures/fig3_stats','A - Ranked Peak Values Swarm Charts');
+[P,sFig,eFig] = tbl.peaks2rows(C);
+io.optSaveFig(sFig,'figures/fig3_stats','A1 - Ranked Peak Values Swarm Charts');
+io.optSaveFig(eFig,'figures/fig3_stats','A2 - Example of Multi-Peaked Evoked Spikes');
 
 % COMPUTE SOLENOID RESPONSES FIRST:
 C.NPeak_Solenoid_Early = tbl.countWindowedResponses(...

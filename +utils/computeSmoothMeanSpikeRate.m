@@ -42,7 +42,7 @@ C = tbl.stats.estimateChannelResponse(T,fn,'Spikes',outputVars);
 C.Spike_Mean = sgolayfilt(C.Spike_Mean./dt,... % spikes/second
    ord,wlen,kaiser(wlen,kshape),2);
 C.Properties.VariableNames{'Spike_Mean'} = 'Smoothed_Mean_Spike_Rate';
-C.Properties.VariableUnits{'Spike_Mean'} = 'E[spikes/s]';
+C.Properties.VariableUnits{'Smoothed_Mean_Spike_Rate'} = 'E[spikes/s]';
 C = movevars(C,'Smoothed_Mean_Spike_Rate','after',size(C,2));
 
 end

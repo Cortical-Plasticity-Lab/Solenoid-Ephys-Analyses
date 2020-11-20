@@ -10,5 +10,6 @@
 %   rat                       - Package for analyses of single-rat data
 %
 % <strong>Functions</strong>
-%   meanSpikesPerChannel      - Return table where rows are average spikes/channel
+%   assignBasalThreshold      - Return table where rows are average spikes/channel
+%   detectAverageEvokedPeaks  - Detect peaks in condition-averaged evoked activity on per-channel, per-block basis
 %   perObservationThreshold   - Create table of per-observation thresholds

@@ -40,8 +40,10 @@
 %  getPCs                              - Return principal components for response variable in data
 %  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
+%  parseDataDescriptor                 - Parses descriptor of data point based on row index and variables available in input data table
 %  parseNamedVariable                  - Parse optional inputs and update a named variable
 %  pivotRows                           - Pivot rows of each corresponding variable in `T1` to produce `T2`
 %  reduceData                          - Return reduced table version
 %  roundEventTimesToNearestMillisecond - Set ICMS onset/offset and Solenoid onset/offset to nearest millisecond value (as seconds)
 %  sec2string                          - Take seconds (double) and return time string for hours, minutes, and seconds
+%  sortMatchedArrayValues              - Sort matched table array values from reference array (in that table)

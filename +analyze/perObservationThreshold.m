@@ -56,7 +56,7 @@ B.Properties.UserData = struct('in_basal_window',idx);   % Store, just in case
 B.Mean_Baseline = splitapply(@(X)nanmean(X),T.Baseline,G);
 
 % Return full array of means
-mu = cell2mat(splitapply(@(X)nanmean(X,1)./dt,T.Spikes,G));
+mu = cell2mat(splitapply(@(X){nanmean(X,1)./dt},T.Spikes,G));
 
 % Apply smoothing to these means
 mu = sgolayfilt(mu,ord,wlen,kaiser(wlen,kshape),2); % Smooth rows
