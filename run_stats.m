@@ -16,33 +16,62 @@ W_LATE_ICMS    = [0.050 0.300]; % Seconds [window start | window stop]
 W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 
 % DEFINE MODELS HERE:
-mdlspec_str_sol = "peakTime ~ 1 + ZLesion_Volume + ZDepth + Area + peakVal + (1|BlockID) + (1 + peakVal + peakRank|Area:Type)";
-mdlspec_str_icms = "peakTime ~ 1 + ZLesion_Volume + ZDepth + Area + peakVal + (1|BlockID) + (1 + peakVal + peakRank|Area:Type) + (1|StimLamina)";
+mdlspec_str_main = "peakVal ~ 1 + Area*Type*Lesion_Volume + (1 + Depth + peakTime + peakRank|Area:Type) + (1 + peakTime + peakRank + ZDepth|AnimalID)";
+mdlspec_str_sol = "peakVal ~ 1 + Area*Lesion_Volume*ZDepth + (1|Area:Type) + (1 + peakTime|AnimalID)";
+mdlspec_str_icms = "peakVal ~ 1 + Area*Lesion_Volume*ZDepth + (1 + StimDepth|Area:Type) + (1 + peakTime|AnimalID)";
 glme_mdl_args = {...
-   'Distribution','normal',...
-   'Link','identity',...
-   'DummyVarCoding','effects'};
+   'Distribution','gamma',...
+   'Link',-1,...
+   'DummyVarCoding','effects',...
+   ... 'CovariancePattern',{'Diagonal','Diagonal'},...
+   'FitMethod','REMPL'};
 
 % REORGANIZE DATA:
-[P,sFig,eFig] = tbl.peaks2rows(C);
-io.optSaveFig(sFig,'figures/fig3_stats','A1 - Ranked Peak Values Swarm Charts');
-io.optSaveFig(eFig,'figures/fig3_stats','A2 - Example of Multi-Peaked Evoked Spikes');
+% % Uncomment to run without figures: % %
+P = tbl.peaks2rows(C);
 
+% % % Uncomment to make figures: % % %
+% [P,sFig,eFig] = tbl.peaks2rows(C);
+% io.optSaveFig(sFig,'figures/fig3_stats','A1 - Ranked Peak Values Swarm Charts');
+% io.optSaveFig(eFig,'figures/fig3_stats','A2 - Example of Multi-Peaked Evoked Spikes');
+
+warning('off','stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:BadDistLinkCombination1');
 mdl = struct;
 
-tic; fprintf(1,'Computing GLME for <strong>solenoid</strong>...');
-mdl.Solenoid = fitglme(P(string(P.Type)~="ICMS",:),mdlspec_str_sol,glme_mdl_args{:});
+tic; fprintf(1,'Computing GLME for <strong>FULL MODEL</strong>...');
+mdl.Full = fitglme(P,mdlspec_str_main,glme_mdl_args{:},...
+   'Exclude',P.peakTime <= 0);
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid);
-fprintf(1,'<strong>R-squared:</strong>\n');
-disp(mdl.Solenoid.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.Full,'FULL MODEL');
+io.optSaveFig(covFig,'figures/fig3_stats','B1 - Covariance Matrices');
 
-tic; fprintf(1,'Computing GLME for <strong>icms</strong>...');
-mdl.Solenoid = fitglme(P(string(P.Type)~="Solenoid",:),mdlspec_str_icms,glme_mdl_args{:});
-fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid);
-fprintf(1,'<strong>R-squared:</strong>\n');
-disp(mdl.Solenoid.Rsquared);
+
+% fprintf(1,'\n\n-------------------------------------------------\n\n');
+%
+% tic; fprintf(1,'Computing GLME for <strong>SOLENOID</strong>...');
+% pSol = P(string(P.Type)~="ICMS",:);
+% pSol.peakTime = pSol.peakTime - pSol.Solenoid_Onset__Exp;
+% mdl.Solenoid = fitglme(pSol,mdlspec_str_sol,glme_mdl_args{:},...
+%    'Exclude',pSol.peakTime <= 0);
+% fprintf(1,'complete (%5.2f sec)\n',toc);
+% disp(mdl.Solenoid);
+% fprintf(1,'<strong>R-squared:</strong>\n');
+% disp(mdl.Solenoid.Rsquared);
+% 
+% fprintf(1,'\n\n-------------------------------------------------\n\n');
+% 
+% tic; fprintf(1,'Computing GLME for <strong>ICMS</strong>...');
+% pICMS = P(string(P.Type)~="Solenoid",:);
+% pICMS.peakTime = pICMS.peakTime - pICMS.ICMS_Onset__Exp;
+% mdl.ICMS = fitglme(pICMS,mdlspec_str_icms,glme_mdl_args{:},...
+%    'Exclude',pICMS.peakTime <= 0);
+% fprintf(1,'complete (%5.2f sec)\n',toc);
+% disp(mdl.ICMS);
+% fprintf(1,'<strong>R-squared:</strong>\n');
+% disp(mdl.ICMS.Rsquared);
+
+
+warning('on','stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:BadDistLinkCombination1');
 
 % % % % % % % % % % Probably deprecated: % % % % % % % % % % % %
 % % COMPUTE SOLENOID RESPONSES FIRST:
