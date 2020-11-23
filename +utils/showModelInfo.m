@@ -95,8 +95,11 @@ resFig = figure('Name',sprintf('Random Effects Covariance Parameters %s',tag),..
    'Color','w','Units','Normalized','Position',pos,...
    'PaperOrientation','Portrait','PaperSize',[8.5 11],...
    'PaperUnits','inches','PaperType','usletter','NumberTitle','off');
+ax = axes(resFig,'NextPlot','add','XColor','k','YColor','k','LineWidth',1.5,'FontName','Arial');
 
 tmp = figure;
-
+h = plotResiduals(mdl,'fitted');
+copyobj(h,ax);
+delete(tmp);
 
 end

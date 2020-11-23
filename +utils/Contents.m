@@ -46,4 +46,5 @@
 %  reduceData                          - Return reduced table version
 %  roundEventTimesToNearestMillisecond - Set ICMS onset/offset and Solenoid onset/offset to nearest millisecond value (as seconds)
 %  sec2string                          - Take seconds (double) and return time string for hours, minutes, and seconds
+%  showModelInfo                       - Print model info and optionally make figure for covariances
 %  sortMatchedArrayValues              - Sort matched table array values from reference array (in that table)
