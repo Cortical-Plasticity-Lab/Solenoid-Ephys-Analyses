@@ -38,6 +38,7 @@ P = tbl.peaks2rows(C);
 warning('off','stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:BadDistLinkCombination1');
 mdl = struct;
 
+% [B1/B2] Run "full" model using all Types
 tic; fprintf(1,'Computing GLME for <strong>FULL MODEL</strong>...');
 mdl.Full = fitglme(P,mdlspec_str_main,glme_mdl_args{:},...
    'Exclude',P.peakTime <= 0);
@@ -45,24 +46,6 @@ fprintf(1,'complete (%5.2f sec)\n',toc);
 [covFig,residFig] = utils.showModelInfo(mdl.Full,'FULL MODEL');
 io.optSaveFig(covFig,'figures/fig3_stats','B1 - Covariance Matrices');
 io.optSaveFig(residFig,'figures/fig3_stats','B2 - Residuals');
-
-% fprintf(1,'\n\n-------------------------------------------------\n\n');
-%
-% tic; fprintf(1,'Computing GLME for <strong>SOLENOID</strong>...');
-% pSol = P(string(P.Type)~="ICMS",:);
-% pSol.peakTime = pSol.peakTime - pSol.Solenoid_Onset__Exp;
-% mdl.Solenoid = fitglme(pSol,mdlspec_str_sol,glme_mdl_args{:},...
-%    'Exclude',pSol.peakTime <= 0);
-% utils.showModelInfo(mdl.Solenoid);
-% 
-% fprintf(1,'\n\n-------------------------------------------------\n\n');
-% 
-% tic; fprintf(1,'Computing GLME for <strong>ICMS</strong>...');
-% pICMS = P(string(P.Type)~="Solenoid",:);
-% pICMS.peakTime = pICMS.peakTime - pICMS.ICMS_Onset__Exp;
-% mdl.ICMS = fitglme(pICMS,mdlspec_str_icms,glme_mdl_args{:},...
-%    'Exclude',pICMS.peakTime <= 0);
-% utils.showModelInfo(mdl.ICMS);
 
 % COMPUTE SOLENOID RESPONSES FIRST:
 C.NPeak_Solenoid_Early = tbl.countWindowedResponses(...
@@ -100,13 +83,10 @@ glme_mdl_args = {...
 
 % mdlspec_str allows us to just insert the name of the response variable.
 % glme_mdl_args are "generic" model arguments that will always be the same.
-% 
-% exc = C.Lamina~="Layer V";
+
 Cs = C;
 Cs.Type = string(Cs.Type);
 Cs.Properties.UserData.NumExcluded = struct;
-% Cs.Properties.UserData.NumExcluded.Lamina = sum(exc);
-% Cs(exc,:) = [];
 
 % SOLENOID: Exclude ICMS trials (there will be no "solenoid" peak)
 Csol = Cs(Cs.Type~="ICMS",:);
@@ -116,9 +96,8 @@ Csol(exc,:) = [];
 id(exc) = [];
 Csol.BinomialSize = tbl.findMaxResponse(Csol.NPeak_Solenoid_Any,id,string(Csol.Type));
 Csol.Properties.RowNames = strcat(Csol.Properties.RowNames,"-N:",num2str(Csol.BinomialSize));
-Dsol = tbl.findResponseDiff(Csol);
 
-% Run model for SOLENOID + EARLY
+% [C1/C2] Run model for SOLENOID + EARLY
 tic; 
 
 fprintf(1,'\n\n\t\t<strong>WITHOUT EXCLUSIONS</strong>\n\n');
@@ -136,11 +115,11 @@ mdl.Solenoid.Early = fitglme(Csol,sprintf(mdlspec_str_sol,"NPeak_Solenoid_Early"
    'BinomialSize',Csol.BinomialSize,...
    'Offset',ones(size(Csol,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid.Early);
-disp('R-squared:');
-disp(mdl.Solenoid.Early.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.Solenoid.Early,'SOLENOID + EARLY');
+io.optSaveFig(covFig,'figures/fig3_stats','C1 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','C2 - Residuals');
 
-% Run model for SOLENOID + LATE
+% [D1/D2] Run model for SOLENOID + LATE
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>LATE SOLENOID</strong> (%d <= t < %d ms)\n',...
@@ -155,9 +134,9 @@ mdl.Solenoid.Late = fitglme(Csol,sprintf(mdlspec_str_sol,"NPeak_Solenoid_Late"),
    'BinomialSize',Csol.BinomialSize,...
    'Offset',ones(size(Csol,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid.Late);
-disp('R-squared:');
-disp(mdl.Solenoid.Late.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.Solenoid.Late,'SOLENOID + LATE');
+io.optSaveFig(covFig,'figures/fig3_stats','D1 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','D2 - Residuals');
 fprintf(1,'\n------------------------------------\n');
 
 % ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
@@ -167,9 +146,8 @@ exc = tbl.requireAnyResponse(Cicms.NPeak_ICMS_Early + Cicms.NPeak_ICMS_Late,id,s
 Cicms(exc,:) = [];
 id(exc) = [];
 Cicms.BinomialSize = tbl.findMaxResponse(Cicms.NPeak_ICMS_Any,id,string(Cicms.Type));
-Dicms = tbl.findResponseDiff(Cicms);
 
-% Run model for ICMS + EARLY
+% [E1/E2] Run model for ICMS + EARLY
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>EARLY ICMS</strong> (%d <= t < %d ms)\n',...
@@ -184,11 +162,11 @@ mdl.ICMS.Early = fitglme(Cicms,sprintf(mdlspec_str_icms,"NPeak_ICMS_Early"),...
    'BinomialSize',Cicms.BinomialSize,...
    'Offset',ones(size(Cicms,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.ICMS.Early);
-disp('R-squared:');
-disp(mdl.ICMS.Early.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.ICMS.Early,'ICMS + EARLY');
+io.optSaveFig(covFig,'figures/fig3_stats','E1 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','E2 - Residuals');
 
-% Run model for ICMS + LATE
+% [F1/F2] Run model for ICMS + LATE
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>LATE ICMS</strong> (%d <= t < %d ms)\n',...
@@ -203,20 +181,15 @@ mdl.ICMS.Late = fitglme(Cicms,sprintf(mdlspec_str_icms,"NPeak_ICMS_Late"),...
    'BinomialSize',Cicms.BinomialSize,...
    'Offset',ones(size(Cicms,1),1));
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.ICMS.Late);
-disp('R-squared:');
-disp(mdl.ICMS.Late.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.ICMS.Late,'ICMS + Late');
+io.optSaveFig(covFig,'figures/fig3_stats','F1 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','F2 - Residuals');
 fprintf(1,'\n------------------------------------\n');
-
-% Debug
-% figure; scatter(mdl.Solenoid.Early.Variables.NPeak_Solenoid_Early+randn(size(Csol,1),1).*0.15,mdl.Solenoid.Early.Variables.BinomialSize+randn(size(Csol,1),1).*0.15,'MarkerFaceColor','b','MarkerEdgeColor','k','MarkerEdgeAlpha',0.05,'SizeData',8,'MarkerFaceAlpha',0.1);
-% xlabel('N Early Peaks (Solenoid)'); ylabel('BinomialSize');
-% set(gcf,'Color','w'); set(gca,'YDir','reverse');
 
 % % RERUN MODELS USING EXCLUSIONS FOR OBSERVATIONS WITH ZERO-PEAK % % 
 fprintf(1,'\n\n\t\t<strong>WITH EXCLUSIONS</strong>\n\n');
 
-% Run model for SOLENOID + EARLY
+% [C3/C4] Run model for SOLENOID + EARLY
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>EARLY SOLENOID (+ Exclude)</strong> (%d <= t < %d ms)\n',...
@@ -231,11 +204,11 @@ mdl.Solenoid.Early_Exclude = fitglme(Csol,sprintf(mdlspec_str_sol,"NPeak_Solenoi
    'BinomialSize',Csol.BinomialSize,...
    'Exclude',Csol.NPeak_Solenoid_Early==0);
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid.Early_Exclude);
-disp('R-squared:');
-disp(mdl.Solenoid.Early_Exclude.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.Solenoid.Early_Exclude,'SOLENOID + EARLY + EXCLUDE');
+io.optSaveFig(covFig,'figures/fig3_stats','C3 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','C4 - Residuals');
 
-% Run model for SOLENOID + LATE
+% [D3/D4] Run model for SOLENOID + LATE
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>LATE SOLENOID (+ Exclude)</strong> (%d <= t < %d ms)\n',...
@@ -250,12 +223,12 @@ mdl.Solenoid.Late_Exclude = fitglme(Csol,sprintf(mdlspec_str_sol,"NPeak_Solenoid
    'BinomialSize',Csol.BinomialSize,...
    'Exclude',Csol.NPeak_Solenoid_Late==0);
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.Solenoid.Late_Exclude);
-disp('R-squared:');
-disp(mdl.Solenoid.Late_Exclude.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.Solenoid.Late_Exclude,'SOLENOID + LATE + EXCLUDE');
+io.optSaveFig(covFig,'figures/fig3_stats','D3 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','D4 - Residuals');
 fprintf(1,'\n------------------------------------\n');
 
-% ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
+% [E3/E4] ICMS: Exclude Solenoid trials (there will be no "ICMS" peak)
 % Run model for ICMS + EARLY AFTER EXCLUSIONS
 tic; 
 fprintf(1,'\n------------------------------------\n');
@@ -271,11 +244,11 @@ mdl.ICMS.Early_Exclude = fitglme(Cicms,sprintf(mdlspec_str_icms,"NPeak_ICMS_Earl
    'BinomialSize',Cicms.BinomialSize,...
    'Exclude',Cicms.NPeak_ICMS_Early==0);
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.ICMS.Early_Exclude);
-disp('R-squared:');
-disp(mdl.ICMS.Early_Exclude.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.ICMS.Early_Exclude,'ICMS + EARLY + EXCLUDE');
+io.optSaveFig(covFig,'figures/fig3_stats','E3 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','E4 - Residuals');
 
-% Run model for ICMS + LATE
+% [F3/F4] Run model for ICMS + LATE
 tic; 
 fprintf(1,'\n------------------------------------\n');
 fprintf(1,'\n\t<strong>LATE ICMS (+ Exclude)</strong> (%d <= t < %d ms)\n',...
@@ -290,7 +263,7 @@ mdl.ICMS.Late_Exclude = fitglme(Cicms,sprintf(mdlspec_str_icms,"NPeak_ICMS_Late"
    'BinomialSize',Cicms.BinomialSize,...
    'Exclude',Cicms.NPeak_ICMS_Late==0);
 fprintf(1,'complete (%5.2f sec)\n',toc);
-disp(mdl.ICMS.Late_Exclude);
-disp('R-squared:');
-disp(mdl.ICMS.Late_Exclude.Rsquared);
+[covFig,residFig] = utils.showModelInfo(mdl.ICMS.Late_Exclude,'ICMS + LATE + EXCLUDE');
+io.optSaveFig(covFig,'figures/fig3_stats','F3 - Covariance Matrices');
+io.optSaveFig(residFig,'figures/fig3_stats','F4 - Residuals');
 fprintf(1,'\n------------------------------------\n');
