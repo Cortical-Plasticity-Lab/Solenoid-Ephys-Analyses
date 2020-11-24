@@ -16,7 +16,7 @@ W_LATE_ICMS    = [0.050 0.300]; % Seconds [window start | window stop]
 W_ANY          = [0.005 0.500]; % Seconds [window start | window stop]
 
 % DEFINE MODELS HERE:
-mdlspec_str_main = "peakVal ~ 1 + Area*Type*Lesion_Volume + Depth + Area:Depth + peakTime + Area:peakTime + (1 + peakTime|AnimalID)";
+mdlspec_str_main = "peakVal ~ 1 + Area*Type*Lesion_Volume*peakTime + Area*Depth + (-1 + peakTime|BlockID) + (-1 + Solenoid_Onset__Exp + Solenoid_Offset__Exp + ICMS_Onset__Exp|AnimalID)";
 mdlspec_str_sol = "%s ~ 1 + Area*Type*Lesion_Volume + (1 + Depth|Area:Type) + (1|AnimalID)";
 mdlspec_str_icms = "%s ~ 1 + Area*Type*Lesion_Volume + (1 + StimDepth + Depth|Area:Type) + (1|AnimalID)";
 glme_mdl_args = {...
