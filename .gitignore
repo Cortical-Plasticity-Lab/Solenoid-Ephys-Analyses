@@ -15,3 +15,5 @@ misc
 *.tiff
 *.ps
 *.txt
+debug/
+debugging.m
