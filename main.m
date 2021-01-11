@@ -4,6 +4,10 @@
 %     * `solRat`     -- All recordings for a given acute procedure (rat)
 %     * `solBlock`   -- Data for an individual recording (experiment; block)
 %     * `solChannel` -- Data for individual channels within a recording
+%
+% To load files from local: 
+%  rats = cfg.default('rats'); % Server tank or folder containing Animal folders
+%  r = solRat.loadAll(pwd,rats);
 
 clear; 
 clc
@@ -41,6 +45,10 @@ T = tbl.parseBlockID(T);   % Format block-related info
 T = tbl.parseProbeData(T); % Format channel-related info
 T = utils.roundEventTimesToNearestMillisecond(T);
 T = tbl.addTrialLFPtMin(T,T.Solenoid_Onset*1e3); % adds `TrialType` and `ElectrodeID` and `Lamina` and `Solenoid_Dwell` variables also
+
+% Remove "bad blocks":
+T = tbl.excludeBlocks(T); % Remove listed "bad blocks" (may not all be "bad", but might have different experimental parameters etc.)
+
 
 % save(cfg.default('exported_database_table__local'),'T','-v7.3'); % (Large-ish)
 % save(cfg.default('exported_database_table__remote'),'T','-v7.3'); % (Large-ish)

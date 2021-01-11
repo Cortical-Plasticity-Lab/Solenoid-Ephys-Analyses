@@ -11,11 +11,17 @@ function fig = plotPEP(T,surgID,blockIndex,trialType,channelName,varargin)
 %  trialType - 1: Solenoid (only) 2: ICMS (only) 3: Solenoid+ICMS
 %  channelName - (Optional) char array - if specified, returns only that
 %                       channel
+%  varargin - (Optional) 'Name',value pairs that are supplied to
+%                 tbl.gfx.PEP
 %  
 % Output
 %  fig - Figure handle with plots laid out for channels by depth
+%
+% See also: tbl, tbl.gfx, tbl.gfx.PEP
 
 % Make LFP event-related potential (peri-event potential; PEP)
+
+
 if nargin > 4
       fig = tbl.gfx.PEP(T,...
          {'SurgID',surgID,... % "filtArgs"

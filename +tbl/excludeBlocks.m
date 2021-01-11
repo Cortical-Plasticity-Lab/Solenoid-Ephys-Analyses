@@ -11,7 +11,7 @@ function T = excludeBlocks(T)
 %  
 % Output
 %  T           - Same table but with blocks with ipsilateral trials and S1 stimulation removed
-
+%
 % See also: tbl, tbl.formatDataTable 
  
 initialVars = who;
