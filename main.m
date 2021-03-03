@@ -63,4 +63,10 @@ channelName = 'B005';
 % Make spike histogram (peri-event histogram; PETH)
 fig_peth = analyze.rat.plotPETH(T,surgID,blockIndex,trialType,channelName);
 % Make LFP event-related potential (peri-event potential; PEP)
-fig_pep = analyze.rat.plotPEP(T,surgID,blockIndex,trialType,channelName);
+
+for probe = ['A', 'B']
+   CH = randi(32,1,4);
+   for ch = CH
+      fig_pep = analyze.rat.plotPEP(T,surgID,blockIndex,trialType,sprintf('%s%03d',probe,ch));
+   end
+end

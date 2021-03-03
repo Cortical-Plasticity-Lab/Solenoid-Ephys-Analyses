@@ -38,6 +38,7 @@
 %  getOpt                              - Process paired optional arguments as `prop`,val1 
 %  getPathTo                           - Return output from uigetdir basically
 %  getPCs                              - Return principal components for response variable in data
+%  getSelector                         - Return formatted array for `getConditionPCs` or other selector
 %  HPF                                 - Software estimate of hardware single-pole state high-pass filter
 %  makeKey                             - Utility to make random alphanumeric key-string for naming a "row"
 %  parseDataDescriptor                 - Parses descriptor of data point based on row index and variables available in input data table

@@ -78,6 +78,10 @@ if istable(T)
    params.Color = c + o;
 end
 
+fs = 1/mean(diff(t*1e-3));
+[b,a] = butter(2,([0.25, 10])./fs,'bandpass');
+X = filtfilt(b,a,X);
+
 % % % Add actual data % % %
 % At this point, we should only have the rows remaining that we want to put
 % on the axes. So we can just plot the median +/- the IQR in order to avoid
