@@ -63,18 +63,30 @@ for iC = 1:numel(Component)
          iRow = utils.selector2mask(C,S);
          x = S.(component);
          Mean = nanmean(x(iRow));
-         SD = nanstd(x(iRow));
+         SEM = nanstd(x(iRow))./sqrt(sum(iRow));
          N = sum(iRow);
-         Stats = [Stats; table(component,type,area,Mean,SD,N)]; %#ok<AGROW>
+         Stats = [Stats; table(component,type,area,Mean,SEM,N)]; %#ok<AGROW>
       end
    end
 end
 st = Stats(Stats.component=="ICA_Early",:);
 y = reshape(st.Mean,2,3);
+s = reshape(st.SEM,2,3);
 fig = figure('Name','ICA Means by Group','Color','w');
-bar(y');
+b = bar(y');
+set(b,'EdgeColor','none');
+set(b(1),'DisplayName',Area(1));
+set(b(2),'DisplayName',Area(2));
+set(gca,'NextPlot','add','XColor','k','YColor','k','LineWidth',1.5);
+x = [b(1).XEndPoints; b(2).XEndPoints];
+l = errorbar(gca, ...
+   x', y', s',...
+   'LineStyle','none',...
+   'LineWidth',1.5, 'Color', 'k');
+set(l(1),'DisplayName','\pmSEM');
+l(2).Annotation.LegendInformation.IconDisplayStyle = 'off';
 title(gca, 'ICA Means by Group','Color','k','FontName','Arial');
 ylabel(gca,'E[Weight]','Color','k','FontName','Arial');
 set(gca,'XTickLabels',Type);
-legend(get(gca,'Children'),Area(end:-1:1));
+legend(gca,'Location','Northwest');
 io.optSaveFig(fig,'figures/pca_stats/conditions','ICA - Early - Group Means');
