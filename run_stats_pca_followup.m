@@ -32,23 +32,26 @@ for iT = 1:nType
 end
 
 %% 2. Plot PCs/ICs by condition
+% Plot PCs & ICs
+ica_mdl = cell(nType,1);
+z = cell(nType,1);
+R = cell(nType,1);
+for ii = 1:nType
+   [fig,ica_mdl{ii},z{ii},R{ii}] = ...
+      analyze.factors.pcs_ics(t,coeff{ii},rate{ii},Type(ii));
+   io.optSaveFig(fig,'figures/pca_stats/conditions',...
+      sprintf('%s PCs and ICs',Type(ii)));
+end
+
+%% 3. Plot PCs/ICs -- %-explained
 % Plot % explained by PC
 for ii = 1:nType
-   fig = analyze.factors.pcs_explained(explained{ii},Type(ii));
+   fig = analyze.factors.pcs_explained(explained{ii},Type(ii),R{ii});
    io.optSaveFig(fig,'figures/pca_stats/conditions',...
       sprintf('%s PCA - Percent Explained',Type(ii)));
 end
 
-% Plot PCs & ICs
-ica_mdl = cell(nType,1);
-z = cell(nType,1);
-for ii = 1:nType
-   [fig,ica_mdl{ii},z{ii}] = analyze.factors.pcs_ics(t,coeff{ii},rate{ii},...
-      Type(ii));
-   io.optSaveFig(fig,'figures/pca_stats/conditions',...
-      sprintf('%s PCs and ICs',Type(ii)));
-end
-%% 3. Plot means by area/condition
+%% 4. Plot means by area/condition
 [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
 [ica_mdl,z] = analyze.factors.getICs(Y,coeff);
 S = analyze.factors.label_ics(S,z);

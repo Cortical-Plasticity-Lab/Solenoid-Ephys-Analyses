@@ -1,4 +1,4 @@
-function [fig,ica_mdl,z] = pcs_ics(t,coeff,Y,tag)
+function [fig,ica_mdl,z, R] = pcs_ics(t,coeff,Y,tag)
 %PCS_ICS Plot top-3 principal and independent components
 %
 %  fig = analyze.factors.pcs_ics(t,coeff,ica_mdl);
@@ -7,7 +7,7 @@ if nargin < 4
    tag = 'Solenoid';
 end
 
-[ica_mdl,z] = analyze.factors.getICs(Y,coeff);
+[ica_mdl,z, R] = analyze.factors.getICs(Y,coeff);
 fig = figure('Name','Solenoid PCs & ICs',...
    'Color','w','Units','Normalized','Position',[0.3 0.3 0.3 0.3]);
 ax = subplot(2,1,1);
