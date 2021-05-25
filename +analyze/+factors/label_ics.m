@@ -17,9 +17,9 @@ S.ICA_Noise = z(:,1); % First IC is "noise floor" component - how active is the 
 % --> This should be used as a covariate for the
 %     other two, which are the responses of interest.
 
-S.ICA_Late = z(:,3);  % Second IC is "late" component
+S.ICA_Late = z(:,2);  % Second IC is "late" component
 
-S.ICA_Early = z(:,2); % Third IC is "early" component
+S.ICA_Early = z(:,3); % Third IC is "early" component
 
 if nargin < 4
     fig = [];
