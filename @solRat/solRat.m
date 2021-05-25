@@ -361,6 +361,34 @@ classdef solRat < handle
             probePETH(obj.Children,trialType,tPre,tPost,binWidth,true);
         end
         
+        % Batch export aligned filtered snippets plots
+        function batchProbeAlignedFiltPlot(obj,trialType,tPre,tPost)
+            %BATCHPROBEAVGLFPPLOT Batch export aligned filtered snippets plots
+            %
+            % Batch export (save and close) TRIAL- or STIMULUS-aligned
+            % filtered snippets to verify spike waveforms.
+            if nargin < 4
+                tPost = cfg.default('tpost');
+            end
+            
+            if nargin < 3
+                tPre = cfg.default('tpre');
+            end
+            
+            if nargin < 2
+                trialType = cfg.TrialType('All');
+            end
+            
+            if numel(obj) > 1
+                for i = 1:numel(obj)
+                    batchProbeAlignedFiltPlot(obj(i),trialType,tPre,tPost);
+                end
+                return;
+            end
+            
+            probeAlignedFiltPlot(obj.Children,trialType,tPre,tPost,true);
+        end
+        
         % Batch export average LFP plots
         function batchProbeAvgLFPplot(obj,trialType,tPre,tPost)
             %BATCHPROBEAVGLFPPLOT Batch export average LFP plots

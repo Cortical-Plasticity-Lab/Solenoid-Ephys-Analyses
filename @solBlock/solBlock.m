@@ -1397,6 +1397,104 @@ classdef solBlock < handle
          
       end
       
+      % Plot the mean aligned LFP for each channel
+      function probeAlignedFiltPlot(obj,trialType,tPre,tPost,batchRun)
+         %PROBEALIGNEDFILTPLOT Plot mean aligned LFP for each channel
+         %
+         % probeAlignedFiltPlot(obj,trialType,tPre,tPost,batchRun);
+         %
+         % Inputs
+         %  obj       - scalar or array `solBlock` object
+         %  trialType - (Optional) Enumerated trial type that we want to 
+         %              select for plots
+         %  tPre      - (Optional) "Pre" time, relative to alignment event
+         %  tPost     - (Optional) "Post" time, relative to alignment event
+         %  batchRun  - (Optional) Default is false. Set true to save and
+         %                 delete each figure after it is generated.
+         %
+         % Output
+         %  fig      - Figure handle or array of `matlab.graphics.figure`
+         %              handles corresponding to generated figures, one for
+         %              each element of `obj`
+         
+         if nargin < 5
+            batchRun = false;
+         end
+         
+         if nargin < 4
+            tPost = cfg.default('tpost');
+         end
+         
+         if nargin < 3
+            tPre = cfg.default('tpre');
+         end
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if numel(obj) > 1
+            for ii = 1:numel(obj)
+               probeAlignedFiltPlot(obj(ii),trialType,tPre,tPost,batchRun);
+            end
+            return;
+         end
+         
+         nTrial = sum(cfg.TrialType(obj.TrialType) == trialType);
+         edgeVec = [tPre,tPost];   
+         [a_loc,b_loc] = solBlock.getDefault('probe_a_loc','probe_b_loc');
+         
+         aFig = figure('Name',sprintf('%s - %s Average LFP (%s trials)',...
+            obj.Name,a_loc,char(trialType)),...
+            'Units','Normalized',...
+            'Position',[0.1 0.1 0.4 0.8],...
+            'Color','w');
+         
+         if isempty(obj.Layout) % If no Layout, use default from config
+            obj.setLayout;
+         end
+           
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            alignedFiltPlot(c(idx),trialType,edgeVec,1,false);
+         end
+         suptitle(sprintf('%s (n = %g)',a_loc,nTrial));
+         
+         bFig = figure('Name',sprintf('%s - %s Average LFP (%s trials)',...
+            obj.Name,b_loc,char(trialType)),...
+            'Units','Normalized',...
+            'Position',[0.5 0.1 0.4 0.8],...
+            'Color','w');
+         
+         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         for ii = 1:numel(c)
+            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            subplot(round(numel(obj.Layout)/4),4,ii);
+            alignedFiltPlot(c(idx),trialType,edgeVec,1,false);
+         end
+         suptitle(sprintf('%s (n = %g)',b_loc,nTrial));
+         
+         if batchRun
+            subf = cfg.default('subf');
+            id = cfg.default('id');
+            
+            outpath = fullfile(obj.folder,[obj.Name subf.figs],subf.probeplots);
+            if exist(outpath,'dir')==0
+               mkdir(outpath);
+            end
+            
+            savefig(aFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-A.fig']));
+            savefig(bFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-B.fig']));
+            saveas(aFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-A.png']));
+            saveas(bFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-B.png']));
+            delete(aFig);
+            delete(bFig);
+         end
+         
+      end
+      
       % Plot the mean aligned IFR for each channel. 
       function probeAvgIFRplot(obj,trialType,tPre,tPost,batchRun)
          %PROBEAVGIFRPLOT Plot mean aligned IFR for each channel
@@ -1838,7 +1936,7 @@ classdef solBlock < handle
          if nargin < 2
             fs = solBlock.getDefault('id');
          end
-         
+
          % Handle object input array
          if numel(obj) > 1
             for ii = 1:numel(obj)

@@ -251,6 +251,63 @@ classdef solChannel < handle
          
       end
       
+      % Return FILTERED data aligned to TRIALS for this channel
+      function [data,t] = getAlignedFilt(obj,trialType)
+         %GETALIGNEDFILT Return FILT aligned to trials for this channel
+         %
+         %  [data,t] = getAlignedFilt(obj);
+         %  [data,t] = getAlignedFilt(obj,trialType);
+         %  
+         % Inputs
+         %  obj       - Scalar or array of `solChannel` objects
+         %  trialType - (Optional) if not specified, returns all trials;
+         %                          otherwise, use this as `cfg.TrialType`
+         %                          element to enumerate subset of trials
+         %                          to return.
+         % Output
+         %  data      - Data matrix, where rows are trials and columns are
+         %              time-samples. All data corresponds to a single
+         %              channel. If `obj` is an array, then this is
+         %              returned as a cell array with each element
+         %              corresponding to matched elements of `obj` array
+         %  t         - Vector of times corresponding to columns of `data`
+         
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         
+         if ~isscalar(obj)
+            data = cell(size(obj));
+            for i = 1:numel(obj)
+               if i == 1
+                  [data{i},t] = getAlignedFilt(obj(i),trialType);
+               else
+                  data{i} = getAlignedFilt(obj(i),trialType);
+               end
+            end
+            return;
+         end
+         
+         data = getFilt(obj);
+         edges = getSpikeBinEdges(obj); %#ok<*PROP>
+         
+         trials = getTrials(obj,trialType);
+         vec = round(edges(1)*obj.fs_d) : round(edges(end)*obj.fs_d);
+         itrials = round(trials * obj.fs_d);
+         itrials = reshape(itrials,numel(itrials),1);
+         
+         t = vec / obj.fs * 1e3;
+         
+         vec = vec + itrials;
+         n = numel(data);
+         
+         vec(any(vec < 1,2),:) = [];
+         vec(any(vec > n,2),:) = [];
+         
+         data = data(vec);
+         
+      end
+      
       % Return INSTANTANEOUS FIRING RATE (IFR; spike rate) aligned to TRIAL
       function [data,t,t_trial] = getAlignedIFR(obj,trialType)
          %GETALIGNEDIFR Return IFR aligned to trials for this channel
@@ -685,6 +742,63 @@ classdef solChannel < handle
             'EdgeColor','none',...
             'FaceColor',pars.col{obj.Hemisphere});
          
+      end
+      
+      % Return figure handle to aligned filtered plot for this channel
+      function fig = alignedFiltPlot(obj,trialType,startStop,ii,makeNewFig)
+         if isempty(obj)
+            fig = [];
+            return;
+         end
+         
+         if nargin < 5
+            makeNewFig = true;
+         end
+         if nargin < 4
+            ii = 1;
+         end
+         if nargin < 3
+            edges = obj.getSpikeBinEdges;
+            startStop = [edges(1), edges(end)];
+         end
+         if nargin < 2
+            trialType = cfg.TrialType('All');
+         end
+         if numel(obj) > 1
+            fig = [];
+            for ii = 1:numel(obj)
+               fig = [fig; alignedFiltPlot(obj(ii),trialType,startStop,ii,makeNewFig)];
+            end
+            return;
+         end
+         
+         if isempty(obj.Parent.Trials)
+            fig = [];
+            fprintf(1,'Trial times not yet parsed for %s (%s).\n',...
+               obj.Parent.Name,obj.Name);
+            return;
+         end         
+         [x,t] = obj.getAlignedFilt(trialType);
+         
+         if makeNewFig
+            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+               obj.Parent.Name,obj.Name,char(trialType)),...
+               'Color','w',...
+               'Units','Normalized',...
+               'Position',obj.Parent.getFigPos(ii));
+         end
+         idx = randi(size(x,1), 20, 1);
+         y = x(idx,:);
+         
+         p = plot(t, y,...
+...             'Color',pars.col{obj.Hemisphere},...
+            'LineWidth', 1);
+         
+         xlim([-250 500]);
+         ylim([-150 150]);
+         
+         obj.addStimulusMarkers(gca,p);
+         solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Filt (\muV)');         
       end
       
       % Return figure handle to average IFR plots aligned to trials

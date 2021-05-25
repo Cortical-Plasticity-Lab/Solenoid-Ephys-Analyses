@@ -21,11 +21,15 @@ figExplained = analyze.factors.pcs_explained(explained);
 [figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
 % S = analyze.factors.label_ics(S,z);
 [S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
-
+icFig2 = figure('Name', 'IC Weights for all Channels', 'Color', 'w'); 
+plot(z);
+xlabel('Channel');
+ylabel('Weight');
 
 io.optSaveFig(figExplained,'figures/pca_stats','Solenoid PCA - Percent Explained');
 io.optSaveFig(figScores,'figures/pca_stats','Solenoid PCs and ICs');
 io.optSaveFig(icaFig,'figures/pca_stats','Solenoid ICs');
+io.optSaveFig(icFig2,'figures/pca_stats','IC Weights for all Channels');
 
 %% 2. Define GLME for lesion volume related to response
 mdl = struct;
