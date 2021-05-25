@@ -32,13 +32,17 @@ mdl = struct;
 mdl.volume.late = fitglme(S,'ICA_Late~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
 mdl.volume.early = fitglme(S,'ICA_Early~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
 
-%% 3. Describe response modulation when ICMS is applied
+%% 3. Describe response modulation by Area and Type
+mdl.area.late = fitglme(S, 'ICA_Late~Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.area.early = fitglme(S, 'ICA_Early~Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+
+%% 4. Describe response modulation when ICMS is applied
 mdl.icms.late = fitglme(S,'ICA_Late~Area*Type*Lesion_Volume+(ICA_Noise|AnimalID)',...
    'DummyVarCoding','effects');
 mdl.icms.early = fitglme(S,'ICA_Early~Area*Type*Lesion_Volume+(ICA_Noise|AnimalID)',...
    'DummyVarCoding','effects');
 
-%% 4. Describe response modulation in only S1
+%% 5. Describe response modulation in only S1
 mdl.S1.late = fitglme(S,'ICA_Late~Type*Lamina*Lesion_Volume-Type:Lamina:Lesion_Volume+(ICA_Noise|AnimalID)',...
    'DummyVarCoding','effects',...
    'Exclude',S.Area=="RFA");
@@ -46,7 +50,7 @@ mdl.S1.early = fitglme(S,'ICA_Early~Type*Lamina*Lesion_Volume-Type:Lamina:Lesion
    'DummyVarCoding','effects',...
    'Exclude',S.Area=="RFA");
 
-%% Export any associated figures
+%% 6. Export any associated figures
 [covFig,residFig] = utils.showModelInfo(mdl.volume.early,'VOLUME - EARLY');
 io.optSaveFig(covFig,'figures/pca_stats/models','VOLUME - EARLY - Covariance Matrices');
 io.optSaveFig(residFig,'figures/pca_stats/models','VOLUME - EARLY - Residuals');
@@ -62,6 +66,14 @@ io.optSaveFig(residFig,'figures/pca_stats/models','ICMS - EARLY - Residuals');
 [covFig,residFig] = utils.showModelInfo(mdl.icms.late,'ICMS - LATE');
 io.optSaveFig(covFig,'figures/pca_stats/models','ICMS - LATE - Covariance Matrices');
 io.optSaveFig(residFig,'figures/pca_stats/models','ICMS - LATE - Residuals');
+
+[covFig, residFig] = utils.showModelInfo(mdl.area.early,'AREA - EARLY');
+io.optSaveFig(covFig,'figures/pca_stats/models','AREA - EARLY - Covariance Matrices');
+io.optSaveFig(residFig,'figures/pca_stats/models','AREA - EARLY - Residuals');
+
+[covFig, residFig] = utils.showModelInfo(mdl.area.late,'AREA - LATE');
+io.optSaveFig(covFig,'figures/pca_stats/models','AREA - LATE - Covariance Matrices');
+io.optSaveFig(residFig,'figures/pca_stats/models','AREA - LATE - Residuals');
 
 [covFig,residFig] = utils.showModelInfo(mdl.S1.early,'S1 - EARLY');
 io.optSaveFig(covFig,'figures/pca_stats/models','S1 - EARLY - Covariance Matrices');
