@@ -19,10 +19,13 @@ end
 [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
 figExplained = analyze.factors.pcs_explained(explained);
 [figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
-S = analyze.factors.label_ics(S,z);
+% S = analyze.factors.label_ics(S,z);
+[S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
+
 
 io.optSaveFig(figExplained,'figures/pca_stats','Solenoid PCA - Percent Explained');
 io.optSaveFig(figScores,'figures/pca_stats','Solenoid PCs and ICs');
+io.optSaveFig(icaFig,'figures/pca_stats','Solenoid ICs');
 
 %% 2. Define GLME for lesion volume related to response
 mdl = struct;

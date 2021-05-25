@@ -54,7 +54,8 @@ end
 %% 4. Plot means by area/condition
 [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
 [ica_mdl,z] = analyze.factors.getICs(Y,coeff);
-S = analyze.factors.label_ics(S,z);
+[S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
+% S = analyze.factors.label_ics(S,z);
 Stats = [];
 for iC = 1:numel(Component)
    component = Component(iC);
@@ -93,3 +94,4 @@ ylabel(gca,'E[Weight]','Color','k','FontName','Arial');
 set(gca,'XTickLabels',Type);
 legend(gca,'Location','Northwest');
 io.optSaveFig(fig,'figures/pca_stats/conditions','ICA - Early - Group Means');
+io.optSaveFig(icaFig,'figures/pca_stats/conditions','ICs');
