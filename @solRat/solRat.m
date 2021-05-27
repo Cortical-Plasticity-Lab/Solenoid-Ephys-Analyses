@@ -363,7 +363,7 @@ classdef solRat < handle
         
         % Batch export aligned filtered snippets plots
         function batchProbeAlignedFiltPlot(obj,trialType,tPre,tPost)
-            %BATCHPROBEAVGLFPPLOT Batch export aligned filtered snippets plots
+            %BATCHPROBEAVGFILTPLOT Batch export aligned filtered snippets plots
             %
             % Batch export (save and close) TRIAL- or STIMULUS-aligned
             % filtered snippets to verify spike waveforms.

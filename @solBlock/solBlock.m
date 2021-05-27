@@ -1397,7 +1397,7 @@ classdef solBlock < handle
          
       end
       
-      % Plot the mean aligned LFP for each channel
+      % Plot the mean aligned filtered data for each channel
       function probeAlignedFiltPlot(obj,trialType,tPre,tPost,batchRun)
          %PROBEALIGNEDFILTPLOT Plot mean aligned LFP for each channel
          %
@@ -1444,37 +1444,37 @@ classdef solBlock < handle
          edgeVec = [tPre,tPost];   
          [a_loc,b_loc] = solBlock.getDefault('probe_a_loc','probe_b_loc');
          
-         aFig = figure('Name',sprintf('%s - %s Average LFP (%s trials)',...
-            obj.Name,a_loc,char(trialType)),...
+         aFig = figure('Name',sprintf('%s - %s Average Filt',...
+            obj.Name,a_loc),...
             'Units','Normalized',...
             'Position',[0.1 0.1 0.4 0.8],...
             'Color','w');
          
          if isempty(obj.Layout) % If no Layout, use default from config
-            obj.setLayout;
+             obj.setLayout;
          end
-           
-         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Left);
-         for ii = 1:numel(c)
-            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
-            subplot(round(numel(obj.Layout)/4),4,ii);
-            alignedFiltPlot(c(idx),trialType,edgeVec,1,false);
-         end
-         suptitle(sprintf('%s (n = %g)',a_loc,nTrial));
          
-         bFig = figure('Name',sprintf('%s - %s Average LFP (%s trials)',...
-            obj.Name,b_loc,char(trialType)),...
+         c = obj.Children([obj.Children.Area] == "RFA");
+         for ii = 1:numel(c)
+             idx = find(contains([c.Name],obj.Layout{ii}),1,'first');
+             subplot(round(numel(obj.Layout)/4),4,ii);
+             alignedFiltPlot(c(idx),trialType,edgeVec,1,false);
+         end
+         subtitle(sprintf('%s (n = %g)',a_loc,nTrial));
+         
+         bFig = figure('Name',sprintf('%s - %s Average Filt',...
+            obj.Name,b_loc),...
             'Units','Normalized',...
             'Position',[0.5 0.1 0.4 0.8],...
             'Color','w');
          
-         c = obj.Children([obj.Children.Hemisphere] == cfg.Hem.Right);
+         c = obj.Children([obj.Children.Area] == "S1");
          for ii = 1:numel(c)
-            idx = find(contains({c.Name},obj.Layout{ii}),1,'first');
+            idx = find(contains([c.Name],obj.Layout{ii}),1,'first');
             subplot(round(numel(obj.Layout)/4),4,ii);
             alignedFiltPlot(c(idx),trialType,edgeVec,1,false);
          end
-         suptitle(sprintf('%s (n = %g)',b_loc,nTrial));
+         subtitle(sprintf('%s (n = %g)',b_loc,nTrial));
          
          if batchRun
             subf = cfg.default('subf');
@@ -1485,10 +1485,8 @@ classdef solBlock < handle
                mkdir(outpath);
             end
             
-            savefig(aFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-A.fig']));
-            savefig(bFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-B.fig']));
-            saveas(aFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-A.png']));
-            saveas(bFig,fullfile(outpath,[obj.Name id.probealignedfilt '_' char(trialType) '-B.png']));
+            savefig(aFig,fullfile(outpath,[obj.Name id.probealignedfilt '-A.fig']));
+            savefig(bFig,fullfile(outpath,[obj.Name id.probealignedfilt '-B.fig']));;
             delete(aFig);
             delete(bFig);
          end

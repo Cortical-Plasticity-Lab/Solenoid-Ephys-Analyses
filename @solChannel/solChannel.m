@@ -292,8 +292,8 @@ classdef solChannel < handle
          edges = getSpikeBinEdges(obj); %#ok<*PROP>
          
          trials = getTrials(obj,trialType);
-         vec = round(edges(1)*obj.fs_d) : round(edges(end)*obj.fs_d);
-         itrials = round(trials * obj.fs_d);
+         vec = round(edges(1)*obj.fs) : round(edges(end)*obj.fs);
+         itrials = round(trials * obj.fs);
          itrials = reshape(itrials,numel(itrials),1);
          
          t = vec / obj.fs * 1e3;
@@ -779,9 +779,8 @@ classdef solChannel < handle
             return;
          end         
          [x,t] = obj.getAlignedFilt(trialType);
-         
          if makeNewFig
-            fig = figure('Name',sprintf('%s: %s average LFP (%s trials)',...
+            fig = figure('Name',sprintf('%s: %s average Filt (%s trials)',...
                obj.Parent.Name,obj.Name,char(trialType)),...
                'Color','w',...
                'Units','Normalized',...
@@ -789,13 +788,13 @@ classdef solChannel < handle
          end
          idx = randi(size(x,1), 20, 1);
          y = x(idx,:);
-         
+        
          p = plot(t, y,...
 ...             'Color',pars.col{obj.Hemisphere},...
             'LineWidth', 1);
          
          xlim([-250 500]);
-         ylim([-150 150]);
+         ylim([-50 50]);
          
          obj.addStimulusMarkers(gca,p);
          solChannel.addAxesLabels(gca,obj.Name,'Time (ms)','Filt (\muV)');         
