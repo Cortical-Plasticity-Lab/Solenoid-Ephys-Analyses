@@ -17,7 +17,7 @@ end
 
 Type = string(unique(T.Type));
 Area = string(unique(T.Area));
-Component = ["ICA_Noise","ICA_Late","ICA_Early"];
+Component = ["ICA_Comp1","ICA_Comp2","ICA_Comp3"];
 nType = numel(Type);
 nArea = numel(Area);
 
@@ -39,16 +39,16 @@ R = cell(nType,1);
 for ii = 1:nType
    [fig,ica_mdl{ii},z{ii},R{ii}] = ...
       analyze.factors.pcs_ics(t,coeff{ii},rate{ii},Type(ii));
-   io.optSaveFig(fig,'figures/pca_stats/conditions',...
-      sprintf('%s PCs and ICs',Type(ii)));
+%    io.optSaveFig(fig,'figures/pca_stats/conditions',...
+%       sprintf('%s PCs and ICs',Type(ii)));
 end
 
 %% 3. Plot PCs/ICs -- %-explained
 % Plot % explained by PC
 for ii = 1:nType
    fig = analyze.factors.pcs_explained(explained{ii},Type(ii),R{ii});
-   io.optSaveFig(fig,'figures/pca_stats/conditions',...
-      sprintf('%s PCA - Percent Explained',Type(ii)));
+%    io.optSaveFig(fig,'figures/pca_stats/conditions',...
+%       sprintf('%s PCA - Percent Explained',Type(ii)));
 end
 
 %% 4. Plot means by area/condition
@@ -73,7 +73,7 @@ for iC = 1:numel(Component)
       end
    end
 end
-st = Stats(Stats.component=="ICA_Early",:);
+st = Stats(Stats.component=="ICA_Comp2",:);
 y = reshape(st.Mean,2,3);
 s = reshape(st.SEM,2,3);
 fig = figure('Name','ICA Means by Group','Color','w');
@@ -93,5 +93,5 @@ title(gca, 'ICA Means by Group','Color','k','FontName','Arial');
 ylabel(gca,'E[Weight]','Color','k','FontName','Arial');
 set(gca,'XTickLabels',Type);
 legend(gca,'Location','Northwest');
-io.optSaveFig(fig,'figures/pca_stats/conditions','ICA - Early - Group Means');
-io.optSaveFig(icaFig,'figures/pca_stats/conditions','ICs');
+% io.optSaveFig(fig,'figures/pca_stats/conditions','ICA - Early - Group Means');
+% io.optSaveFig(icaFig,'figures/pca_stats/conditions','ICs');

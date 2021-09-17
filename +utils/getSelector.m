@@ -11,6 +11,10 @@ function C = getSelector(varargin)
 %  C = utils.getSelector("Type","Solenoid","Type","Solenoid + ICMS");
 %  -> Selector takes Solenoid or Solenoid + ICMS trials from either area.
 %
+%  Example 3
+%  C = utils.getSelector("Type", ["Solenoid", "Solenoid + ICMS"], "Area", "RFA");
+%  -> Selector takes Solenoid or Solenoid + ICMS trials from RFA only.
+%
 % Inputs
 %  varargin - <'Variable',Value> keyword argument pairs. If a given
 %              argument is an array, both elements of pair must have same
@@ -39,12 +43,6 @@ for iV = 1:2:N
       C(iC).Value = string(varargin{iV+1});
    else
       C(iC).Value = varargin{iV+1};
-   end
-   if numel(C(iC).Variable) ~= numel(C(iC).Value)
-      error([...
-         '<strong>Number of elements in selector (`C`) element %d does not match.</strong>\n' ...
-         '->\t(%d in `Variable` but %d in `Value` field)'],...
-         iC,numel(C(iC).Variable),numel(C(iC).Value));
    end
 end
 

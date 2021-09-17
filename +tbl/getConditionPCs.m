@@ -24,7 +24,7 @@ if nargin < 3
 end
 
 if nargin < 2
-   C = utils.getSelector('Type','Solenoid','Type','Solenoid + ICMS');
+    C = utils.getSelector("Type", ["Solenoid", "ICMS", "Solenoid + ICMS"]);
 end
 
 % Return logical "mask" vector and select only those rows.

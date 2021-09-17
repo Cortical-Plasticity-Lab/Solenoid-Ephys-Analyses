@@ -13,13 +13,13 @@ function [S,fig] = label_ics(S,z,t,w)
 %
 % See also: Contents, analyze.factors.getICs
 
-S.ICA_Noise = z(:,1); % First IC is "noise floor" component - how active is the channel?
+S.ICA_Comp1 = z(:,1); % First IC is "noise floor" component - how active is the channel?
 % --> This should be used as a covariate for the
 %     other two, which are the responses of interest.
 
-S.ICA_Late = z(:,2);  % Second IC is "late" component
+S.ICA_Comp2 = z(:,2);  % Second IC is "late" component
 
-S.ICA_Early = z(:,3); % Third IC is "early" component
+S.ICA_Comp3 = z(:,3); % Third IC is "early" component
 
 if nargin < 4
     fig = [];
@@ -31,7 +31,7 @@ fig = figure('Name', 'Independent Components',...
     'PaperUnits','inches','PaperType','usletter','NumberTitle','off');
 ax = axes(fig, 'NextPlot', 'add', 'XColor', 'k', 'YColor', 'k', ...
     'FontName', 'Arial');
-f = ["ICA_{Noise}", "ICA_{Late}", "ICA_{Early}"];
+f = ["ICA_{Comp1}", "ICA_{Comp2}", "ICA_{Comp3}"];
 for ii = 1:3
     plot(ax, t, w(:, ii), ...
         'DisplayName', f(ii), ...

@@ -13,15 +13,15 @@ function iRow = selector2mask(C,T)
 %
 % See also: Contents
 
-iRow = false(size(T,1),1);
+iRow = true(size(T,1),1);
 for iC = 1:numel(C)
    % Get logical AND (arrays within each field of element in `C`)
-   iThis = true(size(T,1),1);   
-   for ii = 1:numel(C(iC).Variable)
-      iThis = iThis & T.(C(iC).Variable(ii)) == C(iC).Value(ii);
+   iThis = false(size(T,1),1);   
+   for ii = 1:numel(C(iC).Value)
+      iThis = iThis | T.(C(iC).Variable) == C(iC).Value(ii);
    end
    % Get logical OR (each unique element in struct array `C`)
-   iRow = iRow | iThis;
+   iRow = iRow & iThis;
 end
 
 end
