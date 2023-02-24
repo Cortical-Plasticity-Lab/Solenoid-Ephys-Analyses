@@ -14,6 +14,18 @@ idxT(6:45) = 1; % middle 200ms, avoids beginning and end of baseline/prestim per
 idxS(61:75) = 1; % 50-125ms after 0 timepoint
 idxT = logical(idxT);
 idxS = logical(idxS);
+
+% % Confirm indexing by making figure % %
+fig = figure('Name', 'Indexing Confirmation','Color','w');
+ax = axes(fig, 'NextPlot', 'add', 'YLim', [-0.5, 1.5], ...
+    'YTick', [0 1], 'YTickLabel', {'Unused', 'Used'});
+stem(ax, t.Spikes.*1e3, double(idxT), 'Color', 'k', 'LineWidth', 2, 'DisplayName', 'idxT');
+stem(ax, t.Spikes.*1e3, double(idxS), 'Color', 'b', 'LineWidth', 2, 'DisplayName', 'idxS');
+xlabel(ax, 'Time (ms)', 'FontName','Tahoma');
+ylabel(ax, 'Indexing Mask', 'FontName', 'Tahoma');
+title(ax, 'Set Up Indexing', 'FontName', 'Tahoma');
+legend(ax);
+
 %% index channels/blocks in S1 and find z scores
 idxC = T.Area == "S1" & T.Type == "Solenoid";
 st = T(idxC,:).Rate(:,idxT);
