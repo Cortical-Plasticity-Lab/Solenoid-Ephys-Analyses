@@ -186,4 +186,14 @@ for iType = 1:2
     legend(ax);
 end
 
+if nargout < 1
+    outdir = 'figures/glme_prediction_stats';
+    if exist(outdir, 'dir')==0
+        mkdir(outdir);
+    end
+    io.optSaveFig(fig(1), fullfile(outdir, 'GLME_Full_Predictions_Volume_ICEarly_ICLate'));
+    io.optSaveFig(fig(2), fullfile(outdir, 'GLME_Marginal_Predictions_Volume_ICEarly_ICLate'));
+    io.optSaveFig(fig(3), fullfile(outdir, 'GLME_Marginal_Predictions_by_Stimulus_by_Volume_ICEarly_ICLate'));
+end
+
 end
