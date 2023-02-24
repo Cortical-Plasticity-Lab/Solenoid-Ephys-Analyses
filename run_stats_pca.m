@@ -16,15 +16,24 @@ end
 % Start: response is evoked activity **FROM SOLENOID**
 % -> Create "SOLENOID" table with only SOLENOID or SOLENOID+ICMS trials.
 % --> (Table is `S`)
-[coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
-figExplained = analyze.factors.pcs_explained(explained);
-[figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
-% S = analyze.factors.label_ics(S,z);
-[S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
-icFig2 = figure('Name', 'IC Weights for all Channels', 'Color', 'w'); 
-plot(z);
-xlabel('Channel');
-ylabel('Weight');
+if exist('run_stats_pca_S.mat', 'file')==0
+    C = utils.getSelector("Type", ["Solenoid", "Solenoid + ICMS"]);
+    [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T, C);
+    figExplained = analyze.factors.pcs_explained(explained);
+    [figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
+    % S = analyze.factors.label_ics(S,z);
+    [S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
+    icFig2 = figure('Name', 'IC Weights for all Channels', 'Color', 'w'); 
+    plot(z);
+    xlabel('Channel');
+    ylabel('Weight');
+    S.Properties.VariableNames{27} = 'ICA_Noise';
+    S.Properties.VariableNames{28} = 'ICA_Early';
+    S.Properties.VariableNames{29} = 'ICA_Late';
+    save('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't', '-v7.3');
+else
+    load('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't');
+end
 
 io.optSaveFig(figExplained,'figures/pca_stats','Solenoid PCA - Percent Explained');
 io.optSaveFig(figScores,'figures/pca_stats','Solenoid PCs and ICs');
@@ -35,6 +44,9 @@ io.optSaveFig(icFig2,'figures/pca_stats','IC Weights for all Channels');
 mdl = struct;
 mdl.volume.late = fitglme(S,'ICA_Late~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
 mdl.volume.early = fitglme(S,'ICA_Early~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.volume.by_type = struct;
+mdl.volume.by_type.late = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.volume.by_type.early = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
 
 %% 3. Describe response modulation by Area and Type
 mdl.area.late = fitglme(S, 'ICA_Late~Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
