@@ -16,15 +16,23 @@ end
 % Start: response is evoked activity **FROM SOLENOID**
 % -> Create "SOLENOID" table with only SOLENOID or SOLENOID+ICMS trials.
 % --> (Table is `S`)
-[coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
-figExplained = analyze.factors.pcs_explained(explained);
-[figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
-% S = analyze.factors.label_ics(S,z);
-[S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
-icFig2 = figure('Name', 'IC Weights for all Channels', 'Color', 'w'); 
-plot(z);
-xlabel('Channel');
-ylabel('Weight');
+if exist('run_stats_pca_S.mat', 'file')==0
+    [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T);
+    figExplained = analyze.factors.pcs_explained(explained);
+    [figScores,ica_mdl,z] = analyze.factors.pcs_ics(t,coeff,Y);
+    % S = analyze.factors.label_ics(S,z);
+    [S, icaFig] = analyze.factors.label_ics(S,z,t,ica_mdl.TransformWeights);
+    icFig2 = figure('Name', 'IC Weights for all Channels', 'Color', 'w'); 
+    plot(z);
+    xlabel('Channel');
+    ylabel('Weight');
+    S.Properties.VariableNames{27} = 'ICA_Noise';
+    S.Properties.VariableNames{28} = 'ICA_Early';
+    S.Properties.VariableNames{29} = 'ICA_Late';
+    save('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't', '-v7.3');
+else
+    load('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't');
+end
 
 io.optSaveFig(figExplained,'figures/pca_stats','Solenoid PCA - Percent Explained');
 io.optSaveFig(figScores,'figures/pca_stats','Solenoid PCs and ICs');
