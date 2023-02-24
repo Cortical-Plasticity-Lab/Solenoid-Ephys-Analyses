@@ -1,5 +1,11 @@
-%% set indices
-% load Reduced-Table.mat
+%% clear workspace and load data
+clearvars -except T;
+clc;
+if (exist('T', 'var')==0) || (~isTable(T)) % To avoid issue commenting/uncommenting
+    load Reduced-Table.mat
+end
+
+%% setup indexing
 t = T.Properties.UserData.t;
 l = zeros(1,150);
 idxT = l;
