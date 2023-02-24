@@ -126,4 +126,64 @@ title(L, 'GLME: Marginal Predictions + 95% CI', 'FontName', 'Tahoma');
 subtitle(L, '(ICs by Lesion Volume)', 'FontName', 'Tahoma');
 legend(ax);
 
+fig(3) = figure('Name', "IC by VOLUME - MEANS BY STIMULUS", 'Color', 'w', ...
+    'Position', [479    91   901   813]);
+L = tiledlayout(fig(3), 2, 2);
+
+uType = ["Solenoid", "Solenoid + ICMS"];
+for iType = 1:2
+    ax = nexttile(L);
+    set(ax, 'NextPlot', 'add', 'FontName', 'Tahoma', 'XColor', 'k', 'YColor', 'k');
+    
+    [ypred, ypredCI] = predict(volumeModel.early);
+    S = volumeModel.early.Variables;
+    [G, S_marg] = findgroups(S(:, {'Area', 'Lesion_Volume', 'Type'}));
+    S_marg.ICA_Early = splitapply(@mean, S.ICA_Early, G);
+    iRFA = strcmpi(S_marg.Area, "RFA") & strcmpi(S_marg.Type, uType(iType));
+    iS1 = strcmpi(S_marg.Area, "S1") & strcmpi(S_marg.Type, uType(iType));
+    scatter(ax, S_marg.Lesion_Volume(iRFA), S_marg.ICA_Early(iRFA), 'filled', ...
+        'Color', color.RFA, 'MarkerEdgeColor', color.RFA, 'MarkerFaceColor', color.RFA, ...
+        'DisplayName', 'RFA');
+    scatter(ax, S_marg.Lesion_Volume(iS1), S_marg.ICA_Early(iS1), 'filled', ...
+        'Color', color.S1, 'MarkerEdgeColor', color.S1, 'MarkerFaceColor', color.S1, ...
+        'DisplayName', 'S1');
+    errorbar(S_marg.Lesion_Volume(iRFA), ypred(iRFA), ypredCI(iRFA,1), ypredCI(iRFA,2),...
+        'DisplayName', 'RFA + 95% CI', 'Color', color.RFA, 'LineWidth', 2);
+    errorbar(S_marg.Lesion_Volume(iS1), ypred(iS1), ypredCI(iS1,1), ypredCI(iS1,2),...
+        'DisplayName', 'S1 + 95% CI', 'Color', color.S1, 'LineWidth', 2);
+    legend(ax, 'Location', 'Best');
+    xlabel(ax, sprintf('Lesion Volume (%s)', S.Properties.VariableUnits{strcmpi(S.Properties.VariableNames, 'Lesion_Volume')}), ...
+        'FontName', 'Tahoma');
+    ylabel(ax, 'Score', 'FontName', 'Tahoma');
+    title(ax, sprintf('Early IC (%s)', uType(iType)), 'FontName', 'Tahoma');
+    
+    ax = nexttile(L);
+    set(ax, 'NextPlot', 'add', 'FontName', 'Tahoma', 'XColor', 'k', 'YColor', 'k');
+    [ypred, ypredCI] = predict(volumeModel.late);
+    S = volumeModel.late.Variables;
+    [G, S_marg] = findgroups(S(:, {'Area', 'Lesion_Volume', 'Type'}));
+    S_marg.ICA_Late = splitapply(@mean, S.ICA_Late, G);
+    iRFA = strcmpi(S_marg.Area, "RFA") & strcmpi(S_marg.Type, uType(iType));
+    iS1 = strcmpi(S_marg.Area, "S1") & strcmpi(S_marg.Type, uType(iType));
+    scatter(ax, S_marg.Lesion_Volume(iRFA), S_marg.ICA_Late(iRFA), 'filled', ...
+        'Color', color.RFA, 'MarkerEdgeColor', color.RFA, 'MarkerFaceColor', color.RFA, ...
+        'DisplayName', 'RFA');
+    scatter(ax, S_marg.Lesion_Volume(iS1), S_marg.ICA_Late(iS1), 'filled', ...
+        'Color', color.S1, 'MarkerEdgeColor', color.S1, 'MarkerFaceColor', color.S1, ...
+        'DisplayName', 'S1');
+    errorbar(S_marg.Lesion_Volume(iRFA), ypred(iRFA), ypredCI(iRFA,1), ypredCI(iRFA,2),...
+        'DisplayName', 'RFA + 95% CI', 'Color', color.RFA, 'LineWidth', 2);
+    errorbar(S_marg.Lesion_Volume(iS1), ypred(iS1), ypredCI(iS1,1), ypredCI(iS1,2),...
+        'DisplayName', 'S1 + 95% CI', 'Color', color.S1, 'LineWidth', 2);
+    legend(ax, 'Location', 'Best');
+    xlabel(ax, sprintf('Lesion Volume (%s)', S.Properties.VariableUnits{strcmpi(S.Properties.VariableNames, 'Lesion_Volume')}), ...
+        'FontName', 'Tahoma');
+    ylabel(ax, 'Score', 'FontName', 'Tahoma');
+    title(ax, sprintf('Late IC (%s)', uType(iType)), 'FontName', 'Tahoma');
+    
+    title(L, 'GLME: Marginal Predictions + 95% CI', 'FontName', 'Tahoma');
+    subtitle(L, '(ICs by Lesion Volume)', 'FontName', 'Tahoma');
+    legend(ax);
+end
+
 end
