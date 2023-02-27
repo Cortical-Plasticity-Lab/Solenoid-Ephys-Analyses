@@ -24,6 +24,7 @@ if nargin < 3
 end
 
 if nargin < 2
+%    C = utils.getSelector('Type','Solenoid','Type','Solenoid + ICMS');
     C = utils.getSelector("Type", ["Solenoid", "Solenoid + ICMS"]);
 end
 

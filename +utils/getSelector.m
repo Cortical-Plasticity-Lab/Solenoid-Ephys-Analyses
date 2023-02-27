@@ -31,19 +31,31 @@ if rem(N,2)~=0
    error('Must have an even number (pairs) of input arguments!');
 end
 n = N/2;
-C = struct(...
+c = struct(...
    'Variable',cell(n,1),...
    'Value',cell(n,1) ...
    );
 iC = 0;
 for iV = 1:2:N
    iC = iC + 1;
-   C(iC).Variable = string(varargin{iV});
+   c(iC).Variable = string(varargin{iV});
    if ischar(varargin{iV+1}) || iscategorical(varargin{iV+1})
-      C(iC).Value = string(varargin{iV+1});
+      c(iC).Value = string(varargin{iV+1});
    else
-      C(iC).Value = varargin{iV+1};
+      c(iC).Value = varargin{iV+1};
    end
+end
+
+vars = vertcat(c.Variable);
+[vars, ~, iC] = unique(vars);
+vars = cellstr(vars);
+vals = cell(numel(vars),1);
+for ii = 1:numel(iC)
+    vals{iC(ii)} = [vals{iC(ii)}; c(ii).Value];
+end
+C = struct('Variable', vars, 'Value', vals);
+for ii = 1:numel(C)
+    C(ii).Variable = string(C(ii).Variable); 
 end
 
 end
