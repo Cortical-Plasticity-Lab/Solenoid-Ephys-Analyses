@@ -17,6 +17,10 @@ end
 % -> Create "SOLENOID" table with only SOLENOID or SOLENOID+ICMS trials.
 % --> (Table is `S`)
 if exist('run_stats_pca_S.mat', 'file')==0
+    l = false(1,numel(T.Properties.UserData.t.Spikes));
+    idx = struct('t', struct('Baseline', l, 'Trial', l));
+    idx.t.Baseline(6:45) = true; % middle 200ms, avoids beginning and end of baseline/prestim period
+    idx.t.Trial(61:75) = true; % 50-125ms after 0 timepoint
     C = utils.getSelector("Type", ["Solenoid", "Solenoid + ICMS"]);
     [coeff,score,explained,S,Y,t] = tbl.getConditionPCs(T, C);
     figExplained = analyze.factors.pcs_explained(explained);
@@ -30,7 +34,8 @@ if exist('run_stats_pca_S.mat', 'file')==0
     S.Properties.VariableNames{27} = 'ICA_Noise';
     S.Properties.VariableNames{28} = 'ICA_Early';
     S.Properties.VariableNames{29} = 'ICA_Late';
-    save('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't', '-v7.3');
+    S.Exclude = mean(S.Rate(:, idx.t.Baseline), 2) < 2.4;
+    save('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't', 'idx', '-v7.3');
 else
     load('run_stats_pca_S.mat', 'S', 'ica_mdl', 'z', 'coeff', 'score', 'explained', 'Y', 't');
 end
@@ -42,29 +47,43 @@ io.optSaveFig(icFig2,'figures/pca_stats','IC Weights for all Channels');
 
 %% 2. Define GLME for lesion volume related to response
 mdl = struct;
-mdl.volume.late = fitglme(S,'ICA_Late~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
-mdl.volume.early = fitglme(S,'ICA_Early~Lesion_Volume*Area+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.volume.late = fitglme(S,'ICA_Late~Lesion_Volume*Area+(ICA_Noise|AnimalID)', ...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
+mdl.volume.early = fitglme(S,'ICA_Early~Lesion_Volume*Area+(ICA_Noise|AnimalID)', ...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
 mdl.volume.by_type = struct;
-mdl.volume.by_type.late = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
-mdl.volume.by_type.early = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.volume.by_type.late = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)', ...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
+mdl.volume.by_type.early = fitglme(S,'ICA_Late~Lesion_Volume*Area*Type+(ICA_Noise|AnimalID)', ...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
 
 %% 3. Describe response modulation by Area and Type
-mdl.area.late = fitglme(S, 'ICA_Late~Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
-mdl.area.early = fitglme(S, 'ICA_Early~Area*Type+(ICA_Noise|AnimalID)','DummyVarCoding','effects');
+mdl.area.late = fitglme(S, 'ICA_Late~Area*Type+(ICA_Noise|AnimalID)',...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
+mdl.area.early = fitglme(S, 'ICA_Early~Area*Type+(ICA_Noise|AnimalID)', ...
+    'DummyVarCoding','effects', ...
+    'Exclude', S.Exclude);
 
 %% 4. Describe response modulation when ICMS is applied
 mdl.icms.late = fitglme(S,'ICA_Late~Area*Type*Lesion_Volume+(ICA_Noise|AnimalID)',...
-   'DummyVarCoding','effects');
+   'DummyVarCoding','effects', ...
+   'Exclude', S.Exclude);
 mdl.icms.early = fitglme(S,'ICA_Early~Area*Type*Lesion_Volume+(ICA_Noise|AnimalID)',...
-   'DummyVarCoding','effects');
+   'DummyVarCoding','effects', ...
+   'Exclude', S.Exclude);
 
 %% 5. Describe response modulation in only S1
 mdl.S1.late = fitglme(S,'ICA_Late~Type*Lamina*Lesion_Volume-Type:Lamina:Lesion_Volume+(ICA_Noise|AnimalID)',...
    'DummyVarCoding','effects',...
-   'Exclude',S.Area=="RFA");
+   'Exclude',(S.Area=="RFA") | S.Exclude);
 mdl.S1.early = fitglme(S,'ICA_Early~Type*Lamina*Lesion_Volume-Type:Lamina:Lesion_Volume+(ICA_Noise|AnimalID)',...
    'DummyVarCoding','effects',...
-   'Exclude',S.Area=="RFA");
+   'Exclude',(S.Area=="RFA") | S.Exclude);
 
 %% 6. Export any associated figures
 [covFig,residFig] = utils.showModelInfo(mdl.volume.early,'VOLUME - EARLY');
